@@ -1,0 +1,416 @@
+/**
+ * ChatGPT Fluent Connector - Response Logs Styles with Token Display
+ * Save this as: assets/css/logs-styles.css
+ */
+
+/* General Styles */
+.sfaic-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 3px;
+}
+
+.sfaic-badge-success {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.sfaic-badge-error {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+/* API Provider Badges */
+.sfaic-api-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sfaic-api-badge.openai {
+    background-color: #74aa9c;
+    color: #fff;
+}
+
+.sfaic-api-badge.gemini {
+    background-color: #4285f4;
+    color: #fff;
+}
+
+.sfaic-api-badge.claude {
+    background-color: #d4a574;
+    color: #fff;
+}
+
+/* Token Usage Statistics Section */
+.sfaic-token-stats {
+    background: #f8f9fa;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.sfaic-token-stats h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 20px;
+    color: #333;
+}
+
+.sfaic-token-stats .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.sfaic-token-stats .stat-box {
+    background: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.sfaic-token-stats .stat-box h3 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sfaic-token-stats .stat-box p {
+    margin: 5px 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+}
+
+.sfaic-token-stats .stat-box p strong {
+    color: #555;
+}
+
+.sfaic-token-stats .stat-box p span {
+    font-weight: 600;
+    color: #333;
+}
+
+/* Table Enhancements */
+.wp-list-table .column-tokens {
+    text-align: center;
+}
+
+.wp-list-table .token-warning {
+    color: #e74c3c;
+    font-weight: 600;
+}
+
+/* Log Details View */
+.sfaic-content-box {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 20px;
+    margin-top: 10px;
+}
+
+.sfaic-code-block {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 15px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.sfaic-error-message {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 12px 20px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* Response View Tabs */
+.sfaic-response-tabs {
+    border-bottom: 2px solid #ddd;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sfaic-view-toggle {
+    display: inline-block;
+    padding: 8px 16px;
+    margin-right: 10px;
+    border: none;
+    background: none;
+    color: #0073aa;
+    cursor: pointer;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.sfaic-view-toggle:hover {
+    color: #005a87;
+}
+
+.sfaic-view-toggle.active {
+    color: #333;
+    border-bottom-color: #0073aa;
+}
+
+.sfaic-copy-response {
+    margin-left: auto !important;
+}
+
+.sfaic-response-view {
+    min-height: 100px;
+}
+
+.sfaic-rendered-response {
+    padding: 15px;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    line-height: 1.6;
+}
+
+.sfaic-rendered-response h1,
+.sfaic-rendered-response h2,
+.sfaic-rendered-response h3,
+.sfaic-rendered-response h4,
+.sfaic-rendered-response h5,
+.sfaic-rendered-response h6 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.sfaic-rendered-response p {
+    margin-bottom: 15px;
+}
+
+.sfaic-rendered-response ul,
+.sfaic-rendered-response ol {
+    margin-bottom: 15px;
+    padding-left: 30px;
+}
+
+/* Form Data Table */
+.sfaic-form-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.sfaic-form-data-table th,
+.sfaic-form-data-table td {
+    padding: 10px 15px;
+    text-align: left;
+    border: 1px solid #ddd;
+}
+
+.sfaic-form-data-table th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+}
+
+.sfaic-form-data-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Token Usage Box */
+.postbox.token-usage {
+    border-left: 4px solid #0073aa;
+}
+
+.token-usage-bar {
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    height: 20px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.token-usage-fill {
+    background-color: #0073aa;
+    height: 100%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.token-usage-fill.warning {
+    background-color: #f39c12;
+}
+
+.token-usage-fill.danger {
+    background-color: #e74c3c;
+}
+
+/* Filters Section */
+.tablenav .alignleft.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.tablenav .alignleft.actions select,
+.tablenav .alignleft.actions input[type="date"] {
+    height: 32px;
+    line-height: 30px;
+}
+
+/* Error States */
+tr.error {
+    background-color: #fff5f5;
+}
+
+tr.error:hover {
+    background-color: #ffe8e8;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 782px) {
+    .sfaic-token-stats .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .tablenav .alignleft.actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .tablenav .alignleft.actions select,
+    .tablenav .alignleft.actions input {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .sfaic-response-tabs {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sfaic-copy-response {
+        margin-top: 10px;
+        width: 100%;
+    }
+}
+
+/* Loading States */
+.sfaic-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.sfaic-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0,0,0,.1);
+    border-radius: 50%;
+    border-top-color: #0073aa;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Tooltips */
+[title] {
+    position: relative;
+    cursor: help;
+}
+
+/* Notice Styles */
+.notice.inline {
+    margin: 15px 0;
+}
+
+/* Print Styles */
+@media print {
+    .sfaic-response-tabs,
+    .sfaic-copy-response,
+    .tablenav,
+    .page-title-action {
+        display: none !important;
+    }
+    
+    .sfaic-content-box,
+    .sfaic-code-block {
+        border: 1px solid #999;
+        page-break-inside: avoid;
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.dashicons.spin {
+    animation: spin 1s linear infinite;
+}
+
+
+/* JSON Download Buttons */
+.postbox .button-secondary .dashicons {
+    font-size: 16px;
+    line-height: 1.2;
+    margin-right: 3px;
+}
+
+.postbox .button-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Template vs Processed Prompt Styling */
+.sfaic-content-box {
+    position: relative;
+}
+
+.sfaic-content-box pre {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    padding: 15px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Highlight placeholders in template */
+.sfaic-content-box pre .placeholder {
+    background-color: #fff3cd;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+}
