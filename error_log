@@ -1,5 +1,0 @@
-[02-Jul-2025 17:57:12 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function cgptfc_main() in /home/aromapnl/public_html/wp-content/plugins/AromaPro-Lifestyle-Assessment-master/direct-processor.php:74
-Stack trace:
-#0 /home/aromapnl/public_html/wp-content/plugins/AromaPro-Lifestyle-Assessment-master/direct-processor.php(301): process_entry(49862, 1482, 39)
-#1 {main}
-  thrown in /home/aromapnl/public_html/wp-content/plugins/AromaPro-Lifestyle-Assessment-master/direct-processor.php on line 74

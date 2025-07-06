@@ -2,8 +2,8 @@
 /**
  * Plugin Name: AromaPro Smart Forms AI Connector
  * Plugin URI: https://aromapro.com/
- * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing
- * Version: 2.0.7
+ * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing. Now includes api2pdf cloud service integration.
+ * Version: 2.1.0
  * Author: Sanil T S
  * Author URI: https://www.fb.com/sanilts
  * License: GPL-2.0+
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('SFAIC_DIR', plugin_dir_path(__FILE__));
 define('SFAIC_URL', plugin_dir_url(__FILE__));
-define('SFAIC_VERSION', '2.0.0');
+define('SFAIC_VERSION', '2.1.0');
 
 /**
  * Main plugin class
@@ -117,7 +117,7 @@ class SFAIC_Main {
             'includes/class-response-logger.php',
             'includes/class-template-manager.php',
             'includes/class-pdf-generator.php',
-            'includes/class-background-job-manager.php'  // New background job manager
+            'includes/class-background-job-manager.php'  // Background job manager
         );
 
         foreach ($files_to_include as $file) {
@@ -161,7 +161,7 @@ class SFAIC_Main {
             'SFAIC_Response_Logger',
             'SFAIC_Template_Manager',
             'SFAIC_PDF_Generator',
-            'SFAIC_Background_Job_Manager'  // New background job manager
+            'SFAIC_Background_Job_Manager'  // Background job manager
         );
 
         foreach ($required_classes as $class_name) {
@@ -235,7 +235,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Plugin activation
+     * Plugin activation (updated with api2pdf defaults)
      */
     public function plugin_activation() {
         // Make sure the classes are loaded
@@ -304,6 +304,16 @@ class SFAIC_Main {
             update_option('sfaic_job_timeout', 300);
         }
 
+        // Set default PDF service options
+        if (!get_option('sfaic_default_pdf_service')) {
+            // Check if mPDF is available, otherwise suggest api2pdf
+            if (class_exists('Mpdf\Mpdf')) {
+                update_option('sfaic_default_pdf_service', 'mpdf');
+            } else {
+                update_option('sfaic_default_pdf_service', 'api2pdf');
+            }
+        }
+
         // Create uploads directory for PDFs
         $upload_dir = wp_upload_dir();
         $pdf_dir = $upload_dir['basedir'] . '/ai-pdfs';
@@ -338,20 +348,20 @@ class SFAIC_Main {
     }
 
     /**
-     * Add dashboard widget for background jobs monitoring
+     * Add dashboard widget for background jobs monitoring (updated with PDF service info)
      */
     public function add_dashboard_widget() {
         if (current_user_can('manage_options') && isset($this->background_job_manager)) {
             wp_add_dashboard_widget(
                 'sfaic_background_jobs_widget',
-                __('AI Connector - Background Jobs', 'chatgpt-fluent-connector'),
+                __('AI Connector - System Status', 'chatgpt-fluent-connector'),
                 array($this, 'render_dashboard_widget')
             );
         }
     }
 
     /**
-     * Render dashboard widget
+     * Render dashboard widget (enhanced with PDF service status)
      */
     public function render_dashboard_widget() {
         if (!isset($this->background_job_manager)) {
@@ -362,13 +372,28 @@ class SFAIC_Main {
         $stats = $this->background_job_manager->get_job_statistics();
         $background_enabled = $this->background_job_manager->is_background_processing_enabled();
         $jobs_url = admin_url('edit.php?post_type=sfaic_prompt&page=sfaic-background-jobs');
+        
+        // Get PDF service status
+        $default_pdf_service = get_option('sfaic_default_pdf_service', 'mpdf');
+        $mpdf_available = class_exists('Mpdf\Mpdf');
+        $api2pdf_available = !empty(get_option('sfaic_api2pdf_api_key'));
         ?>
         <div class="sfaic-dashboard-widget">
             <div class="sfaic-widget-status">
-                <p>
+                <div style="margin-bottom: 10px;">
                     <span class="status-indicator <?php echo $background_enabled ? 'enabled' : 'disabled'; ?>"></span>
                     <?php echo $background_enabled ? __('Background Processing: Enabled', 'chatgpt-fluent-connector') : __('Background Processing: Disabled', 'chatgpt-fluent-connector'); ?>
-                </p>
+                </div>
+                
+                <div style="margin-bottom: 10px;">
+                    <?php if ($default_pdf_service === 'api2pdf'): ?>
+                        <span class="status-indicator <?php echo $api2pdf_available ? 'enabled' : 'disabled'; ?>"></span>
+                        <?php echo $api2pdf_available ? __('PDF Service: api2pdf (Ready)', 'chatgpt-fluent-connector') : __('PDF Service: api2pdf (API Key Required)', 'chatgpt-fluent-connector'); ?>
+                    <?php else: ?>
+                        <span class="status-indicator <?php echo $mpdf_available ? 'enabled' : 'disabled'; ?>"></span>
+                        <?php echo $mpdf_available ? __('PDF Service: mPDF (Ready)', 'chatgpt-fluent-connector') : __('PDF Service: mPDF (Library Missing)', 'chatgpt-fluent-connector'); ?>
+                    <?php endif; ?>
+                </div>
             </div>
             
             <div class="sfaic-widget-stats">
@@ -448,7 +473,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Display admin notice for first-time setup
+     * Display admin notice for first-time setup (updated with PDF service checks)
      */
     public function admin_setup_notice() {
         $screen = get_current_screen();
@@ -493,6 +518,32 @@ class SFAIC_Main {
                     ?>
                     <a href="<?php echo admin_url('options-general.php?page=sfaic-settings'); ?>" class="button button-primary" style="margin-left: 10px;">
                         <?php _e('Configure Now', 'chatgpt-fluent-connector'); ?>
+                    </a>
+                </p>
+            </div>
+            <?php
+        }
+
+        // Check PDF service availability
+        $default_pdf_service = get_option('sfaic_default_pdf_service', 'mpdf');
+        $show_pdf_notice = false;
+        $pdf_notice_message = '';
+
+        if ($default_pdf_service === 'mpdf' && !class_exists('Mpdf\Mpdf')) {
+            $show_pdf_notice = true;
+            $pdf_notice_message = __('<strong>AI API Connector:</strong> mPDF library is not installed. PDF generation will not work. Please install mPDF or switch to api2pdf service.', 'chatgpt-fluent-connector');
+        } elseif ($default_pdf_service === 'api2pdf' && empty(get_option('sfaic_api2pdf_api_key'))) {
+            $show_pdf_notice = true;
+            $pdf_notice_message = __('<strong>AI API Connector:</strong> api2pdf API key is not configured. Please add your API key or switch to mPDF service.', 'chatgpt-fluent-connector');
+        }
+
+        if ($show_pdf_notice) {
+            ?>
+            <div class="notice notice-warning is-dismissible">
+                <p>
+                    <?php echo $pdf_notice_message; ?>
+                    <a href="<?php echo admin_url('options-general.php?page=sfaic-settings#sfaic_pdf_section'); ?>" class="button button-secondary" style="margin-left: 10px;">
+                        <?php _e('Configure PDF Service', 'chatgpt-fluent-connector'); ?>
                     </a>
                 </p>
             </div>

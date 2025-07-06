@@ -1,6 +1,6 @@
 <?php
 /**
- * AI API Settings Class - Updated with Background Processing Options
+ * AI API Settings Class - Updated with api2pdf PDF Service Options
  * 
  * Handles the plugin settings page and API credentials for multiple providers
  */
@@ -24,6 +24,7 @@ class SFAIC_Settings{
         // Add AJAX handlers for API testing
         add_action('wp_ajax_sfaic_test_api', array($this, 'ajax_test_api'));
         add_action('wp_ajax_sfaic_test_pdf', array($this, 'ajax_test_pdf'));
+        add_action('wp_ajax_sfaic_test_api2pdf', array($this, 'ajax_test_api2pdf'));
         
         // Enqueue admin scripts
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
@@ -60,6 +61,7 @@ class SFAIC_Settings{
             'ajax_url' => admin_url('admin-ajax.php'),
             'test_nonce' => wp_create_nonce('sfaic_test_api'),
             'pdf_nonce' => wp_create_nonce('sfaic_test_pdf'),
+            'api2pdf_nonce' => wp_create_nonce('sfaic_test_api2pdf'),
             'strings' => array(
                 'testing' => __('Testing...', 'chatgpt-fluent-connector'),
                 'success' => __('Success!', 'chatgpt-fluent-connector'),
@@ -152,6 +154,43 @@ class SFAIC_Settings{
         // Test PDF generation
         if (isset(sfaic_main()->pdf_generator)) {
             $result = sfaic_main()->pdf_generator->test_mpdf_library();
+        } else {
+            $result = new WP_Error('pdf_not_available', __('PDF generator is not available', 'chatgpt-fluent-connector'));
+        }
+
+        if (is_wp_error($result)) {
+            wp_send_json(array(
+                'success' => false,
+                'message' => $result->get_error_message()
+            ));
+        } else {
+            wp_send_json(array(
+                'success' => true,
+                'message' => $result['message'],
+                'details' => $result
+            ));
+        }
+    }
+
+    /**
+     * AJAX handler for api2pdf testing
+     */
+    public function ajax_test_api2pdf() {
+        // Check nonce for security
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_test_api2pdf')) {
+            wp_die('Security check failed');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $api_key = sanitize_text_field($_POST['api_key']);
+
+        // Test api2pdf service
+        if (isset(sfaic_main()->pdf_generator)) {
+            $result = sfaic_main()->pdf_generator->test_api2pdf_service($api_key);
         } else {
             $result = new WP_Error('pdf_not_available', __('PDF generator is not available', 'chatgpt-fluent-connector'));
         }
@@ -295,6 +334,12 @@ class SFAIC_Settings{
             'default' => 300
         ));
 
+        // PDF Service Settings
+        register_setting('sfaic_settings', 'sfaic_default_pdf_service', array(
+            'default' => 'mpdf'
+        ));
+        register_setting('sfaic_settings', 'sfaic_api2pdf_api_key');
+
         // OpenAI Settings
         register_setting('sfaic_settings', 'sfaic_api_key');
         register_setting('sfaic_settings', 'sfaic_api_endpoint', array(
@@ -376,6 +421,30 @@ class SFAIC_Settings{
                 array($this, 'job_timeout_field_callback'),
                 'sfaic_settings',
                 'sfaic_background_section'
+        );
+
+        // PDF Services Section
+        add_settings_section(
+                'sfaic_pdf_section',
+                __('PDF Generation Settings', 'chatgpt-fluent-connector'),
+                array($this, 'pdf_section_callback'),
+                'sfaic_settings'
+        );
+
+        add_settings_field(
+                'sfaic_default_pdf_service',
+                __('Default PDF Service', 'chatgpt-fluent-connector'),
+                array($this, 'default_pdf_service_field_callback'),
+                'sfaic_settings',
+                'sfaic_pdf_section'
+        );
+
+        add_settings_field(
+                'sfaic_api2pdf_api_key',
+                __('api2pdf API Key', 'chatgpt-fluent-connector'),
+                array($this, 'api2pdf_api_key_field_callback'),
+                'sfaic_settings',
+                'sfaic_pdf_section'
         );
 
         // OpenAI Section
@@ -473,14 +542,138 @@ class SFAIC_Settings{
                 'sfaic_settings',
                 'sfaic_claude_section'
         );
+    }
 
-        // PDF Section
-        add_settings_section(
-                'sfaic_pdf_section',
-                __('PDF Generation Settings', 'chatgpt-fluent-connector'),
-                array($this, 'pdf_section_callback'),
-                'sfaic_settings'
-        );
+    // ... (keep all existing section callbacks unchanged)
+
+    /**
+     * PDF section description (updated)
+     */
+    public function pdf_section_callback() {
+        echo '<div style="background: #e8f5e8; padding: 20px; margin: 15px 0; border-left: 4px solid #28a745; border-radius: 0 3px 3px 0;">';
+        echo '<h3 style="margin-top: 0;">' . esc_html__('📄 PDF Generation Services', 'chatgpt-fluent-connector') . '</h3>';
+        echo '<p>' . esc_html__('Choose between local mPDF generation or cloud-based api2pdf service for creating PDF documents from AI responses.', 'chatgpt-fluent-connector') . '</p>';
+
+        echo '<div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-top: 15px;">';
+        echo '<h4 style="margin-top: 0; color: #28a745;">🔧 ' . esc_html__('Available PDF Services', 'chatgpt-fluent-connector') . '</h4>';
+        echo '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0;">';
+        
+        // Local mPDF info
+        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
+        echo '<h5 style="margin-top: 0; color: #333;">🏠 Local mPDF</h5>';
+        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
+        echo '<li>✅ ' . esc_html__('No external dependencies', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Works offline', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('No API costs', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Privacy friendly', 'chatgpt-fluent-connector') . '</li>';
+        echo '</ul>';
+        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
+        if (class_exists('Mpdf\Mpdf')) {
+            echo '<span style="color: #28a745;">✅ Available</span>';
+        } else {
+            echo '<span style="color: #dc3545;">❌ Library Missing</span>';
+        }
+        echo '</p></div>';
+
+        // api2pdf info
+        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
+        echo '<h5 style="margin-top: 0; color: #333;">☁️ api2pdf Cloud Service</h5>';
+        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
+        echo '<li>✅ ' . esc_html__('Professional quality rendering', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Enterprise-grade reliability', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Scalable for high volume', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Advanced HTML/CSS support', 'chatgpt-fluent-connector') . '</li>';
+        echo '</ul>';
+        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
+        $api2pdf_key = get_option('sfaic_api2pdf_api_key');
+        if (!empty($api2pdf_key)) {
+            echo '<span style="color: #28a745;">✅ API Key Configured</span>';
+        } else {
+            echo '<span style="color: #ffc107;">⚠️ API Key Required</span>';
+        }
+        echo '</p></div>';
+
+        echo '</div></div>';
+
+        echo '</div>';
+    }
+
+    /**
+     * Default PDF service field
+     */
+    public function default_pdf_service_field_callback() {
+        $default_service = get_option('sfaic_default_pdf_service', 'mpdf');
+        $mpdf_available = class_exists('Mpdf\Mpdf');
+        $api2pdf_available = !empty(get_option('sfaic_api2pdf_api_key'));
+        ?>
+        <select name="sfaic_default_pdf_service" id="sfaic_default_pdf_service">
+            <option value="mpdf" <?php selected($default_service, 'mpdf'); ?>>
+                <?php echo esc_html__('Local mPDF', 'chatgpt-fluent-connector'); ?>
+                <?php if (!$mpdf_available): ?>
+                    <?php echo esc_html__('(Not Available)', 'chatgpt-fluent-connector'); ?>
+                <?php endif; ?>
+            </option>
+            <option value="api2pdf" <?php selected($default_service, 'api2pdf'); ?>>
+                <?php echo esc_html__('api2pdf Cloud Service', 'chatgpt-fluent-connector'); ?>
+                <?php if (!$api2pdf_available): ?>
+                    <?php echo esc_html__('(API Key Required)', 'chatgpt-fluent-connector'); ?>
+                <?php endif; ?>
+            </option>
+        </select>
+        <p class="description">
+            <?php echo esc_html__('Choose the default PDF generation service for new prompts. You can override this setting for individual prompts.', 'chatgpt-fluent-connector'); ?>
+            <br><strong><?php echo esc_html__('Note:', 'chatgpt-fluent-connector'); ?></strong> 
+            <?php echo esc_html__('If the selected service is unavailable, the system will automatically fall back to mPDF if available.', 'chatgpt-fluent-connector'); ?>
+        </p>
+
+        <!-- Service status indicators -->
+        <div style="margin-top: 15px;">
+            <div class="service-status" style="display: inline-block; margin-right: 20px;">
+                <strong><?php echo esc_html__('mPDF Status:', 'chatgpt-fluent-connector'); ?></strong>
+                <?php if ($mpdf_available): ?>
+                    <span style="color: #28a745;">✅ <?php echo esc_html__('Available', 'chatgpt-fluent-connector'); ?></span>
+                <?php else: ?>
+                    <span style="color: #dc3545;">❌ <?php echo esc_html__('Library Missing', 'chatgpt-fluent-connector'); ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="service-status" style="display: inline-block;">
+                <strong><?php echo esc_html__('api2pdf Status:', 'chatgpt-fluent-connector'); ?></strong>
+                <?php if ($api2pdf_available): ?>
+                    <span style="color: #28a745;">✅ <?php echo esc_html__('Ready', 'chatgpt-fluent-connector'); ?></span>
+                <?php else: ?>
+                    <span style="color: #ffc107;">⚠️ <?php echo esc_html__('API Key Required', 'chatgpt-fluent-connector'); ?></span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * api2pdf API Key field
+     */
+    public function api2pdf_api_key_field_callback() {
+        $api_key = get_option('sfaic_api2pdf_api_key');
+        ?>
+        <input type="password" name="sfaic_api2pdf_api_key" id="sfaic_api2pdf_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
+        <p class="description">
+            <?php echo esc_html__('Enter your api2pdf API key to enable cloud-based PDF generation.', 'chatgpt-fluent-connector'); ?> 
+            <a href="https://www.api2pdf.com/" target="_blank"><?php echo esc_html__('Get your API key from api2pdf.com', 'chatgpt-fluent-connector'); ?></a>
+        </p>
+
+        <!-- Test button for api2pdf -->
+        <div style="margin-top: 10px;">
+            <button type="button" id="test-api2pdf-btn" class="button button-secondary">
+                <span class="dashicons dashicons-cloud" style="vertical-align: middle; margin-right: 5px;"></span>
+                <?php _e('Test api2pdf Service', 'chatgpt-fluent-connector'); ?>
+            </button>
+            <div id="api2pdf-test-result" class="api-test-result" style="margin-top: 10px;"></div>
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
+            <h4 style="margin-top: 0;"><?php _e('💡 About api2pdf', 'chatgpt-fluent-connector'); ?></h4>
+            <p style="margin-bottom: 0;"><?php _e('api2pdf is a professional cloud service that converts HTML to PDF with high-quality rendering. It offers enterprise-grade reliability, advanced formatting support, and scales automatically to handle high-volume requests.', 'chatgpt-fluent-connector'); ?></p>
+        </div>
+        <?php
     }
 
     /**
@@ -625,59 +818,6 @@ class SFAIC_Settings{
     }
 
     /**
-     * PDF section description
-     */
-    public function pdf_section_callback() {
-        echo '<div style="background: #e8f5e8; padding: 20px; margin: 15px 0; border-left: 4px solid #28a745; border-radius: 0 3px 3px 0;">';
-        echo '<h3 style="margin-top: 0;">' . esc_html__('🏠 Local PDF Generation with mPDF', 'chatgpt-fluent-connector') . '</h3>';
-        echo '<p>' . esc_html__('This plugin uses the local mPDF library to convert AI responses to PDF documents.', 'chatgpt-fluent-connector') . '</p>';
-
-        echo '<div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-top: 15px;">';
-        echo '<h4 style="margin-top: 0; color: #28a745;">🔧 ' . esc_html__('mPDF Library Features', 'chatgpt-fluent-connector') . '</h4>';
-        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666;">';
-        echo '<li>✅ ' . esc_html__('No external dependencies', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Works offline', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Full HTML/CSS support', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Privacy friendly', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Emoji support with image conversion', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('UTF-8 and multilingual support', 'chatgpt-fluent-connector') . '</li>';
-        echo '</ul>';
-        echo '</div>';
-
-        // mPDF Status
-        echo '<div style="margin-top: 15px; padding: 15px; border-radius: 5px; ';
-        if (class_exists('Mpdf\Mpdf')) {
-            echo 'background: #d4edda; border-left: 4px solid #28a745;">';
-            echo '<p style="margin: 0; color: #155724;"><strong>✅ ' . esc_html__('Status: mPDF library is installed and ready!', 'chatgpt-fluent-connector') . '</strong></p>';
-        } else {
-            echo 'background: #f8d7da; border-left: 4px solid #dc3545;">';
-            echo '<p style="margin: 0; color: #721c24;"><strong>❌ ' . esc_html__('Status: mPDF library is not installed', 'chatgpt-fluent-connector') . '</strong></p>';
-            echo '<div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 3px;">';
-            echo '<p style="margin: 0; font-size: 13px;"><strong>' . esc_html__('Installation Options:', 'chatgpt-fluent-connector') . '</strong></p>';
-            echo '<ol style="margin: 5px 0 0 20px; font-size: 13px;">';
-            echo '<li>' . esc_html__('Via Composer (Recommended):', 'chatgpt-fluent-connector') . ' <code>composer require mpdf/mpdf</code></li>';
-            echo '<li><a href="https://github.com/mpdf/mpdf/releases" target="_blank">' . esc_html__('Manual Download from GitHub', 'chatgpt-fluent-connector') . '</a></li>';
-            echo '</ol>';
-            echo '</div>';
-        }
-        echo '</div>';
-
-        // PDF Test Button
-        echo '<div style="margin-top: 15px;">';
-        echo '<button type="button" id="test-pdf-btn" class="button button-secondary" style="background-color: #e74c3c; border-color: #c0392b; color: white;">';
-        echo '<span class="dashicons dashicons-pdf" style="vertical-align: middle; margin-right: 5px;"></span>';
-        echo esc_html__('Test PDF Generation', 'chatgpt-fluent-connector');
-        echo '</button>';
-        echo '<div id="pdf-test-result" style="margin-top: 10px;"></div>';
-        echo '</div>';
-
-        echo '</div>';
-    }
-
-    // ... [Rest of the existing field callback methods remain the same] ...
-    // I'll include the essential ones that are called in the sections above
-
-    /**
      * API Key field
      */
     public function api_key_field_callback() {
@@ -754,31 +894,31 @@ class SFAIC_Settings{
      * Gemini Model field
      */
     public function gemini_model_field_callback() {
-    $model = get_option('sfaic_gemini_model', 'gemini-1.5-pro-latest');
-    ?>
-    <select name="sfaic_gemini_model" id="sfaic_gemini_model">
-        <option value="gemini-1.5-pro-latest" <?php selected($model, 'gemini-1.5-pro-latest'); ?>>
-            <?php echo esc_html__('Gemini 1.5 Pro (Latest - Stable)', 'chatgpt-fluent-connector'); ?>
-        </option>
-        <option value="gemini-1.5-flash-latest" <?php selected($model, 'gemini-1.5-flash-latest'); ?>>
-            <?php echo esc_html__('Gemini 1.5 Flash (Faster, Lower Cost)', 'chatgpt-fluent-connector'); ?>
-        </option>
-        <option value="gemini-2.0-flash-exp" <?php selected($model, 'gemini-2.0-flash-exp'); ?>>
-            <?php echo esc_html__('Gemini 2.0 Flash (Experimental)', 'chatgpt-fluent-connector'); ?>
-        </option>
-        <option value="gemini-2.5-flash" <?php selected($model, 'gemini-2.5-flash'); ?>>
-            <?php echo esc_html__('Gemini 2.5 Flash (Newest, Fastest)', 'chatgpt-fluent-connector'); ?>
-        </option>
-        <option value="gemini-2.5-pro" <?php selected($model, 'gemini-2.5-pro'); ?>>
-            <?php echo esc_html__('Gemini 2.5 Pro (Most Advanced)', 'chatgpt-fluent-connector'); ?>
-        </option>
-    </select>
-    <p class="description">
-        <?php echo esc_html__('Select which Gemini model to use.', 'chatgpt-fluent-connector'); ?><br>
-        <strong><?php echo esc_html__('Note:', 'chatgpt-fluent-connector'); ?></strong> <?php echo esc_html__('Gemini 2.5 models require API access. Check if your API key has access to these models.', 'chatgpt-fluent-connector'); ?>
-    </p>
-    <?php
-}
+        $model = get_option('sfaic_gemini_model', 'gemini-1.5-pro-latest');
+        ?>
+        <select name="sfaic_gemini_model" id="sfaic_gemini_model">
+            <option value="gemini-1.5-pro-latest" <?php selected($model, 'gemini-1.5-pro-latest'); ?>>
+                <?php echo esc_html__('Gemini 1.5 Pro (Latest - Stable)', 'chatgpt-fluent-connector'); ?>
+            </option>
+            <option value="gemini-1.5-flash-latest" <?php selected($model, 'gemini-1.5-flash-latest'); ?>>
+                <?php echo esc_html__('Gemini 1.5 Flash (Faster, Lower Cost)', 'chatgpt-fluent-connector'); ?>
+            </option>
+            <option value="gemini-2.0-flash-exp" <?php selected($model, 'gemini-2.0-flash-exp'); ?>>
+                <?php echo esc_html__('Gemini 2.0 Flash (Experimental)', 'chatgpt-fluent-connector'); ?>
+            </option>
+            <option value="gemini-2.5-flash" <?php selected($model, 'gemini-2.5-flash'); ?>>
+                <?php echo esc_html__('Gemini 2.5 Flash (Newest, Fastest)', 'chatgpt-fluent-connector'); ?>
+            </option>
+            <option value="gemini-2.5-pro" <?php selected($model, 'gemini-2.5-pro'); ?>>
+                <?php echo esc_html__('Gemini 2.5 Pro (Most Advanced)', 'chatgpt-fluent-connector'); ?>
+            </option>
+        </select>
+        <p class="description">
+            <?php echo esc_html__('Select which Gemini model to use.', 'chatgpt-fluent-connector'); ?><br>
+            <strong><?php echo esc_html__('Note:', 'chatgpt-fluent-connector'); ?></strong> <?php echo esc_html__('Gemini 2.5 models require API access. Check if your API key has access to these models.', 'chatgpt-fluent-connector'); ?>
+        </p>
+        <?php
+    }
 
     /**
      * Claude API Key field
@@ -835,7 +975,7 @@ class SFAIC_Settings{
     }
 
     /**
-     * Admin page HTML - Updated with background processing section
+     * Admin page HTML (updated with PDF service testing)
      */
     public function admin_page() {
         if (!current_user_can('manage_options')) {
@@ -844,6 +984,7 @@ class SFAIC_Settings{
 
         $api_provider = get_option('sfaic_api_provider', 'openai');
         $background_enabled = get_option('sfaic_enable_background_processing', true);
+        $default_pdf_service = get_option('sfaic_default_pdf_service', 'mpdf');
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -870,9 +1011,16 @@ class SFAIC_Settings{
                         echo $background_enabled ? 'Enabled' : 'Disabled';
                         ?></li>
                     <li><?php
-                        echo class_exists('Mpdf\Mpdf') ? '✅' : '⚠️';
-                        echo ' ' . __('PDF Generation:', 'chatgpt-fluent-connector') . ' ';
-                        echo class_exists('Mpdf\Mpdf') ? 'Local mPDF (Ready)' : 'Local mPDF (Library Missing)';
+                        if ($default_pdf_service === 'api2pdf') {
+                            $api2pdf_available = !empty(get_option('sfaic_api2pdf_api_key'));
+                            echo $api2pdf_available ? '✅' : '⚠️';
+                            echo ' ' . __('PDF Service:', 'chatgpt-fluent-connector') . ' ';
+                            echo $api2pdf_available ? 'api2pdf (Ready)' : 'api2pdf (API Key Required)';
+                        } else {
+                            echo class_exists('Mpdf\Mpdf') ? '✅' : '⚠️';
+                            echo ' ' . __('PDF Service:', 'chatgpt-fluent-connector') . ' ';
+                            echo class_exists('Mpdf\Mpdf') ? 'Local mPDF (Ready)' : 'Local mPDF (Library Missing)';
+                        }
                         ?></li>
                 </ul>
             </div>
@@ -916,6 +1064,37 @@ class SFAIC_Settings{
                             <td><?php $this->job_timeout_field_callback(); ?></td>
                         </tr>
                     </table>
+                </div>
+
+                <!-- PDF Services Section -->
+                <div class="sfaic-settings-section" id="sfaic_pdf_section">
+                    <h2><?php _e('PDF Generation Settings', 'chatgpt-fluent-connector'); ?> <span class="sfaic-pdf-badge">PDF</span></h2>
+                    <?php $this->pdf_section_callback(); ?>
+
+                    <table class="form-table" role="presentation">
+                        <tr>
+                            <th scope="row"><?php _e('Default PDF Service', 'chatgpt-fluent-connector'); ?></th>
+                            <td><?php $this->default_pdf_service_field_callback(); ?></td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><?php _e('api2pdf API Key', 'chatgpt-fluent-connector'); ?></th>
+                            <td><?php $this->api2pdf_api_key_field_callback(); ?></td>
+                        </tr>
+                    </table>
+
+                    <!-- PDF Test Section -->
+                    <div style="background: #f8f9ff; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
+                        <h4 style="margin-top: 0;"><?php _e('🧪 Test PDF Services', 'chatgpt-fluent-connector'); ?></h4>
+                        <p><?php _e('Test your PDF generation services to ensure they are working correctly:', 'chatgpt-fluent-connector'); ?></p>
+                        
+                        <div style="margin: 15px 0;">
+                            <button type="button" id="test-mpdf-btn" class="button button-secondary">
+                                <span class="dashicons dashicons-desktop" style="vertical-align: middle; margin-right: 5px;"></span>
+                                <?php _e('Test Local mPDF', 'chatgpt-fluent-connector'); ?>
+                            </button>
+                            <div id="mpdf-test-result" class="api-test-result" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Provider-specific settings sections with conditional display -->
@@ -1009,31 +1188,6 @@ class SFAIC_Settings{
                     </table>
                 </div>
 
-                <!-- PDF Generation Settings Section -->
-                <div class="sfaic-settings-section">
-                    <h2><?php _e('PDF Generation Settings', 'chatgpt-fluent-connector'); ?> <span class="sfaic-pdf-badge">PDF</span></h2>
-                    <?php $this->pdf_section_callback(); ?>
-
-                    <div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
-                        <h4 style="margin-top: 0;"><?php _e('📋 Available Template Variables', 'chatgpt-fluent-connector'); ?></h4>
-                        <p><?php _e('Use these variables in your PDF templates:', 'chatgpt-fluent-connector'); ?></p>
-                        <div style="font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 3px; font-size: 13px;">
-                            {title} - Document title<br>
-                            {content} - AI response content<br>
-                            {date} - Current date<br>
-                            {time} - Current time<br>
-                            {entry_id} - Form entry ID<br>
-                            {form_title} - Form title<br>
-                            {form_id} - Form ID<br>
-                            {datetime} - Combined date and time<br>
-                            {timestamp} - Unix timestamp<br>
-                            {site_name} - WordPress site name<br>
-                            {site_url} - WordPress site URL<br>
-                            + Any form field as {field_name}
-                        </div>
-                    </div>
-                </div>
-
                 <?php submit_button(__('Save Settings', 'chatgpt-fluent-connector'), 'primary', 'submit', true, array('style' => 'font-size: 16px; padding: 10px 20px;')); ?>
             </form>
 
@@ -1070,7 +1224,7 @@ class SFAIC_Settings{
                         $('#' + provider + '-settings').show();
                     });
 
-                    // API Testing Functions (existing functionality)
+                    // API Testing Functions
                     function testAPI(provider) {
                         var apiKey = '';
                         var model = '';
@@ -1157,14 +1311,14 @@ class SFAIC_Settings{
                         testAPI('claude');
                     });
 
-                    // PDF Test button
-                    $('#test-pdf-btn').click(function () {
+                    // mPDF Test button
+                    $('#test-mpdf-btn').click(function () {
                         var button = $(this);
-                        var resultDiv = '#pdf-test-result';
+                        var resultDiv = '#mpdf-test-result';
 
                         button.prop('disabled', true);
                         button.find('.dashicons').addClass('spin');
-                        $(resultDiv).html('<div class="notice notice-info inline"><p>Testing PDF generation...</p></div>');
+                        $(resultDiv).html('<div class="notice notice-info inline"><p>Testing mPDF library...</p></div>');
 
                         $.post(ajaxurl, {
                             action: 'sfaic_test_pdf',
@@ -1175,7 +1329,7 @@ class SFAIC_Settings{
 
                             if (response.success) {
                                 var html = '<div class="notice notice-success inline">';
-                                html += '<p><strong>✅ PDF Generation Test Successful!</strong></p>';
+                                html += '<p><strong>✅ mPDF Test Successful!</strong></p>';
                                 html += '<p>' + response.message + '</p>';
                                 if (response.details && response.details.pdf_size) {
                                     html += '<p><strong>Test PDF Size:</strong> ' + response.details.pdf_size + '</p>';
@@ -1183,7 +1337,7 @@ class SFAIC_Settings{
                                 html += '</div>';
                             } else {
                                 var html = '<div class="notice notice-error inline">';
-                                html += '<p><strong>❌ PDF Test Failed</strong></p>';
+                                html += '<p><strong>❌ mPDF Test Failed</strong></p>';
                                 html += '<p><strong>Error:</strong> ' + response.message + '</p>';
                                 html += '</div>';
                             }
@@ -1193,6 +1347,60 @@ class SFAIC_Settings{
                             button.prop('disabled', false);
                             button.find('.dashicons').removeClass('spin');
                             $(resultDiv).html('<div class="notice notice-error inline"><p>Request failed. Please try again.</p></div>');
+                        });
+                    });
+
+                    // api2pdf Test button
+                    $('#test-api2pdf-btn').click(function () {
+                        var button = $(this);
+                        var resultDiv = $('#api2pdf-test-result');
+                        var apiKey = $('#sfaic_api2pdf_api_key').val();
+
+                        if (!apiKey) {
+                            resultDiv.html('<div class="notice notice-error inline"><p>Please enter an api2pdf API key first.</p></div>');
+                            return;
+                        }
+
+                        button.prop('disabled', true);
+                        button.find('.dashicons').addClass('spin');
+                        resultDiv.html('<div class="notice notice-info inline"><p>Testing api2pdf service...</p></div>');
+
+                        $.post(ajaxurl, {
+                            action: 'sfaic_test_api2pdf',
+                            nonce: sfaic_ajax.api2pdf_nonce,
+                            api_key: apiKey
+                        }, function (response) {
+                            button.prop('disabled', false);
+                            button.find('.dashicons').removeClass('spin');
+
+                            if (response.success) {
+                                var html = '<div class="notice notice-success inline">';
+                                html += '<p><strong>✅ api2pdf Test Successful!</strong></p>';
+                                html += '<p><strong>Service:</strong> ' + response.details.service + '</p>';
+                                if (response.details.pdf_size) {
+                                    html += '<p><strong>Test PDF Size:</strong> ' + response.details.pdf_size + '</p>';
+                                }
+                                html += '<details style="margin-top: 10px;"><summary style="cursor: pointer; font-weight: bold;">View Service Features</summary>';
+                                html += '<div style="background: #f9f9f9; padding: 10px; margin-top: 5px; border-radius: 3px; font-size: 12px;">';
+                                if (response.details.features) {
+                                    for (var feature in response.details.features) {
+                                        html += '<strong>' + feature.replace(/_/g, ' ') + ':</strong> ' + response.details.features[feature] + '<br>';
+                                    }
+                                }
+                                html += '</div></details>';
+                                html += '</div>';
+                            } else {
+                                var html = '<div class="notice notice-error inline">';
+                                html += '<p><strong>❌ api2pdf Test Failed</strong></p>';
+                                html += '<p><strong>Error:</strong> ' + response.message + '</p>';
+                                html += '</div>';
+                            }
+
+                            resultDiv.html(html);
+                        }).fail(function () {
+                            button.prop('disabled', false);
+                            button.find('.dashicons').removeClass('spin');
+                            resultDiv.html('<div class="notice notice-error inline"><p>Request failed. Please try again.</p></div>');
                         });
                     });
                 });
@@ -1304,4 +1512,5 @@ class SFAIC_Settings{
         </div>
         <?php
     }
+
 }
