@@ -33,7 +33,7 @@ class SFAIC_PDF_Generator {
 
         // Hook into the AI response to fix encoding early
         add_filter('sfaic_ai_response', array($this, 'fix_response_encoding'), 5);
-        
+
         // Increase memory and execution time for PDF generation
         add_action('sfaic_before_pdf_generation', array($this, 'prepare_environment_for_pdf'));
 
@@ -83,51 +83,7 @@ class SFAIC_PDF_Generator {
         }
     }
 
-    /**
-     * Test api2pdf service
-     */
-    public function test_api2pdf_service($api_key = null) {
-        // Use provided API key or get from settings
-        if ($api_key === null) {
-            $api_key = get_option('sfaic_api2pdf_api_key');
-        }
-
-        if (empty($api_key)) {
-            return new WP_Error('no_api_key', __('api2pdf API key is not set', 'chatgpt-fluent-connector'));
-        }
-
-        try {
-            // Create test HTML content
-            $test_html = $this->get_api2pdf_test_html();
-            
-            // Test the api2pdf service
-            $result = $this->generate_pdf_with_api2pdf($test_html, 'test-pdf', array(
-                'api_key' => $api_key
-            ));
-
-            if (is_wp_error($result)) {
-                return $result;
-            }
-
-            return array(
-                'service' => 'api2pdf Cloud Service',
-                'status' => 'success',
-                'message' => 'api2pdf service is working perfectly! Test PDF generated successfully.',
-                'pdf_size' => $result['size'] ?? 'Unknown',
-                'features' => array(
-                    'cloud_based' => 'No local resources required',
-                    'high_quality' => 'Professional PDF rendering',
-                    'reliable' => 'Enterprise-grade service',
-                    'scalable' => 'Handles high volume requests',
-                    'unicode_support' => 'Full UTF-8 and emoji support'
-                )
-            );
-
-        } catch (Exception $e) {
-            return new WP_Error('api2pdf_test_error', __('api2pdf test error: ', 'chatgpt-fluent-connector') . $e->getMessage());
-        }
-    }
-
+   
     /**
      * Get test HTML for api2pdf
      */
@@ -187,81 +143,6 @@ class SFAIC_PDF_Generator {
     }
 
     /**
-     * Generate PDF using api2pdf service
-     */
-    private function generate_pdf_with_api2pdf($html_content, $filename, $options = array()) {
-        $api_key = $options['api_key'] ?? get_option('sfaic_api2pdf_api_key');
-        
-        if (empty($api_key)) {
-            return new WP_Error('no_api_key', __('api2pdf API key is not configured', 'chatgpt-fluent-connector'));
-        }
-
-        // Prepare api2pdf request
-        $endpoint = 'https://v2.api2pdf.com/wkhtmltopdf/html';
-        
-        $payload = array(
-            'html' => $html_content,
-            'inlinePdf' => true,
-            'fileName' => $filename . '.pdf',
-            'options' => array(
-                'orientation' => $options['orientation'] ?? 'Portrait',
-                'pageSize' => $options['format'] ?? 'A4',
-                'marginTop' => ($options['margin'] ?? 15) . 'mm',
-                'marginBottom' => ($options['margin'] ?? 15) . 'mm',
-                'marginLeft' => ($options['margin'] ?? 15) . 'mm',
-                'marginRight' => ($options['margin'] ?? 15) . 'mm',
-                'printMediaType' => true,
-                'encoding' => 'UTF-8'
-            )
-        );
-
-        $headers = array(
-            'Authorization' => 'Bearer ' . $api_key,
-            'Content-Type' => 'application/json'
-        );
-
-        $args = array(
-            'headers' => $headers,
-            'body' => json_encode($payload),
-            'method' => 'POST',
-            'timeout' => 60,
-            'data_format' => 'body'
-        );
-
-        // Make API request
-        $response = wp_remote_post($endpoint, $args);
-
-        if (is_wp_error($response)) {
-            return new WP_Error('api_request_failed', __('api2pdf API request failed: ', 'chatgpt-fluent-connector') . $response->get_error_message());
-        }
-
-        $response_code = wp_remote_retrieve_response_code($response);
-        $response_body = wp_remote_retrieve_body($response);
-
-        if ($response_code !== 200) {
-            $error_data = json_decode($response_body, true);
-            $error_message = $error_data['error'] ?? 'Unknown error occurred';
-            return new WP_Error('api2pdf_error', __('api2pdf error: ', 'chatgpt-fluent-connector') . $error_message);
-        }
-
-        $result = json_decode($response_body, true);
-
-        if (!isset($result['pdf'])) {
-            return new WP_Error('invalid_response', __('Invalid response from api2pdf service', 'chatgpt-fluent-connector'));
-        }
-
-        // Decode the PDF content
-        $pdf_data = base64_decode($result['pdf']);
-
-        if (empty($pdf_data)) {
-            return new WP_Error('empty_pdf', __('Received empty PDF from api2pdf service', 'chatgpt-fluent-connector'));
-        }
-
-        // Save the PDF file
-        return $this->save_enhanced_pdf_data($pdf_data, $filename);
-    }
-
-    /**
      * Maybe generate PDF after AI response (enhanced with service selection)
      */
     public function maybe_generate_pdf($ai_response, $prompt_id, $entry_id, $form_data, $form) {
@@ -302,16 +183,16 @@ class SFAIC_PDF_Generator {
             update_post_meta($entry_id, '_sfaic_pdf_generated_at', current_time('mysql'));
             update_post_meta($entry_id, '_sfaic_pdf_service', $pdf_service);
             update_post_meta($entry_id, '_sfaic_pdf_size', $pdf_result['size']);
-            
+
             error_log("SFAIC PDF: Successfully generated PDF for entry {$entry_id}: {$pdf_result['filename']} ({$pdf_result['size']} bytes) using {$pdf_service}");
         } else {
             error_log("SFAIC PDF: Failed to generate PDF for entry {$entry_id} using {$pdf_service}: " . $pdf_result->get_error_message());
-            
+
             // Try fallback service if api2pdf fails
             if ($pdf_service === self::SERVICE_API2PDF) {
                 error_log("SFAIC PDF: Attempting fallback to mPDF for entry {$entry_id}");
                 $pdf_result = $this->generate_pdf_with_enhanced_mpdf($ai_response, $prompt_id, $entry_id, $form_data, $form);
-                
+
                 if (!is_wp_error($pdf_result)) {
                     update_post_meta($entry_id, '_sfaic_pdf_url', $pdf_result['url']);
                     update_post_meta($entry_id, '_sfaic_pdf_filename', $pdf_result['filename']);
@@ -319,7 +200,7 @@ class SFAIC_PDF_Generator {
                     update_post_meta($entry_id, '_sfaic_pdf_generated_at', current_time('mysql'));
                     update_post_meta($entry_id, '_sfaic_pdf_service', self::SERVICE_MPDF . '_fallback');
                     update_post_meta($entry_id, '_sfaic_pdf_size', $pdf_result['size']);
-                    
+
                     error_log("SFAIC PDF: Fallback successful for entry {$entry_id}");
                 }
             }
@@ -339,15 +220,15 @@ class SFAIC_PDF_Generator {
 
             // Process filename with enhanced placeholders
             $processed_filename = $this->process_enhanced_filename_placeholders(
-                $settings['pdf_filename'], $entry_id, $form_data, $form
+                    $settings['pdf_filename'], $entry_id, $form_data, $form
             );
 
             // Enhanced content processing
             $ai_response = $this->prepare_content_for_pdf($ai_response);
-            
+
             // Prepare enhanced template variables
             $template_vars = $this->prepare_enhanced_template_variables(
-                $settings, $ai_response, $entry_id, $form_data, $form
+                    $settings, $ai_response, $entry_id, $form_data, $form
             );
 
             // Process template with variables
@@ -361,11 +242,10 @@ class SFAIC_PDF_Generator {
             );
 
             return $this->generate_pdf_with_api2pdf($html_content, $processed_filename, $api2pdf_options);
-
         } catch (Exception $e) {
             error_log('SFAIC PDF Generation Error (api2pdf): ' . $e->getMessage());
-            return new WP_Error('pdf_generation_failed', 
-                sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
+            return new WP_Error('pdf_generation_failed',
+                    sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
             );
         }
     }
@@ -375,12 +255,12 @@ class SFAIC_PDF_Generator {
      */
     public function add_pdf_settings_meta_box() {
         add_meta_box(
-            'sfaic_pdf_settings',
-            __('PDF Settings', 'chatgpt-fluent-connector'),
-            array($this, 'render_pdf_settings_meta_box'),
-            'sfaic_prompt',
-            'normal',
-            'default'
+                'sfaic_pdf_settings',
+                __('PDF Settings', 'chatgpt-fluent-connector'),
+                array($this, 'render_pdf_settings_meta_box'),
+                'sfaic_prompt',
+                'normal',
+                'default'
         );
     }
 
@@ -403,20 +283,27 @@ class SFAIC_PDF_Generator {
         $pdf_template_html = get_post_meta($post->ID, '_sfaic_pdf_template_html', true);
 
         // Set defaults
-        if (empty($pdf_service)) $pdf_service = get_option('sfaic_default_pdf_service', self::SERVICE_MPDF);
-        if (empty($pdf_filename)) $pdf_filename = 'ai-response-{entry_id}';
-        if (empty($pdf_title)) $pdf_title = 'AI Response Report';
-        if (empty($pdf_format)) $pdf_format = 'A4';
-        if (empty($pdf_orientation)) $pdf_orientation = 'P';
-        if (empty($pdf_margin)) $pdf_margin = '15';
-        if (empty($pdf_template_html)) $pdf_template_html = $this->get_enhanced_default_template();
+        if (empty($pdf_service))
+            $pdf_service = get_option('sfaic_default_pdf_service', self::SERVICE_MPDF);
+        if (empty($pdf_filename))
+            $pdf_filename = 'ai-response-{entry_id}';
+        if (empty($pdf_title))
+            $pdf_title = 'AI Response Report';
+        if (empty($pdf_format))
+            $pdf_format = 'A4';
+        if (empty($pdf_orientation))
+            $pdf_orientation = 'P';
+        if (empty($pdf_margin))
+            $pdf_margin = '15';
+        if (empty($pdf_template_html))
+            $pdf_template_html = $this->get_enhanced_default_template();
 
         // Check service availability
         $mpdf_available = class_exists('Mpdf\Mpdf');
         $api2pdf_key = get_option('sfaic_api2pdf_api_key');
         $api2pdf_available = !empty($api2pdf_key);
         ?>
-        
+
         <div class="sfaic-pdf-settings-notice" style="background: #e8f5e8; padding: 15px; margin-bottom: 20px; border-left: 4px solid #28a745; border-radius: 3px;">
             <h4 style="margin-top: 0; color: #28a745;">📄 Enhanced PDF Generation with Multiple Services</h4>
             <p style="margin-bottom: 0;">Choose between local mPDF generation or cloud-based api2pdf service for professional PDF creation.</p>
@@ -431,7 +318,7 @@ class SFAIC_PDF_Generator {
                         <?php _e('Generate PDF from AI response', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description">
-                        <?php _e('When enabled, the AI response will be converted to PDF using your selected service.', 'chatgpt-fluent-connector'); ?>
+        <?php _e('When enabled, the AI response will be converted to PDF using your selected service.', 'chatgpt-fluent-connector'); ?>
                     </p>
                 </td>
             </tr>
@@ -442,18 +329,18 @@ class SFAIC_PDF_Generator {
                     <select name="sfaic_pdf_service" id="sfaic_pdf_service">
                         <option value="<?php echo self::SERVICE_MPDF; ?>" <?php selected($pdf_service, self::SERVICE_MPDF); ?>>
                             <?php _e('Local mPDF', 'chatgpt-fluent-connector'); ?>
-                            <?php if (!$mpdf_available): ?>
+        <?php if (!$mpdf_available): ?>
                                 <?php _e('(Not Available)', 'chatgpt-fluent-connector'); ?>
                             <?php endif; ?>
                         </option>
                         <option value="<?php echo self::SERVICE_API2PDF; ?>" <?php selected($pdf_service, self::SERVICE_API2PDF); ?>>
                             <?php _e('api2pdf Cloud Service', 'chatgpt-fluent-connector'); ?>
-                            <?php if (!$api2pdf_available): ?>
-                                <?php _e('(API Key Required)', 'chatgpt-fluent-connector'); ?>
-                            <?php endif; ?>
+        <?php if (!$api2pdf_available): ?>
+            <?php _e('(API Key Required)', 'chatgpt-fluent-connector'); ?>
+        <?php endif; ?>
                         </option>
                     </select>
-                    
+
                     <div style="margin-top: 10px;">
                         <div class="pdf-service-info mpdf-info" <?php echo ($pdf_service !== self::SERVICE_MPDF) ? 'style="display:none;"' : ''; ?>>
                             <p class="description">
@@ -461,22 +348,22 @@ class SFAIC_PDF_Generator {
                                 <?php _e('Generate PDFs locally on your server. No external dependencies, works offline.', 'chatgpt-fluent-connector'); ?>
                                 <?php if ($mpdf_available): ?>
                                     <span style="color: #28a745;">✅ <?php _e('Available', 'chatgpt-fluent-connector'); ?></span>
-                                <?php else: ?>
+        <?php else: ?>
                                     <span style="color: #dc3545;">❌ <?php _e('mPDF library not installed', 'chatgpt-fluent-connector'); ?></span>
-                                <?php endif; ?>
+        <?php endif; ?>
                             </p>
                         </div>
-                        
+
                         <div class="pdf-service-info api2pdf-info" <?php echo ($pdf_service !== self::SERVICE_API2PDF) ? 'style="display:none;"' : ''; ?>>
                             <p class="description">
                                 <strong><?php _e('api2pdf Cloud Service:', 'chatgpt-fluent-connector'); ?></strong>
                                 <?php _e('Professional cloud-based PDF generation with high-quality rendering and reliability.', 'chatgpt-fluent-connector'); ?>
-                                <?php if ($api2pdf_available): ?>
+        <?php if ($api2pdf_available): ?>
                                     <span style="color: #28a745;">✅ <?php _e('API Key Configured', 'chatgpt-fluent-connector'); ?></span>
                                 <?php else: ?>
                                     <span style="color: #dc3545;">❌ <?php _e('API Key Required', 'chatgpt-fluent-connector'); ?></span>
                                     <a href="<?php echo admin_url('options-general.php?page=sfaic-settings'); ?>" target="_blank"><?php _e('Configure API Key', 'chatgpt-fluent-connector'); ?></a>
-                                <?php endif; ?>
+        <?php endif; ?>
                             </p>
                         </div>
                     </div>
@@ -484,7 +371,7 @@ class SFAIC_PDF_Generator {
                     <div style="margin-top: 10px;">
                         <button type="button" id="test-pdf-service-btn" class="button button-secondary">
                             <span class="dashicons dashicons-pdf" style="vertical-align: middle; margin-right: 5px;"></span>
-                            <?php _e('Test Selected Service', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Test Selected Service', 'chatgpt-fluent-connector'); ?>
                         </button>
                         <div id="pdf-service-test-result" style="margin-top: 10px;"></div>
                     </div>
@@ -535,7 +422,7 @@ class SFAIC_PDF_Generator {
                         <?php _e('HTML template for PDF generation. Works with both local mPDF and api2pdf services.', 'chatgpt-fluent-connector'); ?><br>
                         <strong><?php _e('Available variables:', 'chatgpt-fluent-connector'); ?></strong><br>
                         <code>{title}, {content}, {date}, {time}, {entry_id}, {form_title}, {form_id}, {datetime}, {timestamp}, {site_name}, {site_url}</code><br>
-                        <?php _e('+ any form field as', 'chatgpt-fluent-connector'); ?> <code>{field_name}</code>
+        <?php _e('+ any form field as', 'chatgpt-fluent-connector'); ?> <code>{field_name}</code>
                     </p>
                 </td>
             </tr>
@@ -545,7 +432,7 @@ class SFAIC_PDF_Generator {
                 <td>
                     <label>
                         <input type="checkbox" name="sfaic_pdf_attach_to_email" id="sfaic_pdf_attach_to_email" value="1" <?php checked($pdf_attach_to_email, '1'); ?>>
-                        <?php _e('Attach PDF to email notifications', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Attach PDF to email notifications', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description"><?php _e('When enabled, the generated PDF will be attached to email notifications', 'chatgpt-fluent-connector'); ?></p>
                 </td>
@@ -556,8 +443,8 @@ class SFAIC_PDF_Generator {
                 <td>
                     <input type="text" name="sfaic_pdf_filename" id="sfaic_pdf_filename" value="<?php echo esc_attr($pdf_filename); ?>" class="regular-text">
                     <p class="description">
-                        <?php _e('Filename for the generated PDF (without .pdf extension).', 'chatgpt-fluent-connector'); ?><br>
-                        <?php _e('You can use placeholders like {entry_id}, {form_id}, {date}, {time}', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Filename for the generated PDF (without .pdf extension).', 'chatgpt-fluent-connector'); ?><br>
+        <?php _e('You can use placeholders like {entry_id}, {form_id}, {date}, {time}', 'chatgpt-fluent-connector'); ?>
                     </p>
                 </td>
             </tr>
@@ -627,8 +514,12 @@ class SFAIC_PDF_Generator {
 
         <style>
             @keyframes spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
+                from {
+                    transform: rotate(0deg);
+                }
+                to {
+                    transform: rotate(360deg);
+                }
             }
             .dashicons.spin {
                 animation: spin 1s linear infinite;
@@ -647,8 +538,8 @@ class SFAIC_PDF_Generator {
         }
 
         // Check if our nonce is set and verify it
-        if (!isset($_POST['sfaic_pdf_settings_nonce']) || 
-            !wp_verify_nonce($_POST['sfaic_pdf_settings_nonce'], 'sfaic_pdf_settings_save')) {
+        if (!isset($_POST['sfaic_pdf_settings_nonce']) ||
+                !wp_verify_nonce($_POST['sfaic_pdf_settings_nonce'], 'sfaic_pdf_settings_save')) {
             return;
         }
 
@@ -703,17 +594,17 @@ class SFAIC_PDF_Generator {
                 @ini_set('memory_limit', '256M');
             }
         }
-        
+
         // Increase execution time
         if (function_exists('set_time_limit')) {
             @set_time_limit(300); // 5 minutes
         }
-        
+
         // Disable output buffering issues
         if (function_exists('apache_setenv')) {
             @apache_setenv('no-gzip', '1');
         }
-        
+
         @ini_set('zlib.output_compression', '0');
     }
 
@@ -738,7 +629,7 @@ class SFAIC_PDF_Generator {
 
         // First, try to detect the actual encoding
         $detected_encoding = mb_detect_encoding($content, ['UTF-8', 'ISO-8859-1', 'Windows-1252', 'ASCII'], true);
-        
+
         // If it's not UTF-8, convert it
         if ($detected_encoding && $detected_encoding !== 'UTF-8') {
             $content = mb_convert_encoding($content, 'UTF-8', $detected_encoding);
@@ -813,7 +704,7 @@ class SFAIC_PDF_Generator {
             ]);
 
             $test_html = '<h1>mPDF Test</h1><p>This is a test PDF generated by mPDF library.</p>';
-            
+
             $mpdf->WriteHTML($test_html);
             $pdf_content = $mpdf->Output('', 'S');
 
@@ -827,7 +718,6 @@ class SFAIC_PDF_Generator {
             } else {
                 return new WP_Error('test_failed', 'Generated PDF is too small');
             }
-
         } catch (Exception $e) {
             return new WP_Error('mpdf_test_error', __('mPDF test error: ', 'chatgpt-fluent-connector') . $e->getMessage());
         }
@@ -869,10 +759,10 @@ class SFAIC_PDF_Generator {
     private function prepare_content_for_pdf($content) {
         // Fix encoding issues
         $content = $this->fix_encoding_comprehensive($content);
-        
+
         // Clean up HTML
         $content = $this->clean_html_for_pdf($content);
-        
+
         return $content;
     }
 
@@ -883,10 +773,10 @@ class SFAIC_PDF_Generator {
         // Remove problematic elements that might cause issues in PDF
         $html = preg_replace('/<script[^>]*?>.*?<\/script>/is', '', $html);
         $html = preg_replace('/<iframe[^>]*?>.*?<\/iframe>/is', '', $html);
-        
+
         // Fix self-closing tags
         $html = preg_replace('/<(br|hr|img|input|meta|link)([^>]*?)>/i', '<$1$2 />', $html);
-        
+
         return $html;
     }
 
@@ -895,7 +785,7 @@ class SFAIC_PDF_Generator {
      */
     private function prepare_enhanced_template_variables($settings, $ai_response, $entry_id, $form_data, $form) {
         $current_time = current_time('timestamp');
-        
+
         $template_vars = array(
             'title' => $settings['pdf_title'],
             'content' => $ai_response,
@@ -920,7 +810,7 @@ class SFAIC_PDF_Generator {
                 } else {
                     continue; // Skip non-scalar values
                 }
-                
+
                 // Process content for PDF
                 $field_value = $this->prepare_content_for_pdf($field_value);
                 $template_vars[$field_key] = $field_value;
@@ -950,7 +840,7 @@ class SFAIC_PDF_Generator {
      */
     private function process_enhanced_filename_placeholders($filename, $entry_id, $form_data, $form) {
         $current_time = current_time('timestamp');
-        
+
         $replacements = array(
             '{entry_id}' => $entry_id,
             '{form_id}' => $form->id ?? 0,
@@ -1027,19 +917,19 @@ class SFAIC_PDF_Generator {
     private function ensure_unique_filename($directory, $filename) {
         $original_filename = $filename;
         $counter = 1;
-        
+
         while (file_exists($directory . '/' . $filename)) {
             $pathinfo = pathinfo($original_filename);
             $filename = $pathinfo['filename'] . '_' . $counter . '.' . $pathinfo['extension'];
             $counter++;
-            
+
             // Prevent infinite loop
             if ($counter > 1000) {
                 $filename = $pathinfo['filename'] . '_' . time() . '.' . $pathinfo['extension'];
                 break;
             }
         }
-        
+
         return $filename;
     }
 
@@ -1125,7 +1015,7 @@ class SFAIC_PDF_Generator {
             if ($file_handle) {
                 $header = fread($file_handle, 4);
                 fclose($file_handle);
-                
+
                 if ($header === '%PDF') {
                     return $pdf_path;
                 }
@@ -1162,15 +1052,15 @@ class SFAIC_PDF_Generator {
 
             // Process filename with enhanced placeholders
             $processed_filename = $this->process_enhanced_filename_placeholders(
-                $settings['pdf_filename'], $entry_id, $form_data, $form
+                    $settings['pdf_filename'], $entry_id, $form_data, $form
             );
 
             // Enhanced content processing
             $ai_response = $this->prepare_content_for_pdf($ai_response);
-            
+
             // Prepare enhanced template variables
             $template_vars = $this->prepare_enhanced_template_variables(
-                $settings, $ai_response, $entry_id, $form_data, $form
+                    $settings, $ai_response, $entry_id, $form_data, $form
             );
 
             // Process template with variables
@@ -1199,11 +1089,10 @@ class SFAIC_PDF_Generator {
 
             // Save PDF with enhanced validation
             return $this->save_enhanced_pdf_data($pdf_content, $processed_filename);
-
         } catch (Exception $e) {
             error_log('SFAIC PDF Generation Error: ' . $e->getMessage());
-            return new WP_Error('pdf_generation_failed', 
-                sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
+            return new WP_Error('pdf_generation_failed',
+                    sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
             );
         } finally {
             // Cleanup
@@ -1223,7 +1112,6 @@ class SFAIC_PDF_Generator {
 
         // Set longer execution time
         @set_time_limit(600); // 10 minutes
-
         // Enhanced output buffering control
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -1237,7 +1125,7 @@ class SFAIC_PDF_Generator {
         @ini_set('log_errors', '1');
         @ini_set('zlib.output_compression', '0');
         @ini_set('implicit_flush', '0');
-        
+
         // Set proper timezone if not set
         if (!ini_get('date.timezone')) {
             @ini_set('date.timezone', wp_timezone_string());
@@ -1261,7 +1149,6 @@ class SFAIC_PDF_Generator {
             'default_font' => 'dejavusans',
             'default_font_size' => 12,
             'tempDir' => $temp_dir,
-            
             // Enhanced configuration
             'autoScriptToLang' => true,
             'autoLangToFont' => true,
@@ -1298,15 +1185,14 @@ class SFAIC_PDF_Generator {
             // Set additional mPDF properties for better rendering
             $mpdf->SetDisplayMode('fullpage');
             $mpdf->SetCompression(true);
-            
+
             // Write HTML with error handling
             $mpdf->WriteHTML($html_content);
-            
+
             // Validate that content was written
             if ($mpdf->page < 1) {
                 throw new Exception('No pages were generated');
             }
-            
         } catch (Exception $e) {
             throw new Exception('Failed to write HTML to PDF: ' . $e->getMessage());
         }
@@ -1324,7 +1210,7 @@ class SFAIC_PDF_Generator {
                 error_log('SFAIC PDF: Failed to create temp directory: ' . $temp_dir);
                 return false;
             }
-            
+
             // Create security files for temp directory
             @file_put_contents($temp_dir . '/index.php', '<?php // Silence is golden');
             @file_put_contents($temp_dir . '/.htaccess', 'deny from all');
@@ -1376,5 +1262,277 @@ class SFAIC_PDF_Generator {
         if (function_exists('error_reporting')) {
             error_reporting(E_ALL);
         }
+    }
+
+    /**
+     * Official api2pdf.php implementation following GitHub documentation
+     * Based on: https://github.com/Api2Pdf/api2pdf.php
+     * 
+     * Add this to your SFAIC_PDF_Generator class to replace existing api2pdf methods
+     */
+
+    /**
+     * Create api2pdf client instance
+     */
+    private function create_api2pdf_client($api_key = null) {
+        if ($api_key === null) {
+            $api_key = get_option('sfaic_api2pdf_api_key');
+        }
+
+        if (empty($api_key)) {
+            return new WP_Error('no_api_key', __('api2pdf API key is not configured', 'chatgpt-fluent-connector'));
+        }
+
+        // Simple api2pdf implementation following their official documentation
+        return new SFAIC_Api2Pdf_Client($api_key);
+    }
+
+    /**
+     * Test api2pdf service using official implementation pattern
+     */
+    public function test_api2pdf_service($api_key = null) {
+        try {
+            $client = $this->create_api2pdf_client($api_key);
+
+            if (is_wp_error($client)) {
+                return $client;
+            }
+
+            // Create test HTML following their documentation examples
+            $test_html = $this->get_api2pdf_test_html();
+
+            // Use wkHtmlToPdf method as shown in their documentation (more cost-effective)
+            $result = $client->wkHtmlToPdf($test_html, true, 'test-api2pdf.pdf');
+
+            if (is_wp_error($result)) {
+                return $result;
+            }
+
+            return array(
+                'service' => 'api2pdf Cloud Service',
+                'status' => 'success',
+                'message' => 'api2pdf service is working perfectly! Test PDF generated successfully using wkhtmltopdf engine.',
+                'pdf_url' => $result['file_url'],
+                'pdf_size' => isset($result['mb_out']) ? ($result['mb_out'] * 1024 * 1024) . ' bytes' : 'Unknown',
+                'cost' => $result['cost'] ?? 0,
+                'response_id' => $result['response_id'] ?? null,
+                'features' => array(
+                    'cloud_based' => 'No local resources required',
+                    'high_quality' => 'Professional PDF rendering with wkhtmltopdf',
+                    'reliable' => 'Enterprise-grade service',
+                    'scalable' => 'Handles high volume requests',
+                    'cost_effective' => 'wkhtmltopdf engine for optimal pricing',
+                    'unicode_support' => 'Full UTF-8 and emoji support'
+                )
+            );
+        } catch (Exception $e) {
+            return new WP_Error('api2pdf_test_error', __('api2pdf test error: ', 'chatgpt-fluent-connector') . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate PDF using official api2pdf pattern
+     */
+    private function generate_pdf_with_api2pdf($html_content, $filename, $options = array()) {
+        try {
+            $client = $this->create_api2pdf_client($options['api_key'] ?? null);
+
+            if (is_wp_error($client)) {
+                return $client;
+            }
+
+            // Set PDF options following their documentation
+            $pdf_options = array();
+
+            if (isset($options['orientation'])) {
+                $pdf_options['orientation'] = $options['orientation'] === 'L' ? 'Landscape' : 'Portrait';
+            }
+
+            if (isset($options['format'])) {
+                $pdf_options['pageSize'] = $options['format'];
+            }
+
+            if (isset($options['margin'])) {
+                $pdf_options['marginTop'] = $options['margin'] . 'mm';
+                $pdf_options['marginBottom'] = $options['margin'] . 'mm';
+                $pdf_options['marginLeft'] = $options['margin'] . 'mm';
+                $pdf_options['marginRight'] = $options['margin'] . 'mm';
+            }
+
+            // Add encoding and media type options
+            $pdf_options['encoding'] = 'UTF-8';
+            $pdf_options['printMediaType'] = true;
+
+            // Choose engine: wkhtmltopdf (cheaper) or Chrome (better CSS support)
+            $engine = $options['engine'] ?? 'wkhtmltopdf'; // default to wkhtmltopdf
+
+            if ($engine === 'chrome') {
+                // Use Chrome engine for better CSS/JS support (following their chromeHtmlToPdf method)
+                $result = $client->chromeHtmlToPdf($html_content, true, $filename . '.pdf', $pdf_options);
+            } else {
+                // Use wkhtmltopdf engine (default, more cost-effective)
+                $result = $client->wkHtmlToPdf($html_content, true, $filename . '.pdf', $pdf_options);
+            }
+
+            if (is_wp_error($result)) {
+                return $result;
+            }
+
+            // Download the PDF from the provided URL
+            $pdf_response = wp_remote_get($result['file_url'], array(
+                'timeout' => 60
+            ));
+
+            if (is_wp_error($pdf_response)) {
+                return new WP_Error('pdf_download_failed', __('Failed to download PDF from api2pdf: ', 'chatgpt-fluent-connector') . $pdf_response->get_error_message());
+            }
+
+            $pdf_data = wp_remote_retrieve_body($pdf_response);
+
+            if (empty($pdf_data)) {
+                return new WP_Error('empty_pdf', __('Received empty PDF from api2pdf service', 'chatgpt-fluent-connector'));
+            }
+
+            // Validate PDF header
+            if (substr($pdf_data, 0, 4) !== '%PDF') {
+                return new WP_Error('invalid_pdf_format', __('Downloaded data is not a valid PDF', 'chatgpt-fluent-connector'));
+            }
+
+            // Save the PDF file
+            $save_result = $this->save_enhanced_pdf_data($pdf_data, $filename);
+
+            if (!is_wp_error($save_result)) {
+                // Add api2pdf specific metadata
+                $save_result['service'] = 'api2pdf';
+                $save_result['engine'] = $engine;
+                $save_result['response_id'] = $result['response_id'] ?? null;
+                $save_result['cost'] = $result['cost'] ?? null;
+                $save_result['mb_out'] = $result['mb_out'] ?? null;
+            }
+
+            return $save_result;
+        } catch (Exception $e) {
+            return new WP_Error('api2pdf_generation_error', __('api2pdf generation error: ', 'chatgpt-fluent-connector') . $e->getMessage());
+        }
+    }
+}
+
+/**
+ * Simple api2pdf client following official documentation
+ * Based on: https://github.com/Api2Pdf/api2pdf.php
+ */
+class SFAIC_Api2Pdf_Client {
+
+    private $apiKey;
+    private $base_url;
+
+    public function __construct($apiKey, $base_url = 'https://v2.api2pdf.com') {
+        $this->apiKey = $apiKey;
+        $this->base_url = $base_url;
+    }
+
+    /**
+     * Convert HTML to PDF using wkhtmltopdf
+     * Following official documentation pattern
+     */
+    public function wkHtmlToPdf($html, $inline = true, $filename = null, $options = null) {
+        $payload = $this->buildPayloadBase($inline, $filename, $options);
+        $payload['html'] = $html;
+
+        return $this->makeRequest('/wkhtmltopdf/html', $payload);
+    }
+
+    /**
+     * Convert HTML to PDF using Chrome
+     * Following official documentation pattern  
+     */
+    public function chromeHtmlToPdf($html, $inline = true, $filename = null, $options = null) {
+        $payload = $this->buildPayloadBase($inline, $filename, $options);
+        $payload['html'] = $html;
+
+        return $this->makeRequest('/chrome/pdf/html', $payload);
+    }
+
+    /**
+     * Build payload base following official pattern
+     */
+    private function buildPayloadBase($inline, $filename, $options) {
+        $payload = array(
+            'inlinePdf' => $inline
+        );
+
+        if ($filename !== null) {
+            $payload['fileName'] = $filename;
+        }
+
+        if ($options !== null) {
+            $payload['options'] = $options;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Make request following official documentation
+     * Based on their makeRequest method
+     */
+    private function makeRequest($endpoint, $payload) {
+        $url = $this->base_url . $endpoint;
+
+        $ch = curl_init($url);
+
+        $jsonDataEncoded = json_encode($payload);
+
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+
+        // Official authorization header format (no "Bearer" prefix)
+        curl_setopt(
+                $ch,
+                CURLOPT_HTTPHEADER,
+                [
+                    'Content-Type: application/json',
+                    'Authorization: ' . $this->apiKey
+                ]
+        );
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if ($response === false) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            return new WP_Error('curl_error', __('cURL error: ', 'chatgpt-fluent-connector') . $error);
+        }
+
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return new WP_Error('api_error', __('API request failed with HTTP code: ', 'chatgpt-fluent-connector') . $httpCode);
+        }
+
+        $result = json_decode($response, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return new WP_Error('json_error', __('Invalid JSON response from api2pdf', 'chatgpt-fluent-connector'));
+        }
+
+        // Handle API response following their documentation
+        if (!isset($result['Success']) || $result['Success'] !== true) {
+            $error_message = $result['Error'] ?? 'Unknown error occurred';
+            return new WP_Error('api2pdf_failed', __('api2pdf request failed: ', 'chatgpt-fluent-connector') . $error_message);
+        }
+
+        // Return standardized result following their ApiResult pattern
+        return array(
+            'file_url' => $result['FileUrl'] ?? null,
+            'mb_out' => $result['MbOut'] ?? null,
+            'cost' => $result['Cost'] ?? null,
+            'response_id' => $result['ResponseId'] ?? null,
+            'success' => true
+        );
     }
 }

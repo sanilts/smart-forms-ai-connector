@@ -208,6 +208,8 @@ class SFAIC_Settings{
             ));
         }
     }
+    
+    
 
     /**
      * Test API connection for a specific provider
