@@ -1,11 +1,11 @@
 <?php
 
 /**
- * Enhanced PDF Generator Class - With api2pdf Integration
+ * Enhanced PDF Generator Class - With PDFShift Integration
  * 
  * Handles PDF generation from AI responses with multiple service options:
  * - Local mPDF (existing)
- * - Cloud-based api2pdf (new)
+ * - Cloud-based PDFShift (new)
  */
 class SFAIC_PDF_Generator {
 
@@ -13,7 +13,7 @@ class SFAIC_PDF_Generator {
      * Available PDF services
      */
     const SERVICE_MPDF = 'mpdf';
-    const SERVICE_API2PDF = 'api2pdf';
+    const SERVICE_PDFSHIFT = 'pdfshift';
 
     /**
      * Constructor
@@ -62,8 +62,8 @@ class SFAIC_PDF_Generator {
             case self::SERVICE_MPDF:
                 $result = $this->test_mpdf_library();
                 break;
-            case self::SERVICE_API2PDF:
-                $result = $this->test_api2pdf_service($api_key);
+            case self::SERVICE_PDFSHIFT:
+                $result = $this->test_pdfshift_service($api_key);
                 break;
             default:
                 $result = new WP_Error('invalid_service', __('Invalid PDF service specified', 'chatgpt-fluent-connector'));
@@ -85,17 +85,17 @@ class SFAIC_PDF_Generator {
 
    
     /**
-     * Get test HTML for api2pdf
+     * Get test HTML for PDFShift
      */
-    private function get_api2pdf_test_html() {
+    private function get_pdfshift_test_html() {
         return '<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>api2pdf Test</title>
+    <title>PDFShift Test</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-        .header { background: #007cba; color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .header { background: #667eea; color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
         .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
         table { width: 100%; border-collapse: collapse; margin: 10px 0; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -104,13 +104,13 @@ class SFAIC_PDF_Generator {
 </head>
 <body>
     <div class="header">
-        <h1>🚀 api2pdf Service Test</h1>
-        <p>Testing cloud-based PDF generation with api2pdf</p>
+        <h1>🚀 PDFShift Service Test</h1>
+        <p>Testing cloud-based PDF generation with PDFShift</p>
     </div>
     
     <div class="test-section">
         <h2>✅ Service Functionality Test</h2>
-        <p>This PDF was generated using the api2pdf cloud service integration.</p>
+        <p>This PDF was generated using the PDFShift cloud service integration.</p>
     </div>
     
     <div class="test-section">
@@ -135,7 +135,7 @@ class SFAIC_PDF_Generator {
     </div>
     
     <div style="margin-top: 40px; text-align: center;">
-        <p><strong>api2pdf Test Completed Successfully!</strong></p>
+        <p><strong>PDFShift Test Completed Successfully!</strong></p>
         <p>Generated: ' . date('Y-m-d H:i:s') . '</p>
     </div>
 </body>
@@ -166,8 +166,8 @@ class SFAIC_PDF_Generator {
 
         // Generate PDF based on selected service
         switch ($pdf_service) {
-            case self::SERVICE_API2PDF:
-                $pdf_result = $this->generate_pdf_with_api2pdf_full($ai_response, $prompt_id, $entry_id, $form_data, $form);
+            case self::SERVICE_PDFSHIFT:
+                $pdf_result = $this->generate_pdf_with_pdfshift_full($ai_response, $prompt_id, $entry_id, $form_data, $form);
                 break;
             case self::SERVICE_MPDF:
             default:
@@ -188,8 +188,8 @@ class SFAIC_PDF_Generator {
         } else {
             error_log("SFAIC PDF: Failed to generate PDF for entry {$entry_id} using {$pdf_service}: " . $pdf_result->get_error_message());
 
-            // Try fallback service if api2pdf fails
-            if ($pdf_service === self::SERVICE_API2PDF) {
+            // Try fallback service if PDFShift fails
+            if ($pdf_service === self::SERVICE_PDFSHIFT) {
                 error_log("SFAIC PDF: Attempting fallback to mPDF for entry {$entry_id}");
                 $pdf_result = $this->generate_pdf_with_enhanced_mpdf($ai_response, $prompt_id, $entry_id, $form_data, $form);
 
@@ -208,9 +208,9 @@ class SFAIC_PDF_Generator {
     }
 
     /**
-     * Generate PDF with api2pdf (full implementation)
+     * Generate PDF with PDFShift (full implementation)
      */
-    private function generate_pdf_with_api2pdf_full($ai_response, $prompt_id, $entry_id, $form_data, $form) {
+    private function generate_pdf_with_pdfshift_full($ai_response, $prompt_id, $entry_id, $form_data, $form) {
         try {
             // Get and validate settings
             $settings = $this->get_pdf_settings($prompt_id);
@@ -234,16 +234,16 @@ class SFAIC_PDF_Generator {
             // Process template with variables
             $html_content = $this->process_template_with_variables($settings['pdf_template_html'], $template_vars);
 
-            // Generate PDF using api2pdf
-            $api2pdf_options = array(
+            // Generate PDF using PDFShift
+            $pdfshift_options = array(
                 'format' => $settings['pdf_format'],
                 'orientation' => $settings['pdf_orientation'],
                 'margin' => $settings['pdf_margin']
             );
 
-            return $this->generate_pdf_with_api2pdf($html_content, $processed_filename, $api2pdf_options);
+            return $this->generate_pdf_with_pdfshift($html_content, $processed_filename, $pdfshift_options);
         } catch (Exception $e) {
-            error_log('SFAIC PDF Generation Error (api2pdf): ' . $e->getMessage());
+            error_log('SFAIC PDF Generation Error (PDFShift): ' . $e->getMessage());
             return new WP_Error('pdf_generation_failed',
                     sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
             );
@@ -300,13 +300,13 @@ class SFAIC_PDF_Generator {
 
         // Check service availability
         $mpdf_available = class_exists('Mpdf\Mpdf');
-        $api2pdf_key = get_option('sfaic_api2pdf_api_key');
-        $api2pdf_available = !empty($api2pdf_key);
+        $pdfshift_key = get_option('sfaic_pdfshift_api_key');
+        $pdfshift_available = !empty($pdfshift_key);
         ?>
 
         <div class="sfaic-pdf-settings-notice" style="background: #e8f5e8; padding: 15px; margin-bottom: 20px; border-left: 4px solid #28a745; border-radius: 3px;">
             <h4 style="margin-top: 0; color: #28a745;">📄 Enhanced PDF Generation with Multiple Services</h4>
-            <p style="margin-bottom: 0;">Choose between local mPDF generation or cloud-based api2pdf service for professional PDF creation.</p>
+            <p style="margin-bottom: 0;">Choose between local mPDF generation or cloud-based PDFShift service for professional PDF creation.</p>
         </div>
 
         <table class="form-table">
@@ -333,9 +333,9 @@ class SFAIC_PDF_Generator {
                                 <?php _e('(Not Available)', 'chatgpt-fluent-connector'); ?>
                             <?php endif; ?>
                         </option>
-                        <option value="<?php echo self::SERVICE_API2PDF; ?>" <?php selected($pdf_service, self::SERVICE_API2PDF); ?>>
-                            <?php _e('api2pdf Cloud Service', 'chatgpt-fluent-connector'); ?>
-        <?php if (!$api2pdf_available): ?>
+                        <option value="<?php echo self::SERVICE_PDFSHIFT; ?>" <?php selected($pdf_service, self::SERVICE_PDFSHIFT); ?>>
+                            <?php _e('PDFShift Cloud Service', 'chatgpt-fluent-connector'); ?>
+        <?php if (!$pdfshift_available): ?>
             <?php _e('(API Key Required)', 'chatgpt-fluent-connector'); ?>
         <?php endif; ?>
                         </option>
@@ -354,11 +354,11 @@ class SFAIC_PDF_Generator {
                             </p>
                         </div>
 
-                        <div class="pdf-service-info api2pdf-info" <?php echo ($pdf_service !== self::SERVICE_API2PDF) ? 'style="display:none;"' : ''; ?>>
+                        <div class="pdf-service-info pdfshift-info" <?php echo ($pdf_service !== self::SERVICE_PDFSHIFT) ? 'style="display:none;"' : ''; ?>>
                             <p class="description">
-                                <strong><?php _e('api2pdf Cloud Service:', 'chatgpt-fluent-connector'); ?></strong>
+                                <strong><?php _e('PDFShift Cloud Service:', 'chatgpt-fluent-connector'); ?></strong>
                                 <?php _e('Professional cloud-based PDF generation with high-quality rendering and reliability.', 'chatgpt-fluent-connector'); ?>
-        <?php if ($api2pdf_available): ?>
+        <?php if ($pdfshift_available): ?>
                                     <span style="color: #28a745;">✅ <?php _e('API Key Configured', 'chatgpt-fluent-connector'); ?></span>
                                 <?php else: ?>
                                     <span style="color: #dc3545;">❌ <?php _e('API Key Required', 'chatgpt-fluent-connector'); ?></span>
@@ -419,7 +419,7 @@ class SFAIC_PDF_Generator {
                 <td>
                     <textarea name="sfaic_pdf_template_html" id="sfaic_pdf_template_html" class="large-text code" rows="15"><?php echo esc_textarea($pdf_template_html); ?></textarea>
                     <p class="description">
-                        <?php _e('HTML template for PDF generation. Works with both local mPDF and api2pdf services.', 'chatgpt-fluent-connector'); ?><br>
+                        <?php _e('HTML template for PDF generation. Works with both local mPDF and PDFShift services.', 'chatgpt-fluent-connector'); ?><br>
                         <strong><?php _e('Available variables:', 'chatgpt-fluent-connector'); ?></strong><br>
                         <code>{title}, {content}, {date}, {time}, {entry_id}, {form_title}, {form_id}, {datetime}, {timestamp}, {site_name}, {site_url}</code><br>
         <?php _e('+ any form field as', 'chatgpt-fluent-connector'); ?> <code>{field_name}</code>
@@ -1265,77 +1265,77 @@ class SFAIC_PDF_Generator {
     }
 
     /**
-     * Official api2pdf.php implementation following GitHub documentation
-     * Based on: https://github.com/Api2Pdf/api2pdf.php
-     * 
-     * Add this to your SFAIC_PDF_Generator class to replace existing api2pdf methods
+     * PDFShift service implementation following their API documentation
+     * Based on: https://pdfshift.io/documentation/convert
      */
 
     /**
-     * Create api2pdf client instance
+     * Create PDFShift client instance
      */
-    private function create_api2pdf_client($api_key = null) {
+    private function create_pdfshift_client($api_key = null) {
         if ($api_key === null) {
-            $api_key = get_option('sfaic_api2pdf_api_key');
+            $api_key = get_option('sfaic_pdfshift_api_key');
         }
 
         if (empty($api_key)) {
-            return new WP_Error('no_api_key', __('api2pdf API key is not configured', 'chatgpt-fluent-connector'));
+            return new WP_Error('no_api_key', __('PDFShift API key is not configured', 'chatgpt-fluent-connector'));
         }
 
-        // Simple api2pdf implementation following their official documentation
-        return new SFAIC_Api2Pdf_Client($api_key);
+        // Simple PDFShift implementation following their official documentation
+        return new SFAIC_PDFShift_Client($api_key);
     }
 
     /**
-     * Test api2pdf service using official implementation pattern
+     * Test PDFShift service using official implementation pattern
      */
-    public function test_api2pdf_service($api_key = null) {
+    public function test_pdfshift_service($api_key = null) {
         try {
-            $client = $this->create_api2pdf_client($api_key);
+            $client = $this->create_pdfshift_client($api_key);
 
             if (is_wp_error($client)) {
                 return $client;
             }
 
             // Create test HTML following their documentation examples
-            $test_html = $this->get_api2pdf_test_html();
+            $test_html = $this->get_pdfshift_test_html();
 
-            // Use wkHtmlToPdf method as shown in their documentation (more cost-effective)
-            $result = $client->wkHtmlToPdf($test_html, true, 'test-api2pdf.pdf');
+            // Use their convert method as shown in their documentation
+            $result = $client->convert($test_html, array(
+                'format' => 'A4',
+                'orientation' => 'portrait',
+                'margin' => '15mm'
+            ));
 
             if (is_wp_error($result)) {
                 return $result;
             }
 
             return array(
-                'service' => 'api2pdf Cloud Service',
+                'service' => 'PDFShift Cloud Service',
                 'status' => 'success',
-                'message' => 'api2pdf service is working perfectly! Test PDF generated successfully using wkhtmltopdf engine.',
-                'pdf_url' => $result['file_url'],
-                'pdf_size' => isset($result['mb_out']) ? ($result['mb_out'] * 1024 * 1024) . ' bytes' : 'Unknown',
-                'cost' => $result['cost'] ?? 0,
-                'response_id' => $result['response_id'] ?? null,
+                'message' => 'PDFShift service is working perfectly! Test PDF generated successfully.',
+                'pdf_size' => strlen($result) . ' bytes',
                 'features' => array(
                     'cloud_based' => 'No local resources required',
-                    'high_quality' => 'Professional PDF rendering with wkhtmltopdf',
-                    'reliable' => 'Enterprise-grade service',
-                    'scalable' => 'Handles high volume requests',
-                    'cost_effective' => 'wkhtmltopdf engine for optimal pricing',
-                    'unicode_support' => 'Full UTF-8 and emoji support'
+                    'high_quality' => 'Professional PDF rendering with WebKit engine',
+                    'reliable' => 'Enterprise-grade service with 99.9% uptime',
+                    'scalable' => 'Handles high volume requests automatically',
+                    'fast' => 'Optimized conversion engine for speed',
+                    'unicode_support' => 'Full UTF-8 and emoji support',
+                    'css_support' => 'Complete CSS3 and modern web standards support'
                 )
             );
         } catch (Exception $e) {
-            return new WP_Error('api2pdf_test_error', __('api2pdf test error: ', 'chatgpt-fluent-connector') . $e->getMessage());
+            return new WP_Error('pdfshift_test_error', __('PDFShift test error: ', 'chatgpt-fluent-connector') . $e->getMessage());
         }
     }
 
     /**
-     * Generate PDF using official api2pdf pattern
+     * Generate PDF using official PDFShift pattern
      */
-    private function generate_pdf_with_api2pdf($html_content, $filename, $options = array()) {
+    private function generate_pdf_with_pdfshift($html_content, $filename, $options = array()) {
         try {
-            $client = $this->create_api2pdf_client($options['api_key'] ?? null);
+            $client = $this->create_pdfshift_client($options['api_key'] ?? null);
 
             if (is_wp_error($client)) {
                 return $client;
@@ -1345,52 +1345,26 @@ class SFAIC_PDF_Generator {
             $pdf_options = array();
 
             if (isset($options['orientation'])) {
-                $pdf_options['orientation'] = $options['orientation'] === 'L' ? 'Landscape' : 'Portrait';
+                $pdf_options['orientation'] = $options['orientation'] === 'L' ? 'landscape' : 'portrait';
             }
 
             if (isset($options['format'])) {
-                $pdf_options['pageSize'] = $options['format'];
+                $pdf_options['format'] = $options['format'];
             }
 
             if (isset($options['margin'])) {
-                $pdf_options['marginTop'] = $options['margin'] . 'mm';
-                $pdf_options['marginBottom'] = $options['margin'] . 'mm';
-                $pdf_options['marginLeft'] = $options['margin'] . 'mm';
-                $pdf_options['marginRight'] = $options['margin'] . 'mm';
+                $pdf_options['margin'] = $options['margin'] . 'mm';
             }
 
-            // Add encoding and media type options
-            $pdf_options['encoding'] = 'UTF-8';
-            $pdf_options['printMediaType'] = true;
+            // Generate PDF using PDFShift
+            $pdf_data = $client->convert($html_content, $pdf_options);
 
-            // Choose engine: wkhtmltopdf (cheaper) or Chrome (better CSS support)
-            $engine = $options['engine'] ?? 'wkhtmltopdf'; // default to wkhtmltopdf
-
-            if ($engine === 'chrome') {
-                // Use Chrome engine for better CSS/JS support (following their chromeHtmlToPdf method)
-                $result = $client->chromeHtmlToPdf($html_content, true, $filename . '.pdf', $pdf_options);
-            } else {
-                // Use wkhtmltopdf engine (default, more cost-effective)
-                $result = $client->wkHtmlToPdf($html_content, true, $filename . '.pdf', $pdf_options);
+            if (is_wp_error($pdf_data)) {
+                return $pdf_data;
             }
-
-            if (is_wp_error($result)) {
-                return $result;
-            }
-
-            // Download the PDF from the provided URL
-            $pdf_response = wp_remote_get($result['file_url'], array(
-                'timeout' => 60
-            ));
-
-            if (is_wp_error($pdf_response)) {
-                return new WP_Error('pdf_download_failed', __('Failed to download PDF from api2pdf: ', 'chatgpt-fluent-connector') . $pdf_response->get_error_message());
-            }
-
-            $pdf_data = wp_remote_retrieve_body($pdf_response);
 
             if (empty($pdf_data)) {
-                return new WP_Error('empty_pdf', __('Received empty PDF from api2pdf service', 'chatgpt-fluent-connector'));
+                return new WP_Error('empty_pdf', __('Received empty PDF from PDFShift service', 'chatgpt-fluent-connector'));
             }
 
             // Validate PDF header
@@ -1402,100 +1376,74 @@ class SFAIC_PDF_Generator {
             $save_result = $this->save_enhanced_pdf_data($pdf_data, $filename);
 
             if (!is_wp_error($save_result)) {
-                // Add api2pdf specific metadata
-                $save_result['service'] = 'api2pdf';
-                $save_result['engine'] = $engine;
-                $save_result['response_id'] = $result['response_id'] ?? null;
-                $save_result['cost'] = $result['cost'] ?? null;
-                $save_result['mb_out'] = $result['mb_out'] ?? null;
+                // Add PDFShift specific metadata
+                $save_result['service'] = 'pdfshift';
+                $save_result['engine'] = 'webkit';
             }
 
             return $save_result;
         } catch (Exception $e) {
-            return new WP_Error('api2pdf_generation_error', __('api2pdf generation error: ', 'chatgpt-fluent-connector') . $e->getMessage());
+            return new WP_Error('pdfshift_generation_error', __('PDFShift generation error: ', 'chatgpt-fluent-connector') . $e->getMessage());
         }
     }
 }
 
 /**
- * Simple api2pdf client following official documentation
- * Based on: https://github.com/Api2Pdf/api2pdf.php
+ * Simple PDFShift client following official documentation
+ * Based on: https://pdfshift.io/documentation/convert
  */
-class SFAIC_Api2Pdf_Client {
+class SFAIC_PDFShift_Client {
 
     private $apiKey;
     private $base_url;
 
-    public function __construct($apiKey, $base_url = 'https://v2.api2pdf.com') {
+    public function __construct($apiKey, $base_url = 'https://api.pdfshift.io/v3/convert/pdf') {
         $this->apiKey = $apiKey;
         $this->base_url = $base_url;
     }
 
     /**
-     * Convert HTML to PDF using wkhtmltopdf
+     * Convert HTML to PDF using PDFShift
      * Following official documentation pattern
      */
-    public function wkHtmlToPdf($html, $inline = true, $filename = null, $options = null) {
-        $payload = $this->buildPayloadBase($inline, $filename, $options);
-        $payload['html'] = $html;
-
-        return $this->makeRequest('/wkhtmltopdf/html', $payload);
-    }
-
-    /**
-     * Convert HTML to PDF using Chrome
-     * Following official documentation pattern  
-     */
-    public function chromeHtmlToPdf($html, $inline = true, $filename = null, $options = null) {
-        $payload = $this->buildPayloadBase($inline, $filename, $options);
-        $payload['html'] = $html;
-
-        return $this->makeRequest('/chrome/pdf/html', $payload);
-    }
-
-    /**
-     * Build payload base following official pattern
-     */
-    private function buildPayloadBase($inline, $filename, $options) {
+    public function convert($html, $options = array()) {
         $payload = array(
-            'inlinePdf' => $inline
+            'source' => $html
         );
 
-        if ($filename !== null) {
-            $payload['fileName'] = $filename;
+        // Add options if provided
+        if (!empty($options)) {
+            foreach ($options as $key => $value) {
+                $payload[$key] = $value;
+            }
         }
 
-        if ($options !== null) {
-            $payload['options'] = $options;
-        }
-
-        return $payload;
+        return $this->makeRequest($payload);
     }
 
     /**
      * Make request following official documentation
-     * Based on their makeRequest method
+     * Based on their API documentation examples
      */
-    private function makeRequest($endpoint, $payload) {
-        $url = $this->base_url . $endpoint;
-
-        $ch = curl_init($url);
-
+    private function makeRequest($payload) {
         $jsonDataEncoded = json_encode($payload);
+
+        $ch = curl_init($this->base_url);
 
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 1);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonDataEncoded);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60); // 60 seconds timeout
 
-        // Official authorization header format (no "Bearer" prefix)
+        // Official authorization header format using Bearer token
         curl_setopt(
                 $ch,
                 CURLOPT_HTTPHEADER,
                 [
                     'Content-Type: application/json',
-                    'Authorization: ' . $this->apiKey
+                    'Authorization: Bearer ' . $this->apiKey
                 ]
         );
 
@@ -1511,28 +1459,13 @@ class SFAIC_Api2Pdf_Client {
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            return new WP_Error('api_error', __('API request failed with HTTP code: ', 'chatgpt-fluent-connector') . $httpCode);
+            // Try to decode JSON error response
+            $error_data = json_decode($response, true);
+            $error_message = $error_data['error'] ?? 'HTTP error: ' . $httpCode;
+            return new WP_Error('api_error', __('PDFShift API error: ', 'chatgpt-fluent-connector') . $error_message);
         }
 
-        $result = json_decode($response, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return new WP_Error('json_error', __('Invalid JSON response from api2pdf', 'chatgpt-fluent-connector'));
-        }
-
-        // Handle API response following their documentation
-        if (!isset($result['Success']) || $result['Success'] !== true) {
-            $error_message = $result['Error'] ?? 'Unknown error occurred';
-            return new WP_Error('api2pdf_failed', __('api2pdf request failed: ', 'chatgpt-fluent-connector') . $error_message);
-        }
-
-        // Return standardized result following their ApiResult pattern
-        return array(
-            'file_url' => $result['FileUrl'] ?? null,
-            'mb_out' => $result['MbOut'] ?? null,
-            'cost' => $result['Cost'] ?? null,
-            'response_id' => $result['ResponseId'] ?? null,
-            'success' => true
-        );
+        // PDFShift returns PDF binary data directly on success
+        return $response;
     }
 }
