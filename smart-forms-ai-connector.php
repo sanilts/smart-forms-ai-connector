@@ -2,8 +2,8 @@
 /**
  * Plugin Name: AromaPro Smart Forms AI Connector
  * Plugin URI: https://aromapro.com/
- * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing. Now includes api2pdf cloud service integration.
- * Version: 2.1.0
+ * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing. Now includes PDFShift and PageSnap cloud services integration.
+ * Version: 2.2.0
  * Author: Sanil T S
  * Author URI: https://www.fb.com/sanilts
  * License: GPL-2.0+
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('SFAIC_DIR', plugin_dir_path(__FILE__));
 define('SFAIC_URL', plugin_dir_url(__FILE__));
-define('SFAIC_VERSION', '2.1.0');
+define('SFAIC_VERSION', '2.2.0');
 
 /**
  * Main plugin class
@@ -235,7 +235,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Plugin activation (updated with api2pdf defaults)
+     * Plugin activation (updated with PageSnap defaults)
      */
     public function plugin_activation() {
         // Make sure the classes are loaded
@@ -304,13 +304,13 @@ class SFAIC_Main {
             update_option('sfaic_job_timeout', 300);
         }
 
-        // Set default PDF service options
+        // Set default PDF service options (updated with PageSnap)
         if (!get_option('sfaic_default_pdf_service')) {
-            // Check if mPDF is available, otherwise suggest api2pdf
+            // Check if mPDF is available, otherwise suggest PageSnap as it's often more cost-effective than PDFShift
             if (class_exists('Mpdf\Mpdf')) {
                 update_option('sfaic_default_pdf_service', 'mpdf');
             } else {
-                update_option('sfaic_default_pdf_service', 'api2pdf');
+                update_option('sfaic_default_pdf_service', 'pagesnap');
             }
         }
 
@@ -348,7 +348,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Add dashboard widget for background jobs monitoring (updated with PDF service info)
+     * Add dashboard widget for background jobs monitoring (updated with PageSnap PDF service info)
      */
     public function add_dashboard_widget() {
         if (current_user_can('manage_options') && isset($this->background_job_manager)) {
@@ -361,7 +361,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Render dashboard widget (enhanced with PDF service status)
+     * Render dashboard widget (enhanced with PageSnap PDF service status)
      */
     public function render_dashboard_widget() {
         if (!isset($this->background_job_manager)) {
@@ -376,7 +376,8 @@ class SFAIC_Main {
         // Get PDF service status
         $default_pdf_service = get_option('sfaic_default_pdf_service', 'mpdf');
         $mpdf_available = class_exists('Mpdf\Mpdf');
-        $api2pdf_available = !empty(get_option('sfaic_api2pdf_api_key'));
+        $pdfshift_available = !empty(get_option('sfaic_pdfshift_api_key'));
+        $pagesnap_available = !empty(get_option('sfaic_pagesnap_api_key'));
         ?>
         <div class="sfaic-dashboard-widget">
             <div class="sfaic-widget-status">
@@ -386,9 +387,12 @@ class SFAIC_Main {
                 </div>
                 
                 <div style="margin-bottom: 10px;">
-                    <?php if ($default_pdf_service === 'api2pdf'): ?>
-                        <span class="status-indicator <?php echo $api2pdf_available ? 'enabled' : 'disabled'; ?>"></span>
-                        <?php echo $api2pdf_available ? __('PDF Service: api2pdf (Ready)', 'chatgpt-fluent-connector') : __('PDF Service: api2pdf (API Key Required)', 'chatgpt-fluent-connector'); ?>
+                    <?php if ($default_pdf_service === 'pagesnap'): ?>
+                        <span class="status-indicator <?php echo $pagesnap_available ? 'enabled' : 'disabled'; ?>"></span>
+                        <?php echo $pagesnap_available ? __('PDF Service: PageSnap (Ready)', 'chatgpt-fluent-connector') : __('PDF Service: PageSnap (API Key Required)', 'chatgpt-fluent-connector'); ?>
+                    <?php elseif ($default_pdf_service === 'pdfshift'): ?>
+                        <span class="status-indicator <?php echo $pdfshift_available ? 'enabled' : 'disabled'; ?>"></span>
+                        <?php echo $pdfshift_available ? __('PDF Service: PDFShift (Ready)', 'chatgpt-fluent-connector') : __('PDF Service: PDFShift (API Key Required)', 'chatgpt-fluent-connector'); ?>
                     <?php else: ?>
                         <span class="status-indicator <?php echo $mpdf_available ? 'enabled' : 'disabled'; ?>"></span>
                         <?php echo $mpdf_available ? __('PDF Service: mPDF (Ready)', 'chatgpt-fluent-connector') : __('PDF Service: mPDF (Library Missing)', 'chatgpt-fluent-connector'); ?>
@@ -473,7 +477,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Display admin notice for first-time setup (updated with PDF service checks)
+     * Display admin notice for first-time setup (updated with PageSnap PDF service checks)
      */
     public function admin_setup_notice() {
         $screen = get_current_screen();
@@ -524,17 +528,20 @@ class SFAIC_Main {
             <?php
         }
 
-        // Check PDF service availability
+        // Check PDF service availability (updated with PageSnap)
         $default_pdf_service = get_option('sfaic_default_pdf_service', 'mpdf');
         $show_pdf_notice = false;
         $pdf_notice_message = '';
 
         if ($default_pdf_service === 'mpdf' && !class_exists('Mpdf\Mpdf')) {
             $show_pdf_notice = true;
-            $pdf_notice_message = __('<strong>AI API Connector:</strong> mPDF library is not installed. PDF generation will not work. Please install mPDF or switch to api2pdf service.', 'chatgpt-fluent-connector');
-        } elseif ($default_pdf_service === 'api2pdf' && empty(get_option('sfaic_api2pdf_api_key'))) {
+            $pdf_notice_message = __('<strong>AI API Connector:</strong> mPDF library is not installed. PDF generation will not work. Please install mPDF or switch to a cloud PDF service.', 'chatgpt-fluent-connector');
+        } elseif ($default_pdf_service === 'pdfshift' && empty(get_option('sfaic_pdfshift_api_key'))) {
             $show_pdf_notice = true;
-            $pdf_notice_message = __('<strong>AI API Connector:</strong> api2pdf API key is not configured. Please add your API key or switch to mPDF service.', 'chatgpt-fluent-connector');
+            $pdf_notice_message = __('<strong>AI API Connector:</strong> PDFShift API key is not configured. Please add your API key or switch to another PDF service.', 'chatgpt-fluent-connector');
+        } elseif ($default_pdf_service === 'pagesnap' && empty(get_option('sfaic_pagesnap_api_key'))) {
+            $show_pdf_notice = true;
+            $pdf_notice_message = __('<strong>AI API Connector:</strong> PageSnap API key is not configured. Please add your API key or switch to another PDF service.', 'chatgpt-fluent-connector');
         }
 
         if ($show_pdf_notice) {

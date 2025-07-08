@@ -1,6 +1,6 @@
 <?php
 /**
- * AI API Settings Class - Updated with PDFShift PDF Service Options
+ * AI API Settings Class - Complete with PageSnap PDF Service Options
  * 
  * Handles the plugin settings page and API credentials for multiple providers
  */
@@ -25,9 +25,23 @@ class SFAIC_Settings{
         add_action('wp_ajax_sfaic_test_api', array($this, 'ajax_test_api'));
         add_action('wp_ajax_sfaic_test_pdf', array($this, 'ajax_test_pdf'));
         add_action('wp_ajax_sfaic_test_pdfshift', array($this, 'ajax_test_pdfshift'));
+        add_action('wp_ajax_sfaic_test_pagesnap', array($this, 'ajax_test_pagesnap'));
         
         // Enqueue admin scripts
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+    }
+
+    /**
+     * Add admin menu
+     */
+    public function add_admin_menu() {
+        add_options_page(
+                __('AI API Connector', 'chatgpt-fluent-connector'),
+                __('AI API Connector', 'chatgpt-fluent-connector'),
+                'manage_options',
+                'sfaic-settings',
+                array($this, 'admin_page')
+        );
     }
 
     /**
@@ -62,6 +76,7 @@ class SFAIC_Settings{
             'test_nonce' => wp_create_nonce('sfaic_test_api'),
             'pdf_nonce' => wp_create_nonce('sfaic_test_pdf'),
             'pdfshift_nonce' => wp_create_nonce('sfaic_test_pdfshift'),
+            'pagesnap_nonce' => wp_create_nonce('sfaic_test_pagesnap'),
             'strings' => array(
                 'testing' => __('Testing...', 'chatgpt-fluent-connector'),
                 'success' => __('Success!', 'chatgpt-fluent-connector'),
@@ -208,8 +223,43 @@ class SFAIC_Settings{
             ));
         }
     }
-    
-    
+
+    /**
+     * AJAX handler for PageSnap testing
+     */
+    public function ajax_test_pagesnap() {
+        // Check nonce for security
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_test_pagesnap')) {
+            wp_die('Security check failed');
+        }
+
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $api_key = sanitize_text_field($_POST['api_key']);
+
+        // Test PageSnap service
+        if (isset(sfaic_main()->pdf_generator)) {
+            $result = sfaic_main()->pdf_generator->test_pagesnap_service($api_key);
+        } else {
+            $result = new WP_Error('pdf_not_available', __('PDF generator is not available', 'chatgpt-fluent-connector'));
+        }
+
+        if (is_wp_error($result)) {
+            wp_send_json(array(
+                'success' => false,
+                'message' => $result->get_error_message()
+            ));
+        } else {
+            wp_send_json(array(
+                'success' => true,
+                'message' => $result['message'],
+                'details' => $result
+            ));
+        }
+    }
 
     /**
      * Test API connection for a specific provider
@@ -301,19 +351,6 @@ class SFAIC_Settings{
     }
 
     /**
-     * Add admin menu
-     */
-    public function add_admin_menu() {
-        add_options_page(
-                __('AI API Connector', 'chatgpt-fluent-connector'),
-                __('AI API Connector', 'chatgpt-fluent-connector'),
-                'manage_options',
-                'sfaic-settings',
-                array($this, 'admin_page')
-        );
-    }
-
-    /**
      * Register plugin settings
      */
     public function register_settings() {
@@ -341,6 +378,7 @@ class SFAIC_Settings{
             'default' => 'mpdf'
         ));
         register_setting('sfaic_settings', 'sfaic_pdfshift_api_key');
+        register_setting('sfaic_settings', 'sfaic_pagesnap_api_key');
 
         // OpenAI Settings
         register_setting('sfaic_settings', 'sfaic_api_key');
@@ -449,6 +487,14 @@ class SFAIC_Settings{
                 'sfaic_pdf_section'
         );
 
+        add_settings_field(
+                'sfaic_pagesnap_api_key',
+                __('PageSnap API Key', 'chatgpt-fluent-connector'),
+                array($this, 'pagesnap_api_key_field_callback'),
+                'sfaic_settings',
+                'sfaic_pdf_section'
+        );
+
         // OpenAI Section
         add_settings_section(
                 'sfaic_openai_section',
@@ -546,138 +592,6 @@ class SFAIC_Settings{
         );
     }
 
-    // ... (keep all existing section callbacks unchanged)
-
-    /**
-     * PDF section description (updated for PDFShift)
-     */
-    public function pdf_section_callback() {
-        echo '<div style="background: #e8f5e8; padding: 20px; margin: 15px 0; border-left: 4px solid #28a745; border-radius: 0 3px 3px 0;">';
-        echo '<h3 style="margin-top: 0;">' . esc_html__('📄 PDF Generation Services', 'chatgpt-fluent-connector') . '</h3>';
-        echo '<p>' . esc_html__('Choose between local mPDF generation or cloud-based PDFShift service for creating PDF documents from AI responses.', 'chatgpt-fluent-connector') . '</p>';
-
-        echo '<div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-top: 15px;">';
-        echo '<h4 style="margin-top: 0; color: #28a745;">🔧 ' . esc_html__('Available PDF Services', 'chatgpt-fluent-connector') . '</h4>';
-        echo '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0;">';
-        
-        // Local mPDF info
-        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
-        echo '<h5 style="margin-top: 0; color: #333;">🏠 Local mPDF</h5>';
-        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
-        echo '<li>✅ ' . esc_html__('No external dependencies', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Works offline', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('No API costs', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Privacy friendly', 'chatgpt-fluent-connector') . '</li>';
-        echo '</ul>';
-        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
-        if (class_exists('Mpdf\Mpdf')) {
-            echo '<span style="color: #28a745;">✅ Available</span>';
-        } else {
-            echo '<span style="color: #dc3545;">❌ Library Missing</span>';
-        }
-        echo '</p></div>';
-
-        // PDFShift info
-        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
-        echo '<h5 style="margin-top: 0; color: #333;">☁️ PDFShift Cloud Service</h5>';
-        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
-        echo '<li>✅ ' . esc_html__('Professional quality rendering', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Enterprise-grade reliability', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Scalable for high volume', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Advanced HTML/CSS support', 'chatgpt-fluent-connector') . '</li>';
-        echo '</ul>';
-        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
-        $pdfshift_key = get_option('sfaic_pdfshift_api_key');
-        if (!empty($pdfshift_key)) {
-            echo '<span style="color: #28a745;">✅ API Key Configured</span>';
-        } else {
-            echo '<span style="color: #ffc107;">⚠️ API Key Required</span>';
-        }
-        echo '</p></div>';
-
-        echo '</div></div>';
-
-        echo '</div>';
-    }
-
-    /**
-     * Default PDF service field
-     */
-    public function default_pdf_service_field_callback() {
-        $default_service = get_option('sfaic_default_pdf_service', 'mpdf');
-        $mpdf_available = class_exists('Mpdf\Mpdf');
-        $pdfshift_available = !empty(get_option('sfaic_pdfshift_api_key'));
-        ?>
-        <select name="sfaic_default_pdf_service" id="sfaic_default_pdf_service">
-            <option value="mpdf" <?php selected($default_service, 'mpdf'); ?>>
-                <?php echo esc_html__('Local mPDF', 'chatgpt-fluent-connector'); ?>
-                <?php if (!$mpdf_available): ?>
-                    <?php echo esc_html__('(Not Available)', 'chatgpt-fluent-connector'); ?>
-                <?php endif; ?>
-            </option>
-            <option value="pdfshift" <?php selected($default_service, 'pdfshift'); ?>>
-                <?php echo esc_html__('PDFShift Cloud Service', 'chatgpt-fluent-connector'); ?>
-                <?php if (!$pdfshift_available): ?>
-                    <?php echo esc_html__('(API Key Required)', 'chatgpt-fluent-connector'); ?>
-                <?php endif; ?>
-            </option>
-        </select>
-        <p class="description">
-            <?php echo esc_html__('Choose the default PDF generation service for new prompts. You can override this setting for individual prompts.', 'chatgpt-fluent-connector'); ?>
-            <br><strong><?php echo esc_html__('Note:', 'chatgpt-fluent-connector'); ?></strong> 
-            <?php echo esc_html__('If the selected service is unavailable, the system will automatically fall back to mPDF if available.', 'chatgpt-fluent-connector'); ?>
-        </p>
-
-        <!-- Service status indicators -->
-        <div style="margin-top: 15px;">
-            <div class="service-status" style="display: inline-block; margin-right: 20px;">
-                <strong><?php echo esc_html__('mPDF Status:', 'chatgpt-fluent-connector'); ?></strong>
-                <?php if ($mpdf_available): ?>
-                    <span style="color: #28a745;">✅ <?php echo esc_html__('Available', 'chatgpt-fluent-connector'); ?></span>
-                <?php else: ?>
-                    <span style="color: #dc3545;">❌ <?php echo esc_html__('Library Missing', 'chatgpt-fluent-connector'); ?></span>
-                <?php endif; ?>
-            </div>
-            <div class="service-status" style="display: inline-block;">
-                <strong><?php echo esc_html__('PDFShift Status:', 'chatgpt-fluent-connector'); ?></strong>
-                <?php if ($pdfshift_available): ?>
-                    <span style="color: #28a745;">✅ <?php echo esc_html__('Ready', 'chatgpt-fluent-connector'); ?></span>
-                <?php else: ?>
-                    <span style="color: #ffc107;">⚠️ <?php echo esc_html__('API Key Required', 'chatgpt-fluent-connector'); ?></span>
-                <?php endif; ?>
-            </div>
-        </div>
-        <?php
-    }
-
-    /**
-     * PDFShift API Key field
-     */
-    public function pdfshift_api_key_field_callback() {
-        $api_key = get_option('sfaic_pdfshift_api_key');
-        ?>
-        <input type="password" name="sfaic_pdfshift_api_key" id="sfaic_pdfshift_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
-        <p class="description">
-            <?php echo esc_html__('Enter your PDFShift API key to enable cloud-based PDF generation.', 'chatgpt-fluent-connector'); ?> 
-            <a href="https://pdfshift.io/" target="_blank"><?php echo esc_html__('Get your API key from pdfshift.io', 'chatgpt-fluent-connector'); ?></a>
-        </p>
-
-        <!-- Test button for PDFShift -->
-        <div style="margin-top: 10px;">
-            <button type="button" id="test-pdfshift-btn" class="button button-secondary">
-                <span class="dashicons dashicons-cloud" style="vertical-align: middle; margin-right: 5px;"></span>
-                <?php _e('Test PDFShift Service', 'chatgpt-fluent-connector'); ?>
-            </button>
-            <div id="pdfshift-test-result" class="api-test-result" style="margin-top: 10px;"></div>
-        </div>
-
-        <div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
-            <h4 style="margin-top: 0;"><?php _e('💡 About PDFShift', 'chatgpt-fluent-connector'); ?></h4>
-            <p style="margin-bottom: 0;"><?php _e('PDFShift is a professional cloud service that converts HTML to PDF with high-quality rendering. It offers reliable, scalable PDF generation with advanced HTML/CSS support and excellent performance for production environments.', 'chatgpt-fluent-connector'); ?></p>
-        </div>
-        <?php
-    }
-
     /**
      * General section description
      */
@@ -710,6 +624,96 @@ class SFAIC_Settings{
         echo esc_html__('Monitor Background Jobs', 'chatgpt-fluent-connector') . '</a></p>';
         echo '</div>';
         echo '</div>';
+    }
+
+    /**
+     * PDF section description (updated for PageSnap)
+     */
+    public function pdf_section_callback() {
+        echo '<div style="background: #e8f5e8; padding: 20px; margin: 15px 0; border-left: 4px solid #28a745; border-radius: 0 3px 3px 0;">';
+        echo '<h3 style="margin-top: 0;">' . esc_html__('📄 PDF Generation Services', 'chatgpt-fluent-connector') . '</h3>';
+        echo '<p>' . esc_html__('Choose between local mPDF generation or cloud-based services for creating PDF documents from AI responses.', 'chatgpt-fluent-connector') . '</p>';
+
+        echo '<div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-top: 15px;">';
+        echo '<h4 style="margin-top: 0; color: #28a745;">🔧 ' . esc_html__('Available PDF Services', 'chatgpt-fluent-connector') . '</h4>';
+        echo '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 15px 0;">';
+        
+        // Local mPDF info
+        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
+        echo '<h5 style="margin-top: 0; color: #333;">🏠 Local mPDF</h5>';
+        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
+        echo '<li>✅ ' . esc_html__('No external dependencies', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Works offline', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('No API costs', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Privacy friendly', 'chatgpt-fluent-connector') . '</li>';
+        echo '</ul>';
+        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
+        if (class_exists('Mpdf\Mpdf')) {
+            echo '<span style="color: #28a745;">✅ Available</span>';
+        } else {
+            echo '<span style="color: #dc3545;">❌ Library Missing</span>';
+        }
+        echo '</p></div>';
+
+        // PDFShift info
+        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
+        echo '<h5 style="margin-top: 0; color: #333;">☁️ PDFShift Cloud</h5>';
+        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
+        echo '<li>✅ ' . esc_html__('Professional quality', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Enterprise reliability', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Scalable for high volume', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Advanced HTML/CSS support', 'chatgpt-fluent-connector') . '</li>';
+        echo '</ul>';
+        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
+        $pdfshift_key = get_option('sfaic_pdfshift_api_key');
+        if (!empty($pdfshift_key)) {
+            echo '<span style="color: #28a745;">✅ API Key Configured</span>';
+        } else {
+            echo '<span style="color: #ffc107;">⚠️ API Key Required</span>';
+        }
+        echo '</p></div>';
+
+        // PageSnap info
+        echo '<div style="padding: 15px; border: 1px solid #ddd; border-radius: 5px;">';
+        echo '<h5 style="margin-top: 0; color: #333;">📸 PageSnap Cloud</h5>';
+        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 13px;">';
+        echo '<li>✅ ' . esc_html__('Chrome engine rendering', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('High-speed conversion', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Modern CSS3 support', 'chatgpt-fluent-connector') . '</li>';
+        echo '<li>✅ ' . esc_html__('Cost-effective pricing', 'chatgpt-fluent-connector') . '</li>';
+        echo '</ul>';
+        echo '<p style="margin: 0; font-size: 12px;"><strong>Status:</strong> ';
+        $pagesnap_key = get_option('sfaic_pagesnap_api_key');
+        if (!empty($pagesnap_key)) {
+            echo '<span style="color: #28a745;">✅ API Key Configured</span>';
+        } else {
+            echo '<span style="color: #ffc107;">⚠️ API Key Required</span>';
+        }
+        echo '</p></div>';
+
+        echo '</div></div>';
+        echo '</div>';
+    }
+
+    /**
+     * OpenAI section description
+     */
+    public function openai_section_callback() {
+        echo '<p>' . esc_html__('Enter your ChatGPT (OpenAI) API credentials below.', 'chatgpt-fluent-connector') . '</p>';
+    }
+
+    /**
+     * Gemini section description
+     */
+    public function gemini_section_callback() {
+        echo '<p>' . esc_html__('Enter your Google Gemini API credentials below.', 'chatgpt-fluent-connector') . '</p>';
+    }
+
+    /**
+     * Claude section description
+     */
+    public function claude_section_callback() {
+        echo '<p>' . esc_html__('Enter your Anthropic Claude API credentials below.', 'chatgpt-fluent-connector') . '</p>';
     }
 
     /**
@@ -799,24 +803,124 @@ class SFAIC_Settings{
     }
 
     /**
-     * OpenAI section description
+     * Default PDF service field (updated with PageSnap)
      */
-    public function openai_section_callback() {
-        echo '<p>' . esc_html__('Enter your ChatGPT (OpenAI) API credentials below.', 'chatgpt-fluent-connector') . '</p>';
+    public function default_pdf_service_field_callback() {
+        $default_service = get_option('sfaic_default_pdf_service', 'mpdf');
+        $mpdf_available = class_exists('Mpdf\Mpdf');
+        $pdfshift_available = !empty(get_option('sfaic_pdfshift_api_key'));
+        $pagesnap_available = !empty(get_option('sfaic_pagesnap_api_key'));
+        ?>
+        <select name="sfaic_default_pdf_service" id="sfaic_default_pdf_service">
+            <option value="mpdf" <?php selected($default_service, 'mpdf'); ?>>
+                <?php echo esc_html__('Local mPDF', 'chatgpt-fluent-connector'); ?>
+                <?php if (!$mpdf_available): ?>
+                    <?php echo esc_html__('(Not Available)', 'chatgpt-fluent-connector'); ?>
+                <?php endif; ?>
+            </option>
+            <option value="pdfshift" <?php selected($default_service, 'pdfshift'); ?>>
+                <?php echo esc_html__('PDFShift Cloud Service', 'chatgpt-fluent-connector'); ?>
+                <?php if (!$pdfshift_available): ?>
+                    <?php echo esc_html__('(API Key Required)', 'chatgpt-fluent-connector'); ?>
+                <?php endif; ?>
+            </option>
+            <option value="pagesnap" <?php selected($default_service, 'pagesnap'); ?>>
+                <?php echo esc_html__('PageSnap Cloud Service', 'chatgpt-fluent-connector'); ?>
+                <?php if (!$pagesnap_available): ?>
+                    <?php echo esc_html__('(API Key Required)', 'chatgpt-fluent-connector'); ?>
+                <?php endif; ?>
+            </option>
+        </select>
+        <p class="description">
+            <?php echo esc_html__('Choose the default PDF generation service for new prompts. You can override this setting for individual prompts.', 'chatgpt-fluent-connector'); ?>
+            <br><strong><?php echo esc_html__('Note:', 'chatgpt-fluent-connector'); ?></strong> 
+            <?php echo esc_html__('If the selected service is unavailable, the system will automatically fall back to mPDF if available.', 'chatgpt-fluent-connector'); ?>
+        </p>
+
+        <!-- Service status indicators -->
+        <div style="margin-top: 15px;">
+            <div class="service-status" style="display: inline-block; margin-right: 15px;">
+                <strong><?php echo esc_html__('mPDF:', 'chatgpt-fluent-connector'); ?></strong>
+                <?php if ($mpdf_available): ?>
+                    <span style="color: #28a745;">✅ <?php echo esc_html__('Available', 'chatgpt-fluent-connector'); ?></span>
+                <?php else: ?>
+                    <span style="color: #dc3545;">❌ <?php echo esc_html__('Missing', 'chatgpt-fluent-connector'); ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="service-status" style="display: inline-block; margin-right: 15px;">
+                <strong><?php echo esc_html__('PDFShift:', 'chatgpt-fluent-connector'); ?></strong>
+                <?php if ($pdfshift_available): ?>
+                    <span style="color: #28a745;">✅ <?php echo esc_html__('Ready', 'chatgpt-fluent-connector'); ?></span>
+                <?php else: ?>
+                    <span style="color: #ffc107;">⚠️ <?php echo esc_html__('Key Required', 'chatgpt-fluent-connector'); ?></span>
+                <?php endif; ?>
+            </div>
+            <div class="service-status" style="display: inline-block;">
+                <strong><?php echo esc_html__('PageSnap:', 'chatgpt-fluent-connector'); ?></strong>
+                <?php if ($pagesnap_available): ?>
+                    <span style="color: #28a745;">✅ <?php echo esc_html__('Ready', 'chatgpt-fluent-connector'); ?></span>
+                <?php else: ?>
+                    <span style="color: #ffc107;">⚠️ <?php echo esc_html__('Key Required', 'chatgpt-fluent-connector'); ?></span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
     }
 
     /**
-     * Gemini section description
+     * PDFShift API Key field
      */
-    public function gemini_section_callback() {
-        echo '<p>' . esc_html__('Enter your Google Gemini API credentials below.', 'chatgpt-fluent-connector') . '</p>';
+    public function pdfshift_api_key_field_callback() {
+        $api_key = get_option('sfaic_pdfshift_api_key');
+        ?>
+        <input type="password" name="sfaic_pdfshift_api_key" id="sfaic_pdfshift_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
+        <p class="description">
+            <?php echo esc_html__('Enter your PDFShift API key to enable cloud-based PDF generation.', 'chatgpt-fluent-connector'); ?> 
+            <a href="https://pdfshift.io/" target="_blank"><?php echo esc_html__('Get your API key from pdfshift.io', 'chatgpt-fluent-connector'); ?></a>
+        </p>
+
+        <!-- Test button for PDFShift -->
+        <div style="margin-top: 10px;">
+            <button type="button" id="test-pdfshift-btn" class="button button-secondary">
+                <span class="dashicons dashicons-cloud" style="vertical-align: middle; margin-right: 5px;"></span>
+                <?php _e('Test PDFShift Service', 'chatgpt-fluent-connector'); ?>
+            </button>
+            <div id="pdfshift-test-result" class="api-test-result" style="margin-top: 10px;"></div>
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
+            <h4 style="margin-top: 0;"><?php _e('💡 About PDFShift', 'chatgpt-fluent-connector'); ?></h4>
+            <p style="margin-bottom: 0;"><?php _e('PDFShift is a professional cloud service that converts HTML to PDF with high-quality rendering. It offers reliable, scalable PDF generation with advanced HTML/CSS support and excellent performance for production environments.', 'chatgpt-fluent-connector'); ?></p>
+        </div>
+        <?php
     }
 
     /**
-     * Claude section description
+     * PageSnap API Key field
      */
-    public function claude_section_callback() {
-        echo '<p>' . esc_html__('Enter your Anthropic Claude API credentials below.', 'chatgpt-fluent-connector') . '</p>';
+    public function pagesnap_api_key_field_callback() {
+        $api_key = get_option('sfaic_pagesnap_api_key');
+        ?>
+        <input type="password" name="sfaic_pagesnap_api_key" id="sfaic_pagesnap_api_key" value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
+        <p class="description">
+            <?php echo esc_html__('Enter your PageSnap API key to enable cloud-based PDF generation.', 'chatgpt-fluent-connector'); ?> 
+            <a href="https://pagesnap.co/" target="_blank"><?php echo esc_html__('Get your API key from pagesnap.co', 'chatgpt-fluent-connector'); ?></a>
+        </p>
+
+        <!-- Test button for PageSnap -->
+        <div style="margin-top: 10px;">
+            <button type="button" id="test-pagesnap-btn" class="button button-secondary">
+                <span class="dashicons dashicons-camera" style="vertical-align: middle; margin-right: 5px;"></span>
+                <?php _e('Test PageSnap Service', 'chatgpt-fluent-connector'); ?>
+            </button>
+            <div id="pagesnap-test-result" class="api-test-result" style="margin-top: 10px;"></div>
+        </div>
+
+        <div style="background: #e3f2fd; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
+            <h4 style="margin-top: 0;"><?php _e('💡 About PageSnap', 'chatgpt-fluent-connector'); ?></h4>
+            <p style="margin-bottom: 0;"><?php _e('PageSnap is a high-performance cloud service that converts HTML to PDF using Chrome rendering engine. It offers fast, reliable PDF generation with excellent modern web standards support and competitive pricing.', 'chatgpt-fluent-connector'); ?></p>
+        </div>
+        <?php
     }
 
     /**
@@ -977,7 +1081,7 @@ class SFAIC_Settings{
     }
 
     /**
-     * Admin page HTML (updated with PDFShift service testing)
+     * Admin page HTML (updated with PageSnap service testing)
      */
     public function admin_page() {
         if (!current_user_can('manage_options')) {
@@ -1013,7 +1117,12 @@ class SFAIC_Settings{
                         echo $background_enabled ? 'Enabled' : 'Disabled';
                         ?></li>
                     <li><?php
-                        if ($default_pdf_service === 'pdfshift') {
+                        if ($default_pdf_service === 'pagesnap') {
+                            $pagesnap_available = !empty(get_option('sfaic_pagesnap_api_key'));
+                            echo $pagesnap_available ? '✅' : '⚠️';
+                            echo ' ' . __('PDF Service:', 'chatgpt-fluent-connector') . ' ';
+                            echo $pagesnap_available ? 'PageSnap (Ready)' : 'PageSnap (API Key Required)';
+                        } elseif ($default_pdf_service === 'pdfshift') {
                             $pdfshift_available = !empty(get_option('sfaic_pdfshift_api_key'));
                             echo $pdfshift_available ? '✅' : '⚠️';
                             echo ' ' . __('PDF Service:', 'chatgpt-fluent-connector') . ' ';
@@ -1068,7 +1177,7 @@ class SFAIC_Settings{
                     </table>
                 </div>
 
-                <!-- PDF Services Section -->
+                <!-- Enhanced PDF Services Section -->
                 <div class="sfaic-settings-section" id="sfaic_pdf_section">
                     <h2><?php _e('PDF Generation Settings', 'chatgpt-fluent-connector'); ?> <span class="sfaic-pdf-badge">PDF</span></h2>
                     <?php $this->pdf_section_callback(); ?>
@@ -1082,9 +1191,13 @@ class SFAIC_Settings{
                             <th scope="row"><?php _e('PDFShift API Key', 'chatgpt-fluent-connector'); ?></th>
                             <td><?php $this->pdfshift_api_key_field_callback(); ?></td>
                         </tr>
+                        <tr>
+                            <th scope="row"><?php _e('PageSnap API Key', 'chatgpt-fluent-connector'); ?></th>
+                            <td><?php $this->pagesnap_api_key_field_callback(); ?></td>
+                        </tr>
                     </table>
 
-                    <!-- PDF Test Section -->
+                    <!-- Enhanced PDF Test Section -->
                     <div style="background: #f8f9ff; padding: 15px; margin: 15px 0; border-left: 4px solid #2196f3; border-radius: 0 3px 3px 0;">
                         <h4 style="margin-top: 0;"><?php _e('🧪 Test PDF Services', 'chatgpt-fluent-connector'); ?></h4>
                         <p><?php _e('Test your PDF generation services to ensure they are working correctly:', 'chatgpt-fluent-connector'); ?></p>
@@ -1394,6 +1507,60 @@ class SFAIC_Settings{
                             } else {
                                 var html = '<div class="notice notice-error inline">';
                                 html += '<p><strong>❌ PDFShift Test Failed</strong></p>';
+                                html += '<p><strong>Error:</strong> ' + response.message + '</p>';
+                                html += '</div>';
+                            }
+
+                            resultDiv.html(html);
+                        }).fail(function () {
+                            button.prop('disabled', false);
+                            button.find('.dashicons').removeClass('spin');
+                            resultDiv.html('<div class="notice notice-error inline"><p>Request failed. Please try again.</p></div>');
+                        });
+                    });
+
+                    // PageSnap Test button
+                    $('#test-pagesnap-btn').click(function () {
+                        var button = $(this);
+                        var resultDiv = $('#pagesnap-test-result');
+                        var apiKey = $('#sfaic_pagesnap_api_key').val();
+
+                        if (!apiKey) {
+                            resultDiv.html('<div class="notice notice-error inline"><p>Please enter a PageSnap API key first.</p></div>');
+                            return;
+                        }
+
+                        button.prop('disabled', true);
+                        button.find('.dashicons').addClass('spin');
+                        resultDiv.html('<div class="notice notice-info inline"><p>Testing PageSnap service...</p></div>');
+
+                        $.post(ajaxurl, {
+                            action: 'sfaic_test_pagesnap',
+                            nonce: sfaic_ajax.pagesnap_nonce,
+                            api_key: apiKey
+                        }, function (response) {
+                            button.prop('disabled', false);
+                            button.find('.dashicons').removeClass('spin');
+
+                            if (response.success) {
+                                var html = '<div class="notice notice-success inline">';
+                                html += '<p><strong>✅ PageSnap Test Successful!</strong></p>';
+                                html += '<p><strong>Service:</strong> ' + response.details.service + '</p>';
+                                if (response.details.pdf_size) {
+                                    html += '<p><strong>Test PDF Size:</strong> ' + response.details.pdf_size + '</p>';
+                                }
+                                html += '<details style="margin-top: 10px;"><summary style="cursor: pointer; font-weight: bold;">View Service Features</summary>';
+                                html += '<div style="background: #f9f9f9; padding: 10px; margin-top: 5px; border-radius: 3px; font-size: 12px;">';
+                                if (response.details.features) {
+                                    for (var feature in response.details.features) {
+                                        html += '<strong>' + feature.replace(/_/g, ' ') + ':</strong> ' + response.details.features[feature] + '<br>';
+                                    }
+                                }
+                                html += '</div></details>';
+                                html += '</div>';
+                            } else {
+                                var html = '<div class="notice notice-error inline">';
+                                html += '<p><strong>❌ PageSnap Test Failed</strong></p>';
                                 html += '<p><strong>Error:</strong> ' + response.message + '</p>';
                                 html += '</div>';
                             }
