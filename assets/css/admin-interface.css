@@ -1,0 +1,501 @@
+/**
+ * Admin styles for ChatGPT & Gemini Fluent Forms Connector
+ * Updated with PDF generation styles
+ */
+
+/* Settings page styles */
+.sfaic-settings-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 3px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+
+.sfaic-provider-settings {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-radius: 3px;
+    position: relative;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+
+.sfaic-provider-settings h2 {
+    margin-top: 0;
+}
+
+/* Provider selector */
+#sfaic_api_provider {
+    padding: 5px 10px;
+    min-width: 200px;
+}
+
+/* API Key fields */
+input[name="sfaic_api_key"],
+input[name="sfaic_gemini_api_key"],
+input[name="sfaic_pdf_api_key"] {
+    padding: 5px 10px;
+    width: 100%;
+    max-width: 500px;
+}
+
+/* Connection test results */
+#connection-result {
+    background-color: #f9f9f9;
+    border-left: 4px solid #ccc;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+#connection-result.notice-success {
+    border-left-color: #46b450;
+}
+
+#connection-result.notice-error {
+    border-left-color: #dc3232;
+}
+
+#connection-result pre {
+    background: #fff;
+    padding: 10px;
+    border: 1px solid #eee;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Provider badges */
+.sfaic-api-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
+.sfaic-api-badge.openai {
+    background-color: #10a37f;
+    color: white;
+}
+
+.sfaic-api-badge.gemini {
+    background-color: #4285f4;
+    color: white;
+}
+
+.sfaic-api-badge.claude {
+    background-color: #8B5CF6;
+    color: white;
+}
+
+/* PDF-specific badge */
+.sfaic-pdf-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 5px;
+    vertical-align: middle;
+    background-color: #e74c3c;
+    color: white;
+}
+
+/* Admin notices */
+.sfaic-notice {
+    padding: 12px;
+    margin: 15px 0;
+    border-left: 4px solid #00a0d2;
+    background-color: #fff;
+    box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
+}
+
+.sfaic-notice-warning {
+    border-left-color: #ffb900;
+}
+
+.sfaic-notice-error {
+    border-left-color: #dc3232;
+}
+
+.sfaic-notice-success {
+    border-left-color: #46b450;
+}
+
+/* PDF Settings Styles */
+.pdf-settings {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 10px;
+    transition: all 0.3s ease-in-out;
+}
+
+.pdf-settings .form-table th {
+    width: 200px;
+    font-weight: 600;
+    color: #333;
+}
+
+.pdf-settings .form-table td {
+    padding-left: 20px;
+}
+
+/* PDF Template textarea */
+#sfaic_pdf_template {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+/* PDF filename input */
+#sfaic_pdf_filename {
+    font-family: monospace;
+    background-color: #f9f9f9;
+}
+
+/* PDF format and orientation selects */
+#sfaic_pdf_format,
+#sfaic_pdf_orientation {
+    min-width: 120px;
+    padding: 5px;
+}
+
+/* PDF margin input */
+#sfaic_pdf_margin {
+    width: 80px;
+    text-align: center;
+}
+
+/* Template preview section */
+.sfaic-template-preview {
+    margin-top: 15px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    background-color: #fff;
+}
+
+.sfaic-template-preview h4 {
+    margin: 0;
+    padding: 10px 15px;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ddd;
+    font-size: 14px;
+}
+
+.sfaic-preview-container {
+    padding: 15px;
+    max-height: 300px;
+    overflow: auto;
+}
+
+/* PDF attachment notice */
+.pdf-attachment-notice {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 0 3px 3px 0;
+}
+
+.pdf-attachment-notice .dashicons {
+    color: #2196f3;
+    margin-right: 5px;
+}
+
+/* PDF file status indicators */
+.pdf-status-generated {
+    color: #46b450;
+    font-weight: 600;
+}
+
+.pdf-status-error {
+    color: #dc3232;
+    font-weight: 600;
+}
+
+.pdf-status-pending {
+    color: #ffb900;
+    font-weight: 600;
+}
+
+/* PDF download link styling */
+.pdf-download-link {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: #0073aa;
+    color: white;
+    text-decoration: none;
+    border-radius: 3px;
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+.pdf-download-link:hover {
+    background-color: #005a87;
+    color: white;
+}
+
+.pdf-download-link .dashicons {
+    font-size: 14px;
+    line-height: 1;
+    margin-right: 3px;
+}
+
+/* Enhanced metabox styling for PDF settings */
+#sfaic_pdf_settings .inside {
+    margin: 0;
+    padding: 0;
+}
+
+#sfaic_pdf_settings .form-table {
+    margin-top: 0;
+}
+
+#sfaic_pdf_settings .form-table tr:first-child th,
+#sfaic_pdf_settings .form-table tr:first-child td {
+    border-top: none;
+}
+
+/* PDF test button styling */
+#test-pdf-connection {
+    background-color: #e74c3c;
+    border-color: #c0392b;
+    color: white;
+}
+
+#test-pdf-connection:hover {
+    background-color: #c0392b;
+    border-color: #a93226;
+}
+
+/* PDF settings section highlight */
+.sfaic-settings-section h2:before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background-color: #0073aa;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+/* PDF-specific section styling */
+.sfaic-settings-section:has([name*="pdf"]) h2:before {
+    background-color: #e74c3c;
+}
+
+/* PDF generation status in logs */
+.sfaic-pdf-status {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.sfaic-pdf-status.generated {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.sfaic-pdf-status.failed {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.sfaic-pdf-status.disabled {
+    background-color: #e2e3e5;
+    color: #6c757d;
+    border: 1px solid #d6d8db;
+}
+
+/* Additional PDF template styling */
+details[open] pre {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #0073aa;
+    margin-bottom: 5px;
+}
+
+details summary:hover {
+    color: #005a87;
+}
+
+/* Email Template Editor Styles */
+.sfaic-email-editor-wrapper {
+    margin-top: 10px;
+}
+
+.sfaic-email-editor-wrapper .wp-editor-container {
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.sfaic-email-editor-wrapper .description {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 3px;
+    margin-top: 10px;
+}
+
+.sfaic-email-editor-wrapper .description code {
+    background-color: #fff;
+    padding: 2px 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #d63638;
+}
+
+/* Admin Email Section Styles */
+.form-table th h3 {
+    font-size: 1.3em;
+    margin-bottom: 10px;
+}
+
+.admin-email-settings {
+    background-color: #f9f9f9;
+}
+
+.admin-email-settings td {
+    padding-left: 30px;
+}
+
+/* Email Preview Toggle */
+.email-preview-toggle {
+    margin-top: 10px;
+}
+
+.email-preview-toggle button {
+    background: #0073aa;
+    color: white;
+    border: none;
+    padding: 5px 15px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.email-preview-toggle button:hover {
+    background: #005a87;
+}
+
+/* Placeholder help section */
+.placeholder-help {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 3px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.placeholder-help h4 {
+    margin-top: 0;
+    font-size: 14px;
+}
+
+.placeholder-help .placeholder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.placeholder-help .placeholder-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.placeholder-help .placeholder-item code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+/* Form data table preview */
+.form-data-preview {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.form-data-preview table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.form-data-preview th,
+.form-data-preview td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.form-data-preview th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+/* Prompt editor styles */
+.post-type-sfaic_prompt .form-table th {
+    width: 200px;
+}
+
+/* Responsive fixes */
+@media screen and (max-width: 782px) {
+    .post-type-sfaic_prompt .form-table th {
+        width: auto;
+    }
+    
+    .pdf-settings .form-table th {
+        width: auto;
+        display: block;
+        padding-bottom: 5px;
+    }
+    
+    .pdf-settings .form-table td {
+        padding-left: 0;
+        display: block;
+    }
+    
+    input[name="sfaic_api_key"],
+    input[name="sfaic_gemini_api_key"],
+    input[name="sfaic_pdf_api_key"] {
+        width: 100%;
+        max-width: none;
+    }
+    
+    .sfaic-email-editor-wrapper .description {
+        font-size: 13px;
+    }
+    
+    .placeholder-help .placeholder-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .admin-email-settings td {
+        padding-left: 0;
+    }
+}
