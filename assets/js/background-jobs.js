@@ -1,7 +1,5 @@
 /**
- * Complete Background Jobs Admin Interface JavaScript - Debug Section Removed
- * 
- * Replace your existing assets/js/background-jobs.js with this complete file
+ * WordPress-Style Background Jobs Admin Interface JavaScript
  */
 
 jQuery(document).ready(function($) {
@@ -18,7 +16,7 @@ jQuery(document).ready(function($) {
     init();
     
     function init() {
-        console.log('SFAIC: Initializing background jobs interface');
+        console.log('SFAIC: Initializing WordPress-style background jobs interface');
         
         // Bind event handlers
         bindEventHandlers();
@@ -162,14 +160,14 @@ jQuery(document).ready(function($) {
                         <button type="button" class="button button-small" id="auto-fix-stuck-jobs" style="margin-left: 10px;">
                             Auto-Fix Now
                         </button>
-                        <button type="button" class="notice-dismiss" style="float: right;">
+                        <button type="button" class="notice-dismiss">
                             <span class="screen-reader-text">Dismiss</span>
                         </button>
                     </p>
                 </div>
             `);
             
-            $('.sfaic-jobs-overview').after(warning);
+            $('.wp-header-end').after(warning);
             
             // Bind auto-fix handler
             $('#auto-fix-stuck-jobs').off('click').on('click', function() {
@@ -189,9 +187,11 @@ jQuery(document).ready(function($) {
      */
     function addKeyboardShortcutsInfo() {
         const shortcutsInfo = `
-            <div class="sfaic-shortcuts-info" style="background: #e8f5e8; border: 1px solid #c3e6cb; padding: 10px; margin: 10px 0; border-radius: 3px; font-size: 12px;">
-                <strong>⌨️ Keyboard Shortcuts:</strong> 
-                Press <kbd>R</kbd> to refresh, <kbd>F</kbd> to force process jobs
+            <div class="notice notice-info inline" style="margin: 15px 0; font-size: 13px;">
+                <p>
+                    <strong>⌨️ Keyboard Shortcuts:</strong> 
+                    Press <kbd>R</kbd> to refresh, <kbd>F</kbd> to force process jobs
+                </p>
             </div>
         `;
         
@@ -217,7 +217,7 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // Main action buttons (already in the PHP template)
+        // Main action buttons
         $(document).off('click', '#sfaic-force-process').on('click', '#sfaic-force-process', function(e) {
             e.preventDefault();
             if (confirm('This will force immediate processing of pending jobs. Continue?')) {
@@ -251,10 +251,10 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // Table row click handling for error messages
+        // Table row click handling for error messages - Updated for WordPress table structure
         $(document).off('click', '.sfaic-jobs-table tbody tr').on('click', '.sfaic-jobs-table tbody tr', function(e) {
-            // Don't trigger if clicking on a button
-            if ($(e.target).is('button') || $(e.target).closest('button').length) {
+            // Don't trigger if clicking on a button or link
+            if ($(e.target).is('button, a') || $(e.target).closest('button, a').length) {
                 return;
             }
             
@@ -318,10 +318,6 @@ jQuery(document).ready(function($) {
             // Store scroll position to restore after refresh
             const scrollPosition = $(window).scrollTop();
             
-            // Add loading overlay to prevent interactions
-            const loadingOverlay = $('<div class="sfaic-loading-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.7); z-index: 100; display: flex; align-items: center; justify-content: center;"><div style="background: #fff; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);"><span class="dashicons dashicons-update spin" style="margin-right: 10px;"></span>Refreshing jobs...</div></div>');
-            $('.sfaic-jobs-table').closest('.wrap').css('position', 'relative').append(loadingOverlay);
-            
             $.ajax({
                 url: sfaic_jobs_ajax.ajax_url,
                 method: 'POST',
@@ -367,9 +363,6 @@ jQuery(document).ready(function($) {
                     reject(errorMsg);
                 },
                 complete: function() {
-                    // Remove loading overlay
-                    $('.sfaic-loading-overlay').remove();
-                    
                     // Restore button state
                     button.prop('disabled', false);
                     button.find('.dashicons').removeClass('spin');
@@ -408,13 +401,14 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Improved table update that prevents layout issues
+     * Improved table update that prevents layout issues - Updated for WordPress style
      */
     function updateJobsTable(jobs) {
         const tbody = $('#sfaic-jobs-tbody');
+        const tableWrapper = $('.sfaic-jobs-table-wrapper');
         
-        if (!tbody.length) {
-            console.error('SFAIC: Jobs table body not found');
+        if (!tbody.length && !tableWrapper.length) {
+            console.error('SFAIC: Jobs table not found');
             return;
         }
         
@@ -429,33 +423,76 @@ jQuery(document).ready(function($) {
             }
         });
         
+        if (!jobs || jobs.length === 0) {
+            // Show empty state
+            const emptyState = `
+                <div class="sfaic-no-jobs">
+                    <span class="dashicons dashicons-admin-post"></span>
+                    <h3>No jobs found</h3>
+                    <p>Background jobs will appear here when forms are submitted.</p>
+                </div>
+            `;
+            
+            if (tableWrapper.length) {
+                tableWrapper.html(emptyState);
+            }
+            return;
+        }
+        
+        // Ensure we have the table structure
+        if (!$('.sfaic-jobs-table').length) {
+            const tableHTML = `
+                <div class="tablenav top">
+                    <h3>Recent Jobs</h3>
+                </div>
+                <table class="wp-list-table widefat fixed striped sfaic-jobs-table">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="manage-column column-id">ID</th>
+                            <th scope="col" class="manage-column column-type">Type</th>
+                            <th scope="col" class="manage-column column-name">Name</th>
+                            <th scope="col" class="manage-column column-email">Email</th>
+                            <th scope="col" class="manage-column column-status">Status</th>
+                            <th scope="col" class="manage-column column-date">Created</th>
+                            <th scope="col" class="manage-column column-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sfaic-jobs-tbody">
+                    </tbody>
+                </table>
+            `;
+            
+            if (tableWrapper.length) {
+                tableWrapper.html(tableHTML);
+            }
+        }
+        
+        // Update tbody reference after potential recreation
+        const newTbody = $('#sfaic-jobs-tbody');
+        
         // Use document fragment for better performance
         const fragment = $(document.createDocumentFragment());
         
-        if (!jobs || jobs.length === 0) {
-            fragment.append('<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">No jobs found.</td></tr>');
-        } else {
-            // Build new content efficiently
-            jobs.forEach(function(job) {
-                const row = createJobRow(job);
-                fragment.append(row);
+        // Build new content efficiently
+        jobs.forEach(function(job, index) {
+            const row = createJobRow(job, index);
+            fragment.append(row);
+            
+            // Add error row if there's an error message
+            if (job.error_message) {
+                const errorRow = createErrorRow(job);
+                fragment.append(errorRow);
                 
-                // Add error row if there's an error message
-                if (job.error_message) {
-                    const errorRow = createErrorRow(job);
-                    fragment.append(errorRow);
-                    
-                    // Restore expanded state
-                    if (expandedRows.includes('error-' + job.id)) {
-                        errorRow.show();
-                    }
+                // Restore expanded state
+                if (expandedRows.includes('error-' + job.id)) {
+                    errorRow.show();
                 }
-            });
-        }
+            }
+        });
         
         // Use animation frame to prevent layout thrashing
         requestAnimationFrame(() => {
-            tbody.empty().append(fragment);
+            newTbody.empty().append(fragment);
             
             // Restore scroll position
             $(window).scrollTop(currentScrollTop);
@@ -463,9 +500,9 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Create job row element
+     * Create job row element - Updated for WordPress table style
      */
-    function createJobRow(job) {
+    function createJobRow(job, index) {
         const statusClass = 'status-' + job.status;
         let statusBadge = '<span class="status-badge ' + statusClass + '">' + 
                           job.status.charAt(0).toUpperCase() + job.status.slice(1) + '</span>';
@@ -477,7 +514,7 @@ jQuery(document).ready(function($) {
             const ageMinutes = (now - createdTime) / (1000 * 60);
             
             if (ageMinutes > 5) {
-                statusBadge += ' <span style="color: #dc3545; font-size: 11px;">⚠️ ' + Math.round(ageMinutes) + 'min old</span>';
+                statusBadge += '<br><small style="color: #d63638;">⚠️ ' + Math.round(ageMinutes) + 'min old</small>';
             }
         }
         
@@ -495,14 +532,16 @@ jQuery(document).ready(function($) {
         const userEmail = job.user_email ? 
             '<a href="mailto:' + job.user_email + '">' + job.user_email + '</a>' : '-';
         
-        return $('<tr data-job-id="' + job.id + '">' +
-                '<td>' + job.id + '</td>' +
-                '<td>' + job.job_type + '</td>' +
-                '<td>' + userName + '</td>' +
-                '<td>' + userEmail + '</td>' +
-                '<td>' + statusBadge + '</td>' +
-                '<td>' + createdDate + '</td>' +
-                '<td>' + actions + '</td>' +
+        const alternateClass = (index % 2 === 1) ? 'alternate' : '';
+        
+        return $('<tr class="' + alternateClass + '" data-job-id="' + job.id + '">' +
+                '<td class="column-id" data-label="ID"><strong>' + job.id + '</strong></td>' +
+                '<td class="column-type" data-label="Type">' + job.job_type + '</td>' +
+                '<td class="column-name" data-label="Name">' + userName + '</td>' +
+                '<td class="column-email" data-label="Email">' + userEmail + '</td>' +
+                '<td class="column-status" data-label="Status">' + statusBadge + '</td>' +
+                '<td class="column-date" data-label="Created">' + createdDate + '</td>' +
+                '<td class="column-actions" data-label="Actions">' + actions + '</td>' +
                 '</tr>');
     }
     
@@ -812,7 +851,7 @@ jQuery(document).ready(function($) {
      */
     function addAutoRefreshIndicator() {
         if ($('#sfaic-auto-refresh-indicator').length === 0) {
-            const indicator = $('<div id="sfaic-auto-refresh-indicator" class="notice notice-info inline">' +
+            const indicator = $('<div id="sfaic-auto-refresh-indicator">' +
                              '<p><span class="dashicons dashicons-update spin"></span> ' +
                              'Auto-refresh is enabled (updates every 15 seconds). ' +
                              '<a href="#" id="sfaic-toggle-auto-refresh">Disable</a></p>' +
@@ -829,7 +868,7 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Enhanced notice system with better timing and cleanup
+     * Enhanced notice system with better timing and cleanup - WordPress style
      */
     function showNotice(message, type, duration) {
         // Remove any existing notices of the same type to prevent stacking
@@ -844,8 +883,8 @@ jQuery(document).ready(function($) {
                        '</button>' +
                        '</div>');
         
-        // Insert after the h1
-        $('.wrap h1').after(notice);
+        // Insert after the header end
+        $('.wp-header-end').after(notice);
         
         // Auto-dismiss after appropriate time
         const dismissTime = duration || (type === 'error' ? 8000 : 4000);
@@ -864,57 +903,10 @@ jQuery(document).ready(function($) {
         console.log('SFAIC Notice (' + type + '):', message);
     }
     
-    // Add CSS for loading states and animations
+    // Add CSS for WordPress-style elements
     $('<style>')
         .prop('type', 'text/css')
         .html(`
-            @keyframes sfaic-spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-            @keyframes sfaic-pulse {
-                0% { opacity: 1; }
-                50% { opacity: 0.7; box-shadow: 0 0 10px rgba(220, 53, 69, 0.3); }
-                100% { opacity: 1; }
-            }
-            .spin {
-                animation: sfaic-spin 1s linear infinite;
-            }
-            .sfaic-pulse-animation {
-                animation: sfaic-pulse 2s infinite;
-            }
-            .sfaic-temp-notice {
-                margin: 15px 0;
-                position: relative;
-                z-index: 10;
-            }
-            .job-error-row {
-                background-color: #ffeaea !important;
-            }
-            .error-message {
-                padding: 10px;
-                background-color: #f8d7da;
-                border: 1px solid #f5c6cb;
-                border-radius: 3px;
-                color: #721c24;
-                font-size: 13px;
-                word-wrap: break-word;
-            }
-            .sfaic-stuck-jobs-warning {
-                border-left: 4px solid #dc3545;
-            }
-            .sfaic-loading-overlay {
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                bottom: 0 !important;
-                background: rgba(255,255,255,0.8) !important;
-                z-index: 9999 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-            }
             kbd {
                 background: #f7f7f7;
                 border: 1px solid #ccc;
@@ -927,6 +919,22 @@ jQuery(document).ready(function($) {
                 line-height: 1;
                 padding: 2px 4px;
                 white-space: nowrap;
+                margin: 0 2px;
+            }
+            .spin {
+                animation: rotation 1s infinite linear;
+            }
+            @keyframes rotation {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            .sfaic-pulse-animation {
+                animation: pulse 2s infinite;
+            }
+            @keyframes pulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.7; box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.4); }
+                100% { opacity: 1; }
             }
         `)
         .appendTo('head');
@@ -945,5 +953,5 @@ jQuery(document).ready(function($) {
     });
     
     // Initialize complete
-    console.log('SFAIC: Background jobs interface initialized successfully');
+    console.log('SFAIC: WordPress-style background jobs interface initialized successfully');
 });

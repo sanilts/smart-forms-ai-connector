@@ -1,8 +1,7 @@
 <?php
 /**
- * Complete FIXED Background Job Manager Class
- * 
- * Replace your existing includes/class-background-job-manager.php with this complete file
+ * WordPress-Style Background Job Manager Class
+ * Following WordPress admin design conventions
  */
 
 // Exit if accessed directly
@@ -698,7 +697,7 @@ class SFAIC_Background_Job_Manager {
     }
 
     /**
-     * ENHANCED: Get job statistics with proper data formatting
+     * Get job statistics with proper data formatting
      */
     public function get_job_statistics() {
         global $wpdb;
@@ -739,7 +738,7 @@ class SFAIC_Background_Job_Manager {
     }
 
     /**
-     * ENHANCED: Get recent jobs with proper formatting
+     * Get recent jobs with proper formatting
      */
     public function get_recent_jobs_enhanced($limit = 50) {
         global $wpdb;
@@ -847,7 +846,7 @@ class SFAIC_Background_Job_Manager {
     }
 
     /**
-     * ENHANCED: Jobs page rendering with better error handling
+     * WordPress-style jobs page rendering
      */
     public function render_jobs_page() {
         if (!current_user_can('manage_options')) {
@@ -877,31 +876,47 @@ class SFAIC_Background_Job_Manager {
             
             ?>
             <div class="wrap">
-                <h1><?php _e('Background Jobs Monitor', 'chatgpt-fluent-connector'); ?></h1>
+                <h1 class="wp-heading-inline"><?php _e('Background Jobs', 'chatgpt-fluent-connector'); ?></h1>
+                <hr class="wp-header-end">
                 
-                <!-- Enhanced debug section -->
-                <div class="notice notice-info">
+                <!-- System Status -->
+                <div class="sfaic-system-status">
                     <p>
                         <strong><?php _e('System Status:', 'chatgpt-fluent-connector'); ?></strong>
                         <?php _e('WP Cron:', 'chatgpt-fluent-connector'); ?> 
-                        <?php echo defined('DISABLE_WP_CRON') && DISABLE_WP_CRON ? '<span style="color: #dc3545;">❌ DISABLED</span>' : '<span style="color: #28a745;">✅ ENABLED</span>'; ?> | 
+                        <?php if (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON): ?>
+                            <span class="status-indicator disabled"></span><span style="color: #d63638;"><?php _e('Disabled', 'chatgpt-fluent-connector'); ?></span>
+                        <?php else: ?>
+                            <span class="status-indicator enabled"></span><span style="color: #00a32a;"><?php _e('Enabled', 'chatgpt-fluent-connector'); ?></span>
+                        <?php endif; ?> | 
+                        
                         <?php _e('Next Scheduled:', 'chatgpt-fluent-connector'); ?> 
                         <?php 
                             $next = wp_next_scheduled(self::CRON_HOOK);
                             if ($next) {
-                                echo '<span style="color: #28a745;">' . date('H:i:s', $next) . '</span>';
+                                echo '<span style="color: #00a32a;">' . date('H:i:s', $next) . '</span>';
                             } else {
-                                echo '<span style="color: #dc3545;">❌ None</span>';
+                                echo '<span style="color: #d63638;">' . __('None', 'chatgpt-fluent-connector') . '</span>';
                             }
-                        ?> |
+                        ?> | 
+                        
                         <?php _e('Background Processing:', 'chatgpt-fluent-connector'); ?> 
-                        <?php echo $background_enabled ? '<span style="color: #28a745;">✅ Available</span>' : '<span style="color: #ffc107;">⚠️ Disabled</span>'; ?> |
+                        <?php if ($background_enabled): ?>
+                            <span class="status-indicator enabled"></span><span style="color: #00a32a;"><?php _e('Available', 'chatgpt-fluent-connector'); ?></span>
+                        <?php else: ?>
+                            <span class="status-indicator disabled"></span><span style="color: #dba617;"><?php _e('Disabled', 'chatgpt-fluent-connector'); ?></span>
+                        <?php endif; ?> | 
+                        
                         <?php _e('Active Prompts:', 'chatgpt-fluent-connector'); ?> 
-                        <?php echo $has_bg_prompts ? '<span style="color: #28a745;">✅ ' . count($prompts_with_bg) . '</span>' : '<span style="color: #ffc107;">⚠️ None</span>'; ?>
+                        <?php if ($has_bg_prompts): ?>
+                            <span class="status-indicator enabled"></span><span style="color: #00a32a;"><?php echo count($prompts_with_bg); ?></span>
+                        <?php else: ?>
+                            <span class="status-indicator disabled"></span><span style="color: #dba617;"><?php _e('None', 'chatgpt-fluent-connector'); ?></span>
+                        <?php endif; ?>
                     </p>
                 </div>
 
-                <!-- Status Overview -->
+                <!-- Job Statistics -->
                 <div class="sfaic-jobs-overview">
                     <h2><?php _e('Job Statistics (Last 24 Hours)', 'chatgpt-fluent-connector'); ?></h2>
                     <div class="sfaic-stats-grid">
@@ -942,7 +957,7 @@ class SFAIC_Background_Job_Manager {
                         <span class="dashicons dashicons-controls-play"></span>
                         <?php _e('Force Process Jobs', 'chatgpt-fluent-connector'); ?>
                     </button>
-                    <button type="button" id="sfaic-cleanup-stuck" class="button button-secondary">
+                    <button type="button" id="sfaic-cleanup-stuck" class="button">
                         <span class="dashicons dashicons-undo"></span>
                         <?php _e('Reset Stuck Jobs', 'chatgpt-fluent-connector'); ?>
                     </button>
@@ -952,87 +967,100 @@ class SFAIC_Background_Job_Manager {
                     </button>
                 </div>
 
-                <!-- Jobs Table -->
-                <h3><?php _e('Recent Jobs', 'chatgpt-fluent-connector'); ?></h3>
-                <table class="wp-list-table widefat fixed striped sfaic-jobs-table">
-                    <thead>
-                        <tr>
-                            <th><?php _e('ID', 'chatgpt-fluent-connector'); ?></th>
-                            <th><?php _e('Type', 'chatgpt-fluent-connector'); ?></th>
-                            <th><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
-                            <th><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
-                            <th><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
-                            <th><?php _e('Created', 'chatgpt-fluent-connector'); ?></th>
-                            <th><?php _e('Actions', 'chatgpt-fluent-connector'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody id="sfaic-jobs-tbody">
-                        <?php if (!empty($recent_jobs)): ?>
-                            <?php foreach ($recent_jobs as $job): ?>
-                                <tr data-job-id="<?php echo esc_attr($job['id']); ?>">
-                                    <td><?php echo esc_html($job['id']); ?></td>
-                                    <td><?php echo esc_html($job['job_type']); ?></td>
-                                    <td><?php echo esc_html($job['user_name'] ?: '-'); ?></td>
-                                    <td>
-                                        <?php if ($job['user_email']): ?>
-                                            <a href="mailto:<?php echo esc_attr($job['user_email']); ?>"><?php echo esc_html($job['user_email']); ?></a>
-                                        <?php else: ?>
-                                            -
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <span class="status-badge status-<?php echo esc_attr($job['status']); ?>">
-                                            <?php echo esc_html(ucfirst($job['status'])); ?>
-                                        </span>
-                                        <?php if ($job['status'] === 'pending'): ?>
-                                            <?php
-                                            $age_minutes = (time() - strtotime($job['created_at'])) / 60;
-                                            if ($age_minutes > 5):
-                                            ?>
-                                                <span style="color: #dc3545; font-size: 11px;">⚠️ <?php echo round($age_minutes); ?>min old</span>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($job['created_at']))); ?></td>
-                                    <td>
-                                        <?php if (in_array($job['status'], array('failed', 'retry'))): ?>
-                                            <button type="button" class="button button-small sfaic-retry-job" data-job-id="<?php echo esc_attr($job['id']); ?>">
-                                                <?php _e('Retry', 'chatgpt-fluent-connector'); ?>
-                                            </button>
-                                        <?php endif; ?>
-                                        <?php if ($job['status'] === 'pending'): ?>
-                                            <button type="button" class="button button-small sfaic-cancel-job" data-job-id="<?php echo esc_attr($job['id']); ?>">
-                                                <?php _e('Cancel', 'chatgpt-fluent-connector'); ?>
-                                            </button>
-                                        <?php endif; ?>
-                                    </td>
+                <!-- Jobs Table WordPress Style -->
+                <div class="sfaic-jobs-table-wrapper">
+                    <div class="tablenav top">
+                        <h3><?php _e('Recent Jobs', 'chatgpt-fluent-connector'); ?></h3>
+                    </div>
+                    
+                    <?php if (!empty($recent_jobs)): ?>
+                        <table class="wp-list-table widefat fixed striped sfaic-jobs-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="manage-column column-id"><?php _e('ID', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-type"><?php _e('Type', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-name"><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-email"><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-status"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-date"><?php _e('Created', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-actions"><?php _e('Actions', 'chatgpt-fluent-connector'); ?></th>
                                 </tr>
-                                <?php if (!empty($job['error_message'])): ?>
-                                    <tr class="job-error-row" style="display: none;" id="error-<?php echo esc_attr($job['id']); ?>">
-                                        <td colspan="7">
-                                            <div class="error-message">
-                                                <strong><?php _e('Error:', 'chatgpt-fluent-connector'); ?></strong> 
-                                                <?php echo esc_html($job['error_message']); ?>
-                                            </div>
+                            </thead>
+                            <tbody id="sfaic-jobs-tbody">
+                                <?php foreach ($recent_jobs as $index => $job): ?>
+                                    <tr class="<?php echo ($index % 2 === 1) ? 'alternate' : ''; ?>" data-job-id="<?php echo esc_attr($job['id']); ?>">
+                                        <td class="column-id" data-label="ID">
+                                            <strong><?php echo esc_html($job['id']); ?></strong>
+                                        </td>
+                                        <td class="column-type" data-label="Type">
+                                            <?php echo esc_html($job['job_type']); ?>
+                                        </td>
+                                        <td class="column-name" data-label="Name">
+                                            <?php echo esc_html($job['user_name'] ?: '-'); ?>
+                                        </td>
+                                        <td class="column-email" data-label="Email">
+                                            <?php if ($job['user_email']): ?>
+                                                <a href="mailto:<?php echo esc_attr($job['user_email']); ?>"><?php echo esc_html($job['user_email']); ?></a>
+                                            <?php else: ?>
+                                                -
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="column-status" data-label="Status">
+                                            <span class="status-badge status-<?php echo esc_attr($job['status']); ?>">
+                                                <?php echo esc_html(ucfirst($job['status'])); ?>
+                                            </span>
+                                            <?php if ($job['status'] === 'pending'): ?>
+                                                <?php
+                                                $age_minutes = (time() - strtotime($job['created_at'])) / 60;
+                                                if ($age_minutes > 5):
+                                                ?>
+                                                    <br><small style="color: #d63638;">⚠️ <?php echo round($age_minutes); ?>min old</small>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="column-date" data-label="Created">
+                                            <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($job['created_at']))); ?>
+                                        </td>
+                                        <td class="column-actions" data-label="Actions">
+                                            <?php if (in_array($job['status'], array('failed', 'retry'))): ?>
+                                                <button type="button" class="button button-small sfaic-retry-job" data-job-id="<?php echo esc_attr($job['id']); ?>">
+                                                    <?php _e('Retry', 'chatgpt-fluent-connector'); ?>
+                                                </button>
+                                            <?php endif; ?>
+                                            <?php if ($job['status'] === 'pending'): ?>
+                                                <button type="button" class="button button-small sfaic-cancel-job" data-job-id="<?php echo esc_attr($job['id']); ?>">
+                                                    <?php _e('Cancel', 'chatgpt-fluent-connector'); ?>
+                                                </button>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr>
-                                <td colspan="7" style="text-align: center; padding: 20px; color: #666;">
-                                    <?php _e('No jobs found.', 'chatgpt-fluent-connector'); ?>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                                    <?php if (!empty($job['error_message'])): ?>
+                                        <tr class="job-error-row" style="display: none;" id="error-<?php echo esc_attr($job['id']); ?>">
+                                            <td colspan="7">
+                                                <div class="error-message">
+                                                    <strong><?php _e('Error:', 'chatgpt-fluent-connector'); ?></strong> 
+                                                    <?php echo esc_html($job['error_message']); ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php else: ?>
+                        <div class="sfaic-no-jobs">
+                            <span class="dashicons dashicons-admin-post"></span>
+                            <h3><?php _e('No jobs found', 'chatgpt-fluent-connector'); ?></h3>
+                            <p><?php _e('Background jobs will appear here when forms are submitted.', 'chatgpt-fluent-connector'); ?></p>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
             <?php
             
         } catch (Exception $e) {
             echo '<div class="wrap">';
-            echo '<h1>' . __('Background Jobs Monitor', 'chatgpt-fluent-connector') . '</h1>';
+            echo '<h1>' . __('Background Jobs', 'chatgpt-fluent-connector') . '</h1>';
             echo '<div class="notice notice-error"><p>' . sprintf(__('Error loading jobs page: %s', 'chatgpt-fluent-connector'), esc_html($e->getMessage())) . '</p></div>';
             echo '</div>';
             
@@ -1040,30 +1068,22 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: AJAX handler for getting job status
-     */
+    // AJAX handlers with enhanced error handling
     public function ajax_get_job_status() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
         
         try {
-            // Get statistics
             $stats = $this->get_job_statistics();
-            
-            // Get recent jobs with enhanced data
             $recent_jobs = $this->get_recent_jobs_enhanced(50);
             
-            // Format the response properly
             $response_data = array(
                 'stats' => $stats,
                 'jobs' => $recent_jobs,
@@ -1079,23 +1099,17 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: Retry job handler with proper validation
-     */
     public function ajax_retry_job() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
         
-        // Validate job ID
         if (!isset($_POST['job_id']) || !is_numeric($_POST['job_id'])) {
             wp_send_json_error('Invalid job ID');
             return;
@@ -1106,7 +1120,6 @@ class SFAIC_Background_Job_Manager {
         try {
             global $wpdb;
             
-            // Check if job exists and can be retried
             $job = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM {$this->jobs_table} WHERE id = %d",
                 $job_id
@@ -1122,7 +1135,6 @@ class SFAIC_Background_Job_Manager {
                 return;
             }
             
-            // Reset the job for retry
             $result = $wpdb->update(
                 $this->jobs_table,
                 array(
@@ -1139,9 +1151,7 @@ class SFAIC_Background_Job_Manager {
             );
 
             if ($result !== false) {
-                // Schedule processing
                 $this->schedule_cron_event_reliable(5);
-                
                 wp_send_json_success('Job scheduled for retry');
             } else {
                 wp_send_json_error('Failed to update job in database');
@@ -1153,23 +1163,17 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: Cancel job handler
-     */
     public function ajax_cancel_job() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
         
-        // Validate job ID
         if (!isset($_POST['job_id']) || !is_numeric($_POST['job_id'])) {
             wp_send_json_error('Invalid job ID');
             return;
@@ -1180,7 +1184,6 @@ class SFAIC_Background_Job_Manager {
         try {
             global $wpdb;
             
-            // Check if job exists and can be cancelled
             $job = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM {$this->jobs_table} WHERE id = %d",
                 $job_id
@@ -1196,7 +1199,6 @@ class SFAIC_Background_Job_Manager {
                 return;
             }
             
-            // Cancel the job
             $result = $wpdb->update(
                 $this->jobs_table,
                 array(
@@ -1222,17 +1224,12 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: Cleanup handler
-     */
     public function ajax_cleanup_jobs() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
@@ -1241,7 +1238,6 @@ class SFAIC_Background_Job_Manager {
         try {
             global $wpdb;
             
-            // Count jobs that will be cleaned up
             $completed_count = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE status = %s 
@@ -1256,7 +1252,6 @@ class SFAIC_Background_Job_Manager {
                 self::STATUS_FAILED
             ));
             
-            // Perform cleanup
             $this->cleanup_old_jobs();
             
             $total_cleaned = intval($completed_count) + intval($failed_count);
@@ -1269,17 +1264,12 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: Debug cron handler with comprehensive information
-     */
     public function ajax_debug_cron() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
@@ -1313,7 +1303,6 @@ class SFAIC_Background_Job_Manager {
                 self::STATUS_PENDING
             )) ?: 0;
             
-            // Add additional debug info
             $cron_info['server_time'] = current_time('mysql');
             $cron_info['wp_timezone'] = wp_timezone_string();
             $cron_info['last_cron_run'] = get_option('sfaic_last_cron_run', 0);
@@ -1323,7 +1312,6 @@ class SFAIC_Background_Job_Manager {
                 $cron_info['minutes_since_last_run'] = round((time() - $cron_info['last_cron_run']) / 60, 1);
             }
             
-            // Check cron schedules
             $cron_info['available_schedules'] = wp_get_schedules();
             
             wp_send_json_success($cron_info);
@@ -1334,33 +1322,21 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: Force process handler with better error handling
-     */
     public function ajax_force_process_jobs() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
         
         try {
-            // Reset stuck jobs first
             $this->reset_stuck_processing_jobs();
-            
-            // Clear any existing scheduled events to prevent conflicts
             wp_clear_scheduled_hook(self::CRON_HOOK);
-            
-            // Force immediate processing
             $result = $this->process_background_job();
-            
-            // Schedule next processing
             $this->schedule_cron_event_reliable(5);
             
             wp_send_json_success('Background job processing triggered');
@@ -1371,17 +1347,12 @@ class SFAIC_Background_Job_Manager {
         }
     }
 
-    /**
-     * ENHANCED: Stuck jobs cleanup with detailed reporting
-     */
     public function ajax_cleanup_stuck_jobs() {
-        // Verify nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'sfaic_jobs_nonce')) {
             wp_send_json_error('Invalid nonce');
             return;
         }
         
-        // Check permissions
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
@@ -1390,7 +1361,6 @@ class SFAIC_Background_Job_Manager {
         try {
             global $wpdb;
             
-            // Count stuck jobs before cleanup
             $stuck_processing = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE status = %s 
@@ -1406,10 +1376,7 @@ class SFAIC_Background_Job_Manager {
                 self::STATUS_PENDING
             ));
             
-            // Perform the cleanup
             $this->reset_stuck_processing_jobs();
-            
-            // Schedule new processing
             $this->schedule_cron_event_reliable(0);
             
             $total_reset = intval($stuck_processing) + intval($old_pending);
