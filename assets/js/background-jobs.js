@@ -1,5 +1,5 @@
 /**
- * Complete Background Jobs Admin Interface JavaScript - Fixed Version
+ * Complete Background Jobs Admin Interface JavaScript - Debug Section Removed
  * 
  * Replace your existing assets/js/background-jobs.js with this complete file
  */
@@ -25,9 +25,6 @@ jQuery(document).ready(function($) {
         
         // Start auto-refresh if there are pending or processing jobs
         checkAutoRefresh();
-        
-        // Add debugging tools
-        addDebuggingTools();
         
         // Add periodic status check with visibility handling
         startPeriodicStatusCheck();
@@ -188,50 +185,6 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Add debugging tools section
-     */
-    function addDebuggingTools() {
-        // Check if debug section already exists
-        if ($('.sfaic-debug-section').length > 0) {
-            return;
-        }
-        
-        const debugSection = `
-            <div class="sfaic-debug-section" style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 20px 0; border-radius: 5px;">
-                <h3 style="margin-top: 0; color: #856404;">🔍 Debug Tools (for stuck jobs)</h3>
-                <div class="sfaic-debug-actions" style="margin-bottom: 15px;">
-                    <button type="button" id="sfaic-debug-cron" class="button">
-                        <span class="dashicons dashicons-search"></span>
-                        Debug Cron Status
-                    </button>
-                    <button type="button" id="sfaic-force-process" class="button button-primary">
-                        <span class="dashicons dashicons-controls-play"></span>
-                        Force Process Jobs
-                    </button>
-                    <button type="button" id="sfaic-cleanup-stuck" class="button button-secondary">
-                        <span class="dashicons dashicons-undo"></span>
-                        Reset Stuck Jobs
-                    </button>
-                    <button type="button" id="sfaic-test-refresh" class="button button-secondary">
-                        <span class="dashicons dashicons-update"></span>
-                        Test Refresh
-                    </button>
-                </div>
-                <div id="sfaic-debug-results" style="background: #f8f9fa; padding: 10px; border-radius: 3px; display: none;">
-                    <strong>Debug Results:</strong>
-                    <pre id="sfaic-debug-output" style="margin: 10px 0; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 3px;"></pre>
-                </div>
-            </div>
-        `;
-        
-        // Insert after the job actions
-        $('.sfaic-job-actions').after(debugSection);
-        
-        // Bind debug event handlers
-        bindDebugHandlers();
-    }
-    
-    /**
      * Add keyboard shortcuts information
      */
     function addKeyboardShortcutsInfo() {
@@ -243,217 +196,6 @@ jQuery(document).ready(function($) {
         `;
         
         $('.sfaic-job-actions').after(shortcutsInfo);
-    }
-    
-    /**
-     * Bind debug event handlers
-     */
-    function bindDebugHandlers() {
-        // Prevent multiple bindings by using off first
-        $(document).off('click', '#sfaic-debug-cron').on('click', '#sfaic-debug-cron', function(e) {
-            e.preventDefault();
-            debugCronStatus();
-        });
-        
-        $(document).off('click', '#sfaic-force-process').on('click', '#sfaic-force-process', function(e) {
-            e.preventDefault();
-            if (confirm('This will force immediate processing of pending jobs. Continue?')) {
-                forceProcessJobs();
-            }
-        });
-        
-        $(document).off('click', '#sfaic-cleanup-stuck').on('click', '#sfaic-cleanup-stuck', function(e) {
-            e.preventDefault();
-            if (confirm('This will reset jobs stuck in processing status back to pending. Continue?')) {
-                cleanupStuckJobs();
-            }
-        });
-        
-        $(document).off('click', '#sfaic-test-refresh').on('click', '#sfaic-test-refresh', function(e) {
-            e.preventDefault();
-            testRefreshFunction();
-        });
-    }
-    
-    /**
-     * Test refresh function for debugging
-     */
-    function testRefreshFunction() {
-        console.log('SFAIC: Testing refresh function');
-        const startTime = Date.now();
-        
-        refreshJobsList().then(function() {
-            const endTime = Date.now();
-            console.log('SFAIC: Refresh completed in', (endTime - startTime), 'ms');
-            showNotice('Refresh test completed successfully in ' + (endTime - startTime) + 'ms', 'success', 3000);
-        }).catch(function(error) {
-            console.error('SFAIC: Refresh test failed:', error);
-            showNotice('Refresh test failed: ' + error, 'error');
-        });
-    }
-    
-    /**
-     * Debug cron status
-     */
-    function debugCronStatus() {
-        const button = $('#sfaic-debug-cron');
-        const originalText = button.text();
-        
-        button.prop('disabled', true);
-        button.find('.dashicons').addClass('spin');
-        button.text('Debugging...');
-        
-        $.ajax({
-            url: sfaic_jobs_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'sfaic_debug_cron',
-                nonce: sfaic_jobs_ajax.nonce
-            },
-            timeout: 15000,
-            success: function(response) {
-                if (response.success) {
-                    const data = response.data;
-                    let output = 'CRON DEBUG INFORMATION:\n';
-                    output += '========================\n';
-                    output += 'Server Time: ' + data.server_time + '\n';
-                    output += 'WP Cron Disabled: ' + (data.wp_cron_disabled ? 'YES (This is likely the problem!)' : 'NO') + '\n';
-                    output += 'Next Scheduled: ' + data.next_scheduled + '\n';
-                    output += 'Pending Jobs: ' + data.pending_jobs + '\n';
-                    output += 'Processing Jobs: ' + data.processing_jobs + '\n';
-                    
-                    if (data.stuck_jobs !== undefined) {
-                        output += 'Stuck Jobs: ' + data.stuck_jobs + '\n';
-                    }
-                    
-                    if (data.last_cron_run_formatted) {
-                        output += 'Last Cron Run: ' + data.last_cron_run_formatted + ' (' + data.minutes_since_last_run + ' minutes ago)\n';
-                    } else {
-                        output += 'Last Cron Run: Never\n';
-                    }
-                    
-                    if (data.wp_cron_disabled) {
-                        output += '\n⚠️ ISSUE DETECTED: WordPress cron is disabled!\n';
-                        output += 'To fix this, you can:\n';
-                        output += '1. Remove DISABLE_WP_CRON from wp-config.php\n';
-                        output += '2. Set up a real cron job to call wp-cron.php\n';
-                        output += '3. Use the "Force Process Jobs" button as a temporary fix\n';
-                    }
-                    
-                    if (data.pending_jobs > 0 && data.next_scheduled === 'None') {
-                        output += '\n⚠️ ISSUE DETECTED: Pending jobs but no cron scheduled!\n';
-                        output += 'Try clicking "Force Process Jobs" to trigger processing.\n';
-                    }
-                    
-                    if (data.stuck_jobs > 0) {
-                        output += '\n⚠️ ISSUE DETECTED: ' + data.stuck_jobs + ' jobs stuck in processing!\n';
-                        output += 'Click "Reset Stuck Jobs" to fix this.\n';
-                    }
-                    
-                    if (data.minutes_since_last_run > 5) {
-                        output += '\n⚠️ WARNING: Last cron run was more than 5 minutes ago!\n';
-                        output += 'This might indicate cron issues.\n';
-                    }
-                    
-                    $('#sfaic-debug-output').text(output);
-                    $('#sfaic-debug-results').show();
-                    
-                    showNotice('Debug information retrieved successfully.', 'success');
-                } else {
-                    showNotice('Failed to get debug information: ' + (response.data || 'Unknown error'), 'error');
-                }
-            },
-            error: function(xhr, status, error) {
-                showNotice('Error occurred while debugging: ' + status + ' - ' + error, 'error');
-            },
-            complete: function() {
-                button.prop('disabled', false);
-                button.find('.dashicons').removeClass('spin');
-                button.text(originalText);
-            }
-        });
-    }
-    
-    /**
-     * Force process jobs
-     */
-    function forceProcessJobs() {
-        const button = $('#sfaic-force-process');
-        const originalText = button.text();
-        
-        button.prop('disabled', true);
-        button.find('.dashicons').addClass('spin');
-        button.text('Processing...');
-        
-        $.ajax({
-            url: sfaic_jobs_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'sfaic_force_process_jobs',
-                nonce: sfaic_jobs_ajax.nonce
-            },
-            timeout: 30000,
-            success: function(response) {
-                if (response.success) {
-                    showNotice('Jobs processed successfully! Refreshing list...', 'success');
-                    // Refresh the jobs list after a short delay
-                    setTimeout(function() {
-                        refreshJobsList();
-                    }, 2000);
-                } else {
-                    showNotice('Failed to process jobs: ' + (response.data || 'Unknown error'), 'error');
-                }
-            },
-            error: function(xhr, status, error) {
-                showNotice('Error occurred while processing jobs: ' + status + ' - ' + error, 'error');
-            },
-            complete: function() {
-                button.prop('disabled', false);
-                button.find('.dashicons').removeClass('spin');
-                button.text(originalText);
-            }
-        });
-    }
-    
-    /**
-     * Cleanup stuck jobs
-     */
-    function cleanupStuckJobs() {
-        const button = $('#sfaic-cleanup-stuck');
-        const originalText = button.text();
-        
-        button.prop('disabled', true);
-        button.find('.dashicons').addClass('spin');
-        button.text('Cleaning...');
-        
-        $.ajax({
-            url: sfaic_jobs_ajax.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'sfaic_cleanup_stuck_jobs',
-                nonce: sfaic_jobs_ajax.nonce
-            },
-            timeout: 15000,
-            success: function(response) {
-                if (response.success) {
-                    showNotice(response.data + '. Refreshing list...', 'success');
-                    // Refresh the jobs list after a short delay
-                    setTimeout(function() {
-                        refreshJobsList();
-                    }, 2000);
-                } else {
-                    showNotice('Failed to cleanup stuck jobs: ' + (response.data || 'Unknown error'), 'error');
-                }
-            },
-            error: function(xhr, status, error) {
-                showNotice('Error occurred while cleaning up stuck jobs: ' + status + ' - ' + error, 'error');
-            },
-            complete: function() {
-                button.prop('disabled', false);
-                button.find('.dashicons').removeClass('spin');
-                button.text(originalText);
-            }
-        });
     }
     
     /**
@@ -472,6 +214,21 @@ jQuery(document).ready(function($) {
             e.preventDefault();
             if (confirm(sfaic_jobs_ajax.strings.confirm_cleanup || 'Are you sure you want to cleanup old jobs?')) {
                 cleanupOldJobs();
+            }
+        });
+        
+        // Main action buttons (already in the PHP template)
+        $(document).off('click', '#sfaic-force-process').on('click', '#sfaic-force-process', function(e) {
+            e.preventDefault();
+            if (confirm('This will force immediate processing of pending jobs. Continue?')) {
+                forceProcessJobs();
+            }
+        });
+        
+        $(document).off('click', '#sfaic-cleanup-stuck').on('click', '#sfaic-cleanup-stuck', function(e) {
+            e.preventDefault();
+            if (confirm('This will reset jobs stuck in processing status back to pending. Continue?')) {
+                cleanupStuckJobs();
             }
         });
         
@@ -531,14 +288,6 @@ jQuery(document).ready(function($) {
                 case 'f':
                     e.preventDefault();
                     forceProcessJobs();
-                    break;
-                case 'c':
-                    e.preventDefault();
-                    cleanupStuckJobs();
-                    break;
-                case 'd':
-                    e.preventDefault();
-                    debugCronStatus();
                     break;
             }
         });
@@ -913,6 +662,88 @@ jQuery(document).ready(function($) {
     }
     
     /**
+     * Force process jobs
+     */
+    function forceProcessJobs() {
+        const button = $('#sfaic-force-process');
+        const originalText = button.text();
+        
+        button.prop('disabled', true);
+        button.find('.dashicons').addClass('spin');
+        button.text('Processing...');
+        
+        $.ajax({
+            url: sfaic_jobs_ajax.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'sfaic_force_process_jobs',
+                nonce: sfaic_jobs_ajax.nonce
+            },
+            timeout: 30000,
+            success: function(response) {
+                if (response.success) {
+                    showNotice('Jobs processed successfully! Refreshing list...', 'success');
+                    // Refresh the jobs list after a short delay
+                    setTimeout(function() {
+                        refreshJobsList();
+                    }, 2000);
+                } else {
+                    showNotice('Failed to process jobs: ' + (response.data || 'Unknown error'), 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                showNotice('Error occurred while processing jobs: ' + status + ' - ' + error, 'error');
+            },
+            complete: function() {
+                button.prop('disabled', false);
+                button.find('.dashicons').removeClass('spin');
+                button.text(originalText);
+            }
+        });
+    }
+    
+    /**
+     * Cleanup stuck jobs
+     */
+    function cleanupStuckJobs() {
+        const button = $('#sfaic-cleanup-stuck');
+        const originalText = button.text();
+        
+        button.prop('disabled', true);
+        button.find('.dashicons').addClass('spin');
+        button.text('Cleaning...');
+        
+        $.ajax({
+            url: sfaic_jobs_ajax.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'sfaic_cleanup_stuck_jobs',
+                nonce: sfaic_jobs_ajax.nonce
+            },
+            timeout: 15000,
+            success: function(response) {
+                if (response.success) {
+                    showNotice(response.data + '. Refreshing list...', 'success');
+                    // Refresh the jobs list after a short delay
+                    setTimeout(function() {
+                        refreshJobsList();
+                    }, 2000);
+                } else {
+                    showNotice('Failed to cleanup stuck jobs: ' + (response.data || 'Unknown error'), 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                showNotice('Error occurred while cleaning up stuck jobs: ' + status + ' - ' + error, 'error');
+            },
+            complete: function() {
+                button.prop('disabled', false);
+                button.find('.dashicons').removeClass('spin');
+                button.text(originalText);
+            }
+        });
+    }
+    
+    /**
      * Better auto-refresh logic with proper state management
      */
     function checkAutoRefresh() {
@@ -1068,18 +899,6 @@ jQuery(document).ready(function($) {
                 color: #721c24;
                 font-size: 13px;
                 word-wrap: break-word;
-            }
-            .sfaic-debug-section {
-                border-radius: 5px;
-                clear: both;
-            }
-            .sfaic-debug-actions {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-            }
-            .sfaic-debug-actions button {
-                margin: 0;
             }
             .sfaic-stuck-jobs-warning {
                 border-left: 4px solid #dc3545;
