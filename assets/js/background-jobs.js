@@ -1,7 +1,7 @@
 /**
- * Enhanced Background Jobs Admin Interface JavaScript with Debugging Tools
+ * FIXED Background Jobs Admin Interface JavaScript - Resolves Refresh Issues
  * 
- * Handles interactions for the background jobs monitoring page with diagnostic features
+ * Handles interactions for the background jobs monitoring page with improved reliability
  */
 
 jQuery(document).ready(function($) {
@@ -9,6 +9,7 @@ jQuery(document).ready(function($) {
     // Auto-refresh functionality
     let autoRefreshInterval;
     let isAutoRefreshEnabled = false;
+    let refreshInProgress = false;
     
     // Initialize the interface
     init();
@@ -25,6 +26,119 @@ jQuery(document).ready(function($) {
         
         // Add debugging tools
         addDebuggingTools();
+        
+        // FIXED: Add periodic status check
+        startPeriodicStatusCheck();
+    }
+    
+    /**
+     * FIXED: Add periodic status checking to detect stuck states
+     */
+    function startPeriodicStatusCheck() {
+        // Check status every 30 seconds
+        setInterval(function() {
+            if (!refreshInProgress) {
+                checkJobStatusQuietly();
+            }
+        }, 30000);
+    }
+    
+    /**
+     * FIXED: Quiet status check without full refresh
+     */
+    function checkJobStatusQuietly() {
+        $.ajax({
+            url: sfaic_jobs_ajax.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'sfaic_get_job_status',
+                nonce: sfaic_jobs_ajax.nonce
+            },
+            timeout: 10000,
+            success: function(response) {
+                if (response.success) {
+                    updateStatisticsOnly(response.data.stats);
+                    
+                    // Check if we need to trigger auto-refresh
+                    const pendingJobs = parseInt(response.data.stats.pending_jobs) || 0;
+                    const processingJobs = parseInt(response.data.stats.processing_jobs) || 0;
+                    
+                    // If jobs appear stuck, show warning
+                    if (pendingJobs > 0 || processingJobs > 0) {
+                        if (!isAutoRefreshEnabled) {
+                            startAutoRefresh();
+                        }
+                        
+                        // Check for stuck jobs (pending for more than 10 minutes)
+                        checkForStuckJobs(response.data.jobs);
+                    }
+                }
+            },
+            error: function() {
+                console.log('SFAIC: Quiet status check failed');
+            }
+        });
+    }
+    
+    /**
+     * FIXED: Check for jobs that appear to be stuck
+     */
+    function checkForStuckJobs(jobs) {
+        let stuckJobsFound = false;
+        const now = new Date().getTime();
+        
+        if (jobs && Array.isArray(jobs)) {
+            jobs.forEach(function(job) {
+                if (job.status === 'pending') {
+                    const createdTime = new Date(job.created_at).getTime();
+                    const ageMinutes = (now - createdTime) / (1000 * 60);
+                    
+                    if (ageMinutes > 10) {
+                        stuckJobsFound = true;
+                    }
+                }
+            });
+        }
+        
+        if (stuckJobsFound) {
+            showStuckJobsWarning();
+        }
+    }
+    
+    /**
+     * FIXED: Show warning for stuck jobs
+     */
+    function showStuckJobsWarning() {
+        // Only show warning once per session
+        if (!$('.sfaic-stuck-jobs-warning').length) {
+            const warning = $(`
+                <div class="notice notice-warning sfaic-stuck-jobs-warning" style="margin: 15px 0;">
+                    <p>
+                        <strong>⚠️ Stuck Jobs Detected:</strong> 
+                        Some jobs have been pending for a long time. 
+                        <button type="button" class="button button-small" id="auto-fix-stuck-jobs" style="margin-left: 10px;">
+                            Auto-Fix Now
+                        </button>
+                        <button type="button" class="notice-dismiss" style="float: right;">
+                            <span class="screen-reader-text">Dismiss</span>
+                        </button>
+                    </p>
+                </div>
+            `);
+            
+            $('.sfaic-jobs-overview').after(warning);
+            
+            // Bind auto-fix handler
+            $('#auto-fix-stuck-jobs').on('click', function() {
+                cleanupStuckJobs();
+                warning.remove();
+            });
+            
+            // Bind dismiss handler
+            warning.find('.notice-dismiss').on('click', function() {
+                warning.remove();
+            });
+        }
     }
     
     function addDebuggingTools() {
@@ -99,6 +213,7 @@ jQuery(document).ready(function($) {
                 action: 'sfaic_debug_cron',
                 nonce: sfaic_jobs_ajax.nonce
             },
+            timeout: 15000,
             success: function(response) {
                 if (response.success) {
                     const data = response.data;
@@ -108,6 +223,11 @@ jQuery(document).ready(function($) {
                     output += 'Next Scheduled: ' + data.next_scheduled + '\n';
                     output += 'Pending Jobs: ' + data.pending_jobs + '\n';
                     output += 'Processing Jobs: ' + data.processing_jobs + '\n';
+                    
+                    // FIXED: Add stuck jobs info
+                    if (data.stuck_jobs !== undefined) {
+                        output += 'Stuck Jobs: ' + data.stuck_jobs + '\n';
+                    }
                     
                     if (data.wp_cron_disabled) {
                         output += '\n⚠️ ISSUE DETECTED: WordPress cron is disabled!\n';
@@ -120,6 +240,12 @@ jQuery(document).ready(function($) {
                     if (data.pending_jobs > 0 && data.next_scheduled === 'None') {
                         output += '\n⚠️ ISSUE DETECTED: Pending jobs but no cron scheduled!\n';
                         output += 'Try clicking "Force Process Jobs" to trigger processing.\n';
+                    }
+                    
+                    // FIXED: Check for stuck jobs
+                    if (data.stuck_jobs > 0) {
+                        output += '\n⚠️ ISSUE DETECTED: ' + data.stuck_jobs + ' jobs stuck in processing!\n';
+                        output += 'Click "Reset Stuck Jobs" to fix this.\n';
                     }
                     
                     $('#sfaic-debug-output').text(output);
@@ -156,6 +282,7 @@ jQuery(document).ready(function($) {
                 action: 'sfaic_force_process_jobs',
                 nonce: sfaic_jobs_ajax.nonce
             },
+            timeout: 30000,
             success: function(response) {
                 if (response.success) {
                     showNotice('Jobs processed successfully! Refreshing list...', 'success');
@@ -193,6 +320,7 @@ jQuery(document).ready(function($) {
                 action: 'sfaic_cleanup_stuck_jobs',
                 nonce: sfaic_jobs_ajax.nonce
             },
+            timeout: 15000,
             success: function(response) {
                 if (response.success) {
                     showNotice(response.data + '. Refreshing list...', 'success');
@@ -285,7 +413,17 @@ jQuery(document).ready(function($) {
         });
     }
     
+    /**
+     * FIXED: Enhanced refresh with better error handling
+     */
     function refreshJobsList() {
+        if (refreshInProgress) {
+            console.log('SFAIC: Refresh already in progress, skipping');
+            return;
+        }
+        
+        refreshInProgress = true;
+        
         const button = $('#sfaic-refresh-jobs');
         const originalText = button.text();
         
@@ -301,6 +439,7 @@ jQuery(document).ready(function($) {
                 action: 'sfaic_get_job_status',
                 nonce: sfaic_jobs_ajax.nonce
             },
+            timeout: 20000, // FIXED: Increased timeout
             success: function(response) {
                 if (response.success) {
                     updateJobsTable(response.data.jobs);
@@ -310,8 +449,13 @@ jQuery(document).ready(function($) {
                     showNotice('Failed to refresh jobs list.', 'error');
                 }
             },
-            error: function() {
-                showNotice('Error occurred while refreshing jobs list.', 'error');
+            error: function(xhr, status, error) {
+                console.log('SFAIC: Refresh error:', status, error);
+                if (status === 'timeout') {
+                    showNotice('Refresh timed out. The server may be busy processing jobs.', 'warning');
+                } else {
+                    showNotice('Error occurred while refreshing jobs list.', 'error');
+                }
             },
             complete: function() {
                 // Restore button state
@@ -319,10 +463,27 @@ jQuery(document).ready(function($) {
                 button.find('.dashicons').removeClass('spin');
                 button.text(originalText);
                 
+                refreshInProgress = false;
+                
                 // Check if auto-refresh should continue
                 checkAutoRefresh();
             }
         });
+    }
+    
+    /**
+     * FIXED: Update only statistics without full refresh
+     */
+    function updateStatisticsOnly(stats) {
+        $('.sfaic-stat-card.total .stat-number').text(stats.total_jobs || 0);
+        $('.sfaic-stat-card.pending .stat-number').text(stats.pending_jobs || 0);
+        $('.sfaic-stat-card.processing .stat-number').text(stats.processing_jobs || 0);
+        $('.sfaic-stat-card.completed .stat-number').text(stats.completed_jobs || 0);
+        $('.sfaic-stat-card.failed .stat-number').text(stats.failed_jobs || 0);
+        $('.sfaic-stat-card.retry .stat-number').text(stats.retry_jobs || 0);
+        
+        // Update highlighting
+        highlightProblemsInStats(stats);
     }
     
     function updateJobsTable(jobs) {
@@ -405,6 +566,9 @@ jQuery(document).ready(function($) {
                 '</tr>');
     }
     
+    /**
+     * FIXED: Better highlighting of problems in statistics
+     */
     function updateStatistics(stats) {
         $('.sfaic-stat-card.total .stat-number').text(stats.total_jobs || 0);
         $('.sfaic-stat-card.pending .stat-number').text(stats.pending_jobs || 0);
@@ -413,20 +577,34 @@ jQuery(document).ready(function($) {
         $('.sfaic-stat-card.failed .stat-number').text(stats.failed_jobs || 0);
         $('.sfaic-stat-card.retry .stat-number').text(stats.retry_jobs || 0);
         
-        // Highlight problems
+        highlightProblemsInStats(stats);
+    }
+    
+    /**
+     * FIXED: Highlight problems in statistics
+     */
+    function highlightProblemsInStats(stats) {
         const pendingJobs = stats.pending_jobs || 0;
         const processingJobs = stats.processing_jobs || 0;
+        const failedJobs = stats.failed_jobs || 0;
+        
+        // Reset animations
+        $('.sfaic-stat-card').css('animation', 'none');
         
         if (pendingJobs > 5) {
             $('.sfaic-stat-card.pending').css('border-left-color', '#dc3545').css('animation', 'pulse 2s infinite');
         } else {
-            $('.sfaic-stat-card.pending').css('border-left-color', '#ffc107').css('animation', 'none');
+            $('.sfaic-stat-card.pending').css('border-left-color', '#ffc107');
         }
         
         if (processingJobs > 3) {
             $('.sfaic-stat-card.processing').css('border-left-color', '#dc3545').css('animation', 'pulse 2s infinite');
         } else {
-            $('.sfaic-stat-card.processing').css('border-left-color', '#17a2b8').css('animation', 'none');
+            $('.sfaic-stat-card.processing').css('border-left-color', '#17a2b8');
+        }
+        
+        if (failedJobs > 0) {
+            $('.sfaic-stat-card.failed').css('animation', 'pulse 2s infinite');
         }
     }
     
@@ -522,6 +700,9 @@ jQuery(document).ready(function($) {
         });
     }
     
+    /**
+     * FIXED: Better auto-refresh logic
+     */
     function checkAutoRefresh() {
         const pendingJobs = parseInt($('.sfaic-stat-card.pending .stat-number').text()) || 0;
         const processingJobs = parseInt($('.sfaic-stat-card.processing .stat-number').text()) || 0;
@@ -539,9 +720,12 @@ jQuery(document).ready(function($) {
         isAutoRefreshEnabled = true;
         addAutoRefreshIndicator();
         
+        // FIXED: Longer interval to reduce server load
         autoRefreshInterval = setInterval(function() {
-            refreshJobsList();
-        }, 10000); // Refresh every 10 seconds
+            if (!refreshInProgress) {
+                refreshJobsList();
+            }
+        }, 15000); // Refresh every 15 seconds instead of 10
     }
     
     function stopAutoRefresh() {
@@ -568,7 +752,7 @@ jQuery(document).ready(function($) {
         if ($('#sfaic-auto-refresh-indicator').length === 0) {
             const indicator = $('<div id="sfaic-auto-refresh-indicator" class="notice notice-info inline">' +
                              '<p><span class="dashicons dashicons-update spin"></span> ' +
-                             'Auto-refresh is enabled (updates every 10 seconds). ' +
+                             'Auto-refresh is enabled (updates every 15 seconds). ' +
                              '<a href="#" id="sfaic-toggle-auto-refresh">Disable</a></p>' +
                              '</div>');
             $('.sfaic-job-actions').after(indicator);
@@ -584,7 +768,13 @@ jQuery(document).ready(function($) {
         // For now, it's just a placeholder for future enhancement
     }
     
+    /**
+     * FIXED: Enhanced notice system with auto-dismiss
+     */
     function showNotice(message, type) {
+        // Remove any existing notices of the same type
+        $('.sfaic-temp-notice.notice-' + type).remove();
+        
         const noticeClass = 'notice-' + type;
         const notice = $('<div class="notice ' + noticeClass + ' is-dismissible sfaic-temp-notice">' +
                        '<p>' + message + '</p>' +
@@ -596,12 +786,13 @@ jQuery(document).ready(function($) {
         // Insert after the h1
         $('.wrap h1').after(notice);
         
-        // Auto-dismiss after 5 seconds
+        // Auto-dismiss after appropriate time based on type
+        const dismissTime = type === 'error' ? 10000 : 5000;
         setTimeout(function() {
             notice.fadeOut(500, function() {
                 $(this).remove();
             });
-        }, 5000);
+        }, dismissTime);
         
         // Handle dismiss button
         notice.find('.notice-dismiss').on('click', function() {
@@ -645,6 +836,9 @@ jQuery(document).ready(function($) {
             .sfaic-debug-actions button {\
                 margin-right: 10px;\
                 margin-bottom: 5px;\
+            }\
+            .sfaic-stuck-jobs-warning {\
+                border-left: 4px solid #dc3545;\
             }\
         ')
         .appendTo('head');
