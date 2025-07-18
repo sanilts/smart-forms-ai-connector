@@ -1,10 +1,23 @@
 /**
- * Background Jobs Admin Interface CSS
+ * Complete Background Jobs Admin Interface CSS - Fixed Version
  * 
- * Styles for the background jobs monitoring page
+ * Replace your existing assets/css/background-jobs.css with this complete file
  */
 
-/* Overview Statistics */
+/* Base layout with proper containment */
+.wrap {
+    position: relative;
+    max-width: 100%;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+/* Remove any conflicting margins from WordPress admin */
+.wrap > h1 {
+    margin-bottom: 20px;
+}
+
+/* Overview Statistics - Stable layout */
 .sfaic-jobs-overview {
     background: #fff;
     border: 1px solid #ccd0d4;
@@ -12,6 +25,9 @@
     margin-bottom: 20px;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    position: relative;
+    clear: both;
+    overflow: hidden;
 }
 
 .sfaic-jobs-overview h2 {
@@ -19,15 +35,20 @@
     margin-bottom: 20px;
     color: #23282d;
     font-size: 18px;
+    font-weight: 600;
 }
 
+/* Stable grid layout that doesn't shift */
 .sfaic-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 15px;
     margin-bottom: 15px;
+    min-height: 120px; /* Prevent height jumping */
+    align-items: stretch;
 }
 
+/* Stable stat cards with consistent dimensions */
 .sfaic-stat-card {
     background: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -37,6 +58,12 @@
     transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
+    min-height: 80px; /* Consistent height */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
 }
 
 .sfaic-stat-card:hover {
@@ -44,6 +71,7 @@
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
+/* Consistent border styling for different card types */
 .sfaic-stat-card.total {
     border-left: 4px solid #6c757d;
 }
@@ -68,13 +96,20 @@
     border-left: 4px solid #fd7e14;
 }
 
+/* Consistent number display */
 .sfaic-stat-card .stat-number {
     font-size: 32px;
     font-weight: bold;
     margin-bottom: 5px;
     line-height: 1;
+    min-height: 40px; /* Prevent jumping */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
 }
 
+/* Color coding for numbers */
 .sfaic-stat-card.total .stat-number {
     color: #6c757d;
 }
@@ -105,9 +140,34 @@
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    min-height: 20px; /* Consistent label height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* Processing Status */
+/* Pulse animation for problem highlighting */
+.sfaic-stat-card.sfaic-pulse-animation {
+    animation: sfaic-pulse 2s infinite;
+}
+
+@keyframes sfaic-pulse {
+    0% { 
+        opacity: 1; 
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    50% { 
+        opacity: 0.8; 
+        box-shadow: 0 0 15px rgba(220, 53, 69, 0.4);
+        transform: translateY(-1px);
+    }
+    100% { 
+        opacity: 1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+}
+
+/* Processing Status - Stable layout */
 .sfaic-processing-status {
     background: #fff;
     border: 1px solid #ccd0d4;
@@ -115,6 +175,7 @@
     margin-bottom: 20px;
     border-radius: 5px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    clear: both;
 }
 
 .sfaic-processing-status h3 {
@@ -123,6 +184,7 @@
     color: #23282d;
 }
 
+/* Status indicators with consistent sizing */
 .status-indicator {
     display: inline-block;
     width: 12px;
@@ -130,6 +192,7 @@
     border-radius: 50%;
     margin-right: 8px;
     vertical-align: middle;
+    flex-shrink: 0; /* Prevent shrinking */
 }
 
 .status-indicator.enabled {
@@ -142,25 +205,47 @@
     box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
 }
 
-/* Job Actions */
+/* Job Actions - Prevent button layout issues */
 .sfaic-job-actions {
     margin-bottom: 20px;
     padding: 15px 0;
     border-bottom: 1px solid #ddd;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    clear: both;
+    min-height: 50px;
 }
 
 .sfaic-job-actions .button {
-    margin-right: 10px;
-    margin-bottom: 5px;
+    margin: 0; /* Remove individual margins */
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
 }
 
-/* Jobs Table */
+.sfaic-job-actions .button .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Jobs Table with stable layout */
 .sfaic-jobs-table {
     background: #fff;
     border: 1px solid #ccd0d4;
     border-radius: 5px;
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    width: 100%;
+    table-layout: fixed; /* Prevent column width jumping */
+    border-collapse: collapse;
+    margin-bottom: 20px;
 }
 
 .sfaic-jobs-table th {
@@ -171,27 +256,68 @@
     letter-spacing: 0.5px;
     color: #495057;
     border-bottom: 2px solid #dee2e6;
+    padding: 12px 8px;
+    text-align: left;
+    position: relative;
+    border-right: 1px solid #dee2e6;
 }
+
+.sfaic-jobs-table th:last-child {
+    border-right: none;
+}
+
+/* Column width distribution - Fixed layout */
+.sfaic-jobs-table th:nth-child(1) { width: 8%; }  /* ID */
+.sfaic-jobs-table th:nth-child(2) { width: 15%; } /* Type */
+.sfaic-jobs-table th:nth-child(3) { width: 15%; } /* Name */
+.sfaic-jobs-table th:nth-child(4) { width: 20%; } /* Email */
+.sfaic-jobs-table th:nth-child(5) { width: 15%; } /* Status */
+.sfaic-jobs-table th:nth-child(6) { width: 17%; } /* Created */
+.sfaic-jobs-table th:nth-child(7) { width: 10%; } /* Actions */
 
 .sfaic-jobs-table td {
     vertical-align: middle;
     font-size: 13px;
+    padding: 12px 8px;
+    border-bottom: 1px solid #eee;
+    border-right: 1px solid #f0f0f0;
+    word-wrap: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.sfaic-jobs-table tr:hover {
-    background-color: #f8f9fa;
+.sfaic-jobs-table td:last-child {
+    border-right: none;
+}
+
+/* Table row interactions */
+.sfaic-jobs-table tbody tr {
+    transition: background-color 0.2s ease;
     cursor: pointer;
+}
+
+.sfaic-jobs-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.sfaic-jobs-table tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.sfaic-jobs-table tbody tr:nth-child(even):hover {
+    background-color: #f0f0f0;
 }
 
 .sfaic-jobs-table tr.job-error-row {
     background-color: #ffeaea !important;
+    cursor: default;
 }
 
 .sfaic-jobs-table tr.job-error-row:hover {
     background-color: #ffe0e0 !important;
 }
 
-/* Status Badges */
+/* Status Badges with consistent sizing */
 .status-badge {
     display: inline-block;
     padding: 4px 8px;
@@ -200,6 +326,10 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    min-width: 70px; /* Minimum width for consistency */
+    text-align: center;
+    box-sizing: border-box;
 }
 
 .status-badge.status-pending {
@@ -232,7 +362,7 @@
     border: 1px solid #fdd1a4;
 }
 
-/* Error Messages */
+/* Error Messages with proper containment */
 .error-message {
     padding: 12px;
     background-color: #f8d7da;
@@ -243,15 +373,20 @@
     font-family: Monaco, 'Courier New', monospace;
     white-space: pre-wrap;
     word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.4;
 }
 
-/* Auto-refresh Indicator */
+/* Auto-refresh Indicator with stable positioning */
 #sfaic-auto-refresh-indicator {
     margin: 15px 0;
     padding: 10px 15px;
     background-color: #e3f2fd;
     border-left: 4px solid #2196f3;
     border-radius: 0 4px 4px 0;
+    position: relative;
+    clear: both;
 }
 
 #sfaic-auto-refresh-indicator .dashicons {
@@ -270,22 +405,25 @@
     text-decoration: underline;
 }
 
-/* Loading States */
+/* Loading States with proper spin animation */
 .button .dashicons.spin {
-    animation: spin 1s linear infinite;
+    animation: sfaic-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes sfaic-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
 
-/* Button Enhancements */
+/* Button Enhancements with stable sizing */
 .button-small {
     font-size: 11px;
     padding: 3px 8px;
     height: auto;
     line-height: 1.4;
+    min-width: 60px; /* Prevent button size jumping */
+    box-sizing: border-box;
+    white-space: nowrap;
 }
 
 .sfaic-retry-job {
@@ -294,7 +432,8 @@
     color: white;
 }
 
-.sfaic-retry-job:hover {
+.sfaic-retry-job:hover,
+.sfaic-retry-job:focus {
     background-color: #138496;
     border-color: #117a8b;
     color: white;
@@ -306,16 +445,20 @@
     color: white;
 }
 
-.sfaic-cancel-job:hover {
+.sfaic-cancel-job:hover,
+.sfaic-cancel-job:focus {
     background-color: #c82333;
     border-color: #bd2130;
     color: white;
 }
 
-/* Form Data Table */
+/* Form Data Table with stable layout */
 .sfaic-form-data-table {
     margin-top: 15px;
     border: 1px solid #ddd;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
 }
 
 .sfaic-form-data-table th {
@@ -323,18 +466,107 @@
     font-weight: 600;
     padding: 12px;
     border-bottom: 2px solid #ddd;
+    width: 30%;
+    text-align: left;
 }
 
 .sfaic-form-data-table td {
     padding: 10px 12px;
     border-bottom: 1px solid #eee;
+    word-wrap: break-word;
+    vertical-align: top;
 }
 
 .sfaic-form-data-table tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 
-/* Responsive Design */
+/* Debug Section with proper containment */
+.sfaic-debug-section {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    position: relative;
+    clear: both;
+}
+
+.sfaic-debug-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #856404;
+    font-size: 16px;
+}
+
+.sfaic-debug-actions {
+    margin-bottom: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.sfaic-debug-actions button {
+    margin: 0; /* Remove conflicting margins */
+    min-height: 32px;
+}
+
+#sfaic-debug-results {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 3px;
+    margin-top: 10px;
+    border: 1px solid #dee2e6;
+}
+
+#sfaic-debug-output {
+    margin: 10px 0;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #fff;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-family: Monaco, 'Courier New', monospace;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+/* Shortcuts info styling */
+.sfaic-shortcuts-info {
+    background: #e8f5e8;
+    border: 1px solid #c3e6cb;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 3px;
+    font-size: 12px;
+    clear: both;
+}
+
+.sfaic-shortcuts-info kbd {
+    background: #f7f7f7;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.2);
+    color: #333;
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    white-space: nowrap;
+    margin: 0 2px;
+}
+
+/* Responsive Design with stable breakpoints */
+@media (max-width: 1200px) {
+    .sfaic-stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
 @media (max-width: 782px) {
     .sfaic-stats-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -343,10 +575,12 @@
     
     .sfaic-stat-card {
         padding: 15px;
+        min-height: 70px;
     }
     
     .sfaic-stat-card .stat-number {
         font-size: 24px;
+        min-height: 30px;
     }
     
     .sfaic-jobs-table {
@@ -361,6 +595,28 @@
     .button-small {
         font-size: 10px;
         padding: 2px 6px;
+        min-width: 50px;
+    }
+    
+    .sfaic-job-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+    }
+    
+    .sfaic-job-actions .button {
+        width: 100%;
+        margin-bottom: 0;
+    }
+    
+    .sfaic-debug-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .sfaic-debug-actions button {
+        width: 100%;
+        margin-bottom: 5px;
     }
 }
 
@@ -369,14 +625,28 @@
         grid-template-columns: 1fr;
     }
     
-    .sfaic-job-actions .button {
-        width: 100%;
-        margin-bottom: 10px;
-        margin-right: 0;
+    .sfaic-stat-card {
+        padding: 12px;
+        min-height: 60px;
     }
     
-    /* Stack table on mobile */
-    .sfaic-jobs-table,
+    .sfaic-stat-card .stat-number {
+        font-size: 20px;
+        min-height: 25px;
+    }
+    
+    .sfaic-stat-card .stat-label {
+        font-size: 12px;
+    }
+    
+    /* Mobile table layout */
+    .sfaic-jobs-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        border: none;
+    }
+    
     .sfaic-jobs-table thead,
     .sfaic-jobs-table tbody,
     .sfaic-jobs-table th,
@@ -397,6 +667,8 @@
         padding: 10px;
         border-radius: 4px;
         background-color: #fff;
+        position: relative;
+        white-space: normal;
     }
     
     .sfaic-jobs-table td {
@@ -404,6 +676,9 @@
         position: relative;
         padding: 8px 8px 8px 120px !important;
         text-align: left;
+        white-space: normal;
+        word-wrap: break-word;
+        border-right: none;
     }
     
     .sfaic-jobs-table td:before {
@@ -415,13 +690,43 @@
         white-space: nowrap;
         font-weight: bold;
         color: #666;
+        top: 8px;
+        font-size: 11px;
+    }
+    
+    /* Add data labels for mobile */
+    .sfaic-jobs-table td:nth-child(1):before { content: "ID: "; }
+    .sfaic-jobs-table td:nth-child(2):before { content: "Type: "; }
+    .sfaic-jobs-table td:nth-child(3):before { content: "Name: "; }
+    .sfaic-jobs-table td:nth-child(4):before { content: "Email: "; }
+    .sfaic-jobs-table td:nth-child(5):before { content: "Status: "; }
+    .sfaic-jobs-table td:nth-child(6):before { content: "Created: "; }
+    .sfaic-jobs-table td:nth-child(7):before { content: "Actions: "; }
+}
+
+@media (max-width: 480px) {
+    .wrap {
+        margin: 10px;
+    }
+    
+    .sfaic-jobs-overview,
+    .sfaic-debug-section {
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .sfaic-job-actions {
+        padding: 10px 0;
     }
 }
 
-/* Notices and Alerts */
+/* Notices and Alerts with proper positioning */
 .sfaic-temp-notice {
     margin: 15px 0;
     border-radius: 4px;
+    position: relative;
+    clear: both;
+    z-index: 10;
 }
 
 .notice.notice-success {
@@ -462,18 +767,34 @@
     font-weight: bold;
 }
 
+.sfaic-widget-stats .stat-value.pending {
+    color: #ffc107;
+}
+
+.sfaic-widget-stats .stat-value.processing {
+    color: #17a2b8;
+}
+
+.sfaic-widget-stats .stat-value.completed {
+    color: #28a745;
+}
+
+.sfaic-widget-stats .stat-value.failed {
+    color: #dc3545;
+}
+
 .sfaic-widget-actions {
     margin-top: 15px;
 }
 
 .sfaic-widget-actions .button {
     margin-right: 5px;
+    margin-bottom: 5px;
 }
 
 /* Accessibility Improvements */
 .status-badge,
 .status-indicator {
-    /* Ensure color is not the only way to convey information */
     position: relative;
 }
 
@@ -496,6 +817,10 @@
     outline-offset: 2px;
 }
 
+.sfaic-jobs-table tbody tr:focus {
+    background-color: #e3f2fd;
+}
+
 /* High contrast mode support */
 @media (prefers-contrast: high) {
     .sfaic-stat-card {
@@ -509,19 +834,44 @@
     .sfaic-jobs-table th {
         border-bottom-width: 3px;
     }
+    
+    .sfaic-jobs-table td {
+        border-bottom-width: 2px;
+    }
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .sfaic-stat-card,
+    .status-badge,
+    .button,
+    .sfaic-jobs-table tr {
+        transition: none;
+    }
+    
+    .sfaic-pulse-animation {
+        animation: none;
+    }
+    
+    .spin {
+        animation: none;
+    }
 }
 
 /* Print styles */
 @media print {
     .sfaic-job-actions,
     .button,
-    .notice {
+    .notice,
+    .sfaic-debug-section,
+    .sfaic-shortcuts-info {
         display: none;
     }
     
     .sfaic-jobs-table {
         border-collapse: collapse;
         width: 100%;
+        table-layout: auto;
     }
     
     .sfaic-jobs-table th,
@@ -534,5 +884,131 @@
         border: 1px solid #000;
         background-color: transparent !important;
         color: #000 !important;
+    }
+    
+    .sfaic-stat-card {
+        break-inside: avoid;
+    }
+}
+
+/* Loading states */
+.sfaic-loading-placeholder {
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-style: italic;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+/* Smooth transitions for all interactive elements */
+.sfaic-stat-card,
+.status-badge,
+.button,
+.sfaic-jobs-table tr {
+    transition: all 0.2s ease;
+}
+
+/* Ensure proper z-index stacking */
+.notice {
+    z-index: 10;
+    position: relative;
+}
+
+.sfaic-debug-section {
+    z-index: 5;
+    position: relative;
+}
+
+.sfaic-jobs-table {
+    z-index: 1;
+    position: relative;
+}
+
+/* Additional utility classes */
+.sfaic-hidden {
+    display: none !important;
+}
+
+.sfaic-visible {
+    display: block !important;
+}
+
+.sfaic-text-center {
+    text-align: center;
+}
+
+.sfaic-text-right {
+    text-align: right;
+}
+
+.sfaic-text-left {
+    text-align: left;
+}
+
+.sfaic-mb-0 {
+    margin-bottom: 0 !important;
+}
+
+.sfaic-mt-0 {
+    margin-top: 0 !important;
+}
+
+.sfaic-p-0 {
+    padding: 0 !important;
+}
+
+/* Stuck jobs warning styling */
+.sfaic-stuck-jobs-warning {
+    border-left: 4px solid #dc3545;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.sfaic-stuck-jobs-warning .notice-dismiss {
+    color: #721c24;
+}
+
+.sfaic-stuck-jobs-warning .notice-dismiss:hover {
+    color: #521c24;
+}
+
+/* Dark mode support (if WordPress admin uses dark mode) */
+@media (prefers-color-scheme: dark) {
+    .sfaic-jobs-overview,
+    .sfaic-processing-status {
+        background: #1e1e1e;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    
+    .sfaic-jobs-table {
+        background: #1e1e1e;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    
+    .sfaic-jobs-table th {
+        background-color: #2a2a2a;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    
+    .sfaic-jobs-table td {
+        border-color: #333;
+    }
+    
+    .sfaic-jobs-table tbody tr:hover {
+        background-color: #2a2a2a;
+    }
+    
+    .error-message {
+        background-color: #3d1a1a;
+        border-color: #6a2626;
+        color: #f8d7da;
     }
 }

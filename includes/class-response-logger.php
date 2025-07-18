@@ -3,7 +3,7 @@
 /**
  * Enhanced Response Logger Class with Token Tracking, Restart Functionality, and User Name/Email
  */
-class SFAIC_Response_Logger{
+class SFAIC_Response_Logger {
 
     /**
      * Table name
@@ -37,7 +37,7 @@ class SFAIC_Response_Logger{
         // Add AJAX handlers for JSON downloads
         add_action('wp_ajax_sfaic_download_request_json', array($this, 'ajax_download_request_json'));
         add_action('wp_ajax_sfaic_download_response_json', array($this, 'ajax_download_response_json'));
-        
+
         // Add AJAX handler for restart functionality
         add_action('wp_ajax_sfaic_restart_ai_process', array($this, 'ajax_restart_ai_process'));
     }
@@ -126,7 +126,7 @@ class SFAIC_Response_Logger{
 
     /**
      * Update table structure to the latest version
-    */
+     */
     public function update_table_structure() {
         global $wpdb;
 
@@ -202,19 +202,19 @@ class SFAIC_Response_Logger{
     }
 
     /**
-        * Create logs table with enhanced fields including token tracking and user name/email
-    */
-    public function create_logs_table(){
+     * Create logs table with enhanced fields including token tracking and user name/email
+     */
+    public function create_logs_table() {
         global $wpdb;
 
-           // Include WordPress upgrade functions for dbDelta
-           if (!function_exists('dbDelta')) {
-               require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-           }
+        // Include WordPress upgrade functions for dbDelta
+        if (!function_exists('dbDelta')) {
+            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        }
 
-           $charset_collate = $wpdb->get_charset_collate();
+        $charset_collate = $wpdb->get_charset_collate();
 
-           $sql = "CREATE TABLE IF NOT EXISTS {$this->table_name} (
+        $sql = "CREATE TABLE IF NOT EXISTS {$this->table_name} (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             prompt_id bigint(20) NOT NULL,
             prompt_title varchar(255) DEFAULT NULL,
@@ -248,7 +248,7 @@ class SFAIC_Response_Logger{
 
         dbDelta($sql);
 
-           // Set the table version
+        // Set the table version
         update_option('sfaic_logs_table_version', $this->table_version);
     }
 
@@ -651,7 +651,7 @@ class SFAIC_Response_Logger{
                             // Format user name and email with proper display
                             $user_name_display = !empty($log->user_name) ? esc_html($log->user_name) : '-';
                             $user_email_display = '-';
-                            
+
                             if (!empty($log->user_email)) {
                                 $user_email_display = '<a href="mailto:' . esc_attr($log->user_email) . '">' . esc_html($log->user_email) . '</a>';
                             }
@@ -692,7 +692,7 @@ class SFAIC_Response_Logger{
                                     ?>" class="button button-small">
                                            <?php _e('View', 'chatgpt-fluent-connector'); ?>
                                     </a>
-                                    
+
                                     <!-- Restart button -->
                                     <button type="button" 
                                             class="button button-small sfaic-restart-process" 
@@ -737,6 +737,10 @@ class SFAIC_Response_Logger{
     /**
      * Render log details view with enhanced user information
      */
+
+    /**
+     * FIXED: Render log details view with enhanced user information and HTML safety
+     */
     private function render_log_details($log_id) {
         global $wpdb;
 
@@ -750,6 +754,10 @@ class SFAIC_Response_Logger{
             wp_die(__('Log entry not found.', 'chatgpt-fluent-connector'));
         }
 
+        // FIXED: Safely process AI response to prevent HTML crashes
+        $ai_response_safe = $this->safe_process_ai_response($log->ai_response);
+        $ai_response_length = strlen($log->ai_response);
+        $is_long_response = $ai_response_length > 50000; // 50KB threshold
         // Get form name
         $form_name = '';
         if (function_exists('wpFluent')) {
@@ -780,7 +788,9 @@ class SFAIC_Response_Logger{
         $execution_time = isset($log->execution_time) ? round($log->execution_time, 2) . 's' : '-';
 
         // Prepare status badge
-        $status_badge = ($log->status === 'error') ? '<span class="sfaic-badge sfaic-badge-error">' . __('Error', 'chatgpt-fluent-connector') . '</span>' : '<span class="sfaic-badge sfaic-badge-success">' . __('Success', 'chatgpt-fluent-connector') . '</span>';
+        $status_badge = ($log->status === 'error') ?
+                '<span class="sfaic-badge sfaic-badge-error">' . __('Error', 'chatgpt-fluent-connector') . '</span>' :
+                '<span class="sfaic-badge sfaic-badge-success">' . __('Success', 'chatgpt-fluent-connector') . '</span>';
 
         // Prepare provider badge
         $provider_badge = '';
@@ -802,7 +812,7 @@ class SFAIC_Response_Logger{
                 <a href="<?php echo esc_url(admin_url('edit.php?post_type=sfaic_prompt&page=sfaic-response-logs')); ?>" class="page-title-action">
                     <?php _e('Back to Logs', 'chatgpt-fluent-connector'); ?>
                 </a>
-                
+
                 <!-- Restart button in details view -->
                 <button type="button" 
                         class="page-title-action sfaic-restart-process" 
@@ -827,24 +837,24 @@ class SFAIC_Response_Logger{
                                 <td><?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($log->created_at))); ?></td>
                             </tr>
                             <?php if (!empty($log->user_name)) : ?>
-                            <tr>
-                                <th><?php _e('User Name:', 'chatgpt-fluent-connector'); ?></th>
-                                <td>
-                                    <strong><?php echo esc_html($log->user_name); ?></strong>
-                                    <?php if (!empty($log->user_email)) : ?>
-                                        <a href="mailto:<?php echo esc_attr($log->user_email); ?>" class="button button-small" style="margin-left: 10px;">
-                                            <span class="dashicons dashicons-email" style="vertical-align: middle; font-size: 14px;"></span>
-                                            <?php _e('Email', 'chatgpt-fluent-connector'); ?>
-                                        </a>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+                                <tr>
+                                    <th><?php _e('User Name:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td>
+                                        <strong><?php echo esc_html($log->user_name); ?></strong>
+                                        <?php if (!empty($log->user_email)) : ?>
+                                            <a href="mailto:<?php echo esc_attr($log->user_email); ?>" class="button button-small" style="margin-left: 10px;">
+                                                <span class="dashicons dashicons-email" style="vertical-align: middle; font-size: 14px;"></span>
+                                                <?php _e('Email', 'chatgpt-fluent-connector'); ?>
+                                            </a>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
                             <?php endif; ?>
                             <?php if (!empty($log->user_email)) : ?>
-                            <tr>
-                                <th><?php _e('User Email:', 'chatgpt-fluent-connector'); ?></th>
-                                <td><a href="mailto:<?php echo esc_attr($log->user_email); ?>"><?php echo esc_html($log->user_email); ?></a></td>
-                            </tr>
+                                <tr>
+                                    <th><?php _e('User Email:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td><a href="mailto:<?php echo esc_attr($log->user_email); ?>"><?php echo esc_html($log->user_email); ?></a></td>
+                                </tr>
                             <?php endif; ?>
                             <tr>
                                 <th><?php _e('Status:', 'chatgpt-fluent-connector'); ?></th>
@@ -886,6 +896,17 @@ class SFAIC_Response_Logger{
                                 <th><?php _e('Model:', 'chatgpt-fluent-connector'); ?></th>
                                 <td><?php echo esc_html($log->model); ?></td>
                             </tr>
+                            <?php if (!empty($ai_response_length)) : ?>
+                                <tr>
+                                    <th><?php _e('Response Size:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td>
+                                        <?php echo esc_html(size_format($ai_response_length, 2)); ?>
+                                        <?php if ($is_long_response) : ?>
+                                            <span style="color: #856404;">⚠️ Large response</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                             <?php if ($log->status === 'error' && !empty($log->error_message)) : ?>
                                 <tr>
                                     <th><?php _e('Error:', 'chatgpt-fluent-connector'); ?></th>
@@ -938,8 +959,8 @@ class SFAIC_Response_Logger{
                                 <div class="token-usage-fill <?php echo ($usage_percentage > 80) ? 'danger' : ($usage_percentage > 60 ? 'warning' : ''); ?>" 
                                      style="width: <?php echo min($usage_percentage, 100); ?>%;"
                                      data-percentage="<?php echo round($usage_percentage, 1); ?>">
-                                    <?php if ($usage_percentage > 20) : ?>
-                                        <?php echo round($usage_percentage, 1); ?>%
+                                         <?php if ($usage_percentage > 20) : ?>
+                                             <?php echo round($usage_percentage, 1); ?>%
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -991,7 +1012,7 @@ class SFAIC_Response_Logger{
                     </div>
                 <?php endif; ?>
 
-                <!-- AI Response -->
+                <!-- FIXED: AI Response with Enhanced Safety -->
                 <div class="postbox">
                     <h2 class="hndle">
                         <span><?php _e('AI Response', 'chatgpt-fluent-connector'); ?></span>
@@ -1007,8 +1028,18 @@ class SFAIC_Response_Logger{
                         <?php endif; ?>
                     </h2>
                     <div class="inside">
+                        <?php if ($is_long_response) : ?>
+                            <div class="notice notice-info inline" style="margin: 0 0 15px 0;">
+                                <p>
+                                    <strong><?php _e('Large Response Detected:', 'chatgpt-fluent-connector'); ?></strong>
+                                    <?php _e('This response is very large. Use the tabs below to view different formats, or download the JSON for external viewing.', 'chatgpt-fluent-connector'); ?>
+                                </p>
+                            </div>
+                        <?php endif; ?>
+
                         <div class="sfaic-response-tabs">
-                            <a href="#" class="sfaic-view-toggle active" data-target="sfaic-rendered-response"><?php _e('Rendered', 'chatgpt-fluent-connector'); ?></a>
+                            <a href="#" class="sfaic-view-toggle active" data-target="sfaic-rendered-response"><?php _e('Safe Rendered', 'chatgpt-fluent-connector'); ?></a>
+                            <a href="#" class="sfaic-view-toggle" data-target="sfaic-formatted-response"><?php _e('Formatted', 'chatgpt-fluent-connector'); ?></a>
                             <a href="#" class="sfaic-view-toggle" data-target="sfaic-raw-response"><?php _e('Raw', 'chatgpt-fluent-connector'); ?></a>
                             <button type="button" class="button sfaic-copy-response" style="margin-left: auto;">
                                 <span class="dashicons dashicons-clipboard" style="vertical-align: middle;"></span>
@@ -1016,15 +1047,33 @@ class SFAIC_Response_Logger{
                             </button>
                         </div>
 
+                        <!-- FIXED: Safe Rendered View -->
                         <div class="sfaic-response-view" id="sfaic-rendered-response">
-                            <div class="sfaic-rendered-response">
-                                <?php echo wp_kses_post(wpautop($log->ai_response)); ?>
+                            <div class="sfaic-rendered-response sfaic-safe-content">
+                                <?php echo $ai_response_safe['rendered']; ?>
                             </div>
                         </div>
 
+                        <!-- FIXED: Formatted View for better readability -->
+                        <div class="sfaic-response-view" id="sfaic-formatted-response" style="display: none;">
+                            <div class="sfaic-content-box">
+                                <div class="sfaic-formatted-content">
+                                    <?php echo $ai_response_safe['formatted']; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FIXED: Raw View with length protection -->
                         <div class="sfaic-response-view" id="sfaic-raw-response" style="display: none;">
                             <div class="sfaic-content-box">
-                                <pre><?php echo esc_html($log->ai_response); ?></pre>
+                                <?php if ($is_long_response) : ?>
+                                    <div class="notice notice-warning inline" style="margin: 0 0 15px 0;">
+                                        <p><?php _e('Response is very large. Showing first 50,000 characters.', 'chatgpt-fluent-connector'); ?></p>
+                                    </div>
+                                    <pre class="sfaic-raw-content"><?php echo esc_html(substr($log->ai_response, 0, 50000)); ?><?php if (strlen($log->ai_response) > 50000) echo "\n\n... [Response truncated for display. Download full JSON for complete content.]"; ?></pre>
+                                <?php else : ?>
+                                    <pre class="sfaic-raw-content"><?php echo esc_html($log->ai_response); ?></pre>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -1052,12 +1101,236 @@ class SFAIC_Response_Logger{
                     </div>
                 <?php endif; ?>
             </div>
+
+            <!-- FIXED: Enhanced CSS for safe content display -->
+            <style>
+                .sfaic-safe-content {
+                    max-height: 600px;
+                    overflow-y: auto;
+                    border: 1px solid #ddd;
+                    padding: 15px;
+                    background: #fafafa;
+                }
+
+                .sfaic-formatted-content {
+                    max-height: 500px;
+                    overflow-y: auto;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    font-family: 'Courier New', monospace;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    padding: 15px;
+                    background: #f8f8f8;
+                    border: 1px solid #ddd;
+                }
+
+                .sfaic-raw-content {
+                    max-height: 400px;
+                    overflow-y: auto;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    font-size: 12px;
+                    line-height: 1.3;
+                }
+
+                /* Prevent HTML content from breaking layout */
+                .sfaic-safe-content * {
+                    max-width: 100% !important;
+                    word-wrap: break-word !important;
+                }
+
+                .sfaic-safe-content img {
+                    max-width: 300px !important;
+                    height: auto !important;
+                }
+
+                .sfaic-safe-content table {
+                    width: auto !important;
+                    max-width: 100% !important;
+                    overflow-x: auto !important;
+                    display: block !important;
+                    white-space: nowrap !important;
+                }
+
+                /* Long content handling */
+                .sfaic-response-view {
+                    position: relative;
+                }
+
+                .response-length-warning {
+                    background: #fff3cd;
+                    border: 1px solid #ffeaa7;
+                    padding: 10px;
+                    margin-bottom: 15px;
+                    border-radius: 4px;
+                    color: #856404;
+                }
+            </style>
         </div>
         <?php
     }
 
-    // Include all the other required methods (get_all_logs, count_all_logs, etc.)
-    // ... [Include remaining methods from the original file]
+    /**
+     * FIXED: Safely process AI response to prevent HTML crashes
+     */
+    private function safe_process_ai_response($ai_response) {
+        if (empty($ai_response)) {
+            return array(
+                'rendered' => '<p><em>' . __('No response content.', 'chatgpt-fluent-connector') . '</em></p>',
+                'formatted' => 'No response content.'
+            );
+        }
+
+        // Check if response is too large
+        $is_large = strlen($ai_response) > 50000;
+
+        if ($is_large) {
+            $truncated_response = substr($ai_response, 0, 50000);
+        } else {
+            $truncated_response = $ai_response;
+        }
+
+        // Enhanced HTML cleaning and safety
+        $safe_rendered = $this->create_safe_html_content($truncated_response, $is_large);
+
+        // Create formatted version (plain text with basic formatting)
+        $formatted = $this->create_formatted_content($truncated_response, $is_large);
+
+        return array(
+            'rendered' => $safe_rendered,
+            'formatted' => $formatted
+        );
+    }
+
+    /**
+     * FIXED: Create safe HTML content that won't crash the page
+     */
+    private function create_safe_html_content($content, $is_truncated = false) {
+        // First, try to detect if content is HTML or plain text
+        $has_html_tags = preg_match('/<[^>]+>/', $content);
+
+        if ($has_html_tags) {
+            // Content appears to be HTML - process carefully
+            // Define allowed HTML tags for safe display
+            $allowed_html = array(
+                'p' => array(),
+                'br' => array(),
+                'strong' => array(),
+                'b' => array(),
+                'em' => array(),
+                'i' => array(),
+                'u' => array(),
+                'h1' => array(),
+                'h2' => array(),
+                'h3' => array(),
+                'h4' => array(),
+                'h5' => array(),
+                'h6' => array(),
+                'ul' => array(),
+                'ol' => array(),
+                'li' => array(),
+                'blockquote' => array(),
+                'code' => array(),
+                'pre' => array('class' => array()),
+                'div' => array('class' => array(), 'style' => array()),
+                'span' => array('class' => array(), 'style' => array()),
+                'table' => array('class' => array()),
+                'thead' => array(),
+                'tbody' => array(),
+                'tr' => array(),
+                'th' => array(),
+                'td' => array(),
+                'a' => array('href' => array(), 'target' => array()),
+                'img' => array('src' => array(), 'alt' => array(), 'width' => array(), 'height' => array()),
+            );
+
+            // Clean the HTML
+            $cleaned_html = wp_kses($content, $allowed_html);
+
+            // Fix any unclosed tags that might remain
+            $cleaned_html = $this->fix_unclosed_html_tags($cleaned_html);
+
+            // Wrap in container with safety CSS
+            $safe_html = '<div class="ai-response-container">' . $cleaned_html . '</div>';
+        } else {
+            // Content is plain text - convert to safe HTML
+            $safe_html = '<div class="ai-response-container">' . wpautop(esc_html($content)) . '</div>';
+        }
+
+        // Add truncation notice if needed
+        if ($is_truncated) {
+            $safe_html .= '<div class="response-length-warning"><strong>' . __('Note:', 'chatgpt-fluent-connector') . '</strong> ' . __('Response was truncated for display. Download the full JSON to see complete content.', 'chatgpt-fluent-connector') . '</div>';
+        }
+
+        return $safe_html;
+    }
+
+    /**
+     * FIXED: Create formatted plain text version
+     */
+    private function create_formatted_content($content, $is_truncated = false) {
+        // Strip all HTML tags and decode entities
+        $plain_text = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Clean up extra whitespace
+        $plain_text = preg_replace('/\n\s*\n\s*\n/', "\n\n", $plain_text);
+        $plain_text = trim($plain_text);
+
+        // Add truncation notice if needed
+        if ($is_truncated) {
+            $plain_text .= "\n\n[Response was truncated for display. Download the full JSON to see complete content.]";
+        }
+
+        return $plain_text;
+    }
+
+    /**
+     * FIXED: Fix unclosed HTML tags to prevent page crashes
+     */
+    private function fix_unclosed_html_tags($html) {
+        // List of self-closing tags that don't need to be closed
+        $self_closing_tags = array('br', 'hr', 'img', 'input', 'meta', 'link');
+
+        // List of tags that need to be properly closed
+        $container_tags = array('p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'em', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th');
+
+        // Use DOMDocument to fix the HTML structure
+        if (class_exists('DOMDocument')) {
+            $dom = new DOMDocument();
+
+            // Suppress errors for malformed HTML
+            libxml_use_internal_errors(true);
+
+            // Load HTML with UTF-8 encoding
+            $dom->loadHTML('<meta charset="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+            // Clear any errors
+            libxml_clear_errors();
+
+            // Get the body content (strip the meta tag we added)
+            $fixed_html = $dom->saveHTML();
+            $fixed_html = str_replace('<meta charset="UTF-8">', '', $fixed_html);
+
+            return $fixed_html;
+        }
+
+        // Fallback: simple tag balancing for critical tags
+        foreach ($container_tags as $tag) {
+            $open_count = substr_count($html, '<' . $tag);
+            $close_count = substr_count($html, '</' . $tag . '>');
+
+            // Add missing closing tags
+            if ($open_count > $close_count) {
+                $missing = $open_count - $close_count;
+                for ($i = 0; $i < $missing; $i++) {
+                    $html .= '</' . $tag . '>';
+                }
+            }
+        }
+
+        return $html;
+    }
 
     // Essential methods for functionality
     public function get_all_logs($filters = array(), $limit = 20, $offset = 0) {
@@ -1471,8 +1744,8 @@ class SFAIC_Response_Logger{
 
         // Get the original log entry
         $log = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table_name} WHERE id = %d",
-            $log_id
+                        "SELECT * FROM {$this->table_name} WHERE id = %d",
+                        $log_id
         ));
 
         if (!$log) {
@@ -1483,7 +1756,7 @@ class SFAIC_Response_Logger{
 
         // Get the form data from the original submission
         $form_data = $this->get_form_data_from_entry($log->form_id, $log->entry_id);
-        
+
         if (is_wp_error($form_data)) {
             wp_send_json_error(array(
                 'message' => $form_data->get_error_message()
@@ -1492,7 +1765,7 @@ class SFAIC_Response_Logger{
 
         // Get the form object
         $form = $this->get_form_object($log->form_id);
-        
+
         if (is_wp_error($form)) {
             wp_send_json_error(array(
                 'message' => $form->get_error_message()
@@ -1502,20 +1775,20 @@ class SFAIC_Response_Logger{
         try {
             // Check if background processing is enabled
             $background_enabled = get_option('sfaic_enable_background_processing', true);
-            
+
             if ($background_enabled && isset(sfaic_main()->background_job_manager)) {
                 // Schedule background job for restart
                 $job_id = sfaic_main()->background_job_manager->schedule_job(
-                    'ai_form_processing',
-                    $log->prompt_id,
-                    $log->form_id,
-                    $log->entry_id,
-                    array(
-                        'form_data' => $form_data,
-                        'restart_from_log_id' => $log_id
-                    ),
-                    5, // 5 second delay
-                    1  // Higher priority for restarts
+                        'ai_form_processing',
+                        $log->prompt_id,
+                        $log->form_id,
+                        $log->entry_id,
+                        array(
+                            'form_data' => $form_data,
+                            'restart_from_log_id' => $log_id
+                        ),
+                        5, // 5 second delay
+                        1  // Higher priority for restarts
                 );
 
                 if ($job_id) {
@@ -1532,7 +1805,6 @@ class SFAIC_Response_Logger{
                 // Process immediately
                 $this->process_restart_immediately($log, $form_data, $form);
             }
-
         } catch (Exception $e) {
             error_log('SFAIC: Restart process error: ' . $e->getMessage());
             wp_send_json_error(array(
@@ -1547,7 +1819,7 @@ class SFAIC_Response_Logger{
     private function process_restart_immediately($log, $form_data, $form) {
         // Get the active API provider
         $api = sfaic_main()->get_active_api();
-        
+
         if (!$api) {
             wp_send_json_error(array(
                 'message' => __('AI API not available', 'chatgpt-fluent-connector')
@@ -1593,38 +1865,36 @@ class SFAIC_Response_Logger{
 
         // Create new log entry for the restart
         $new_log_id = $this->log_response(
-            $log->prompt_id,
-            $log->entry_id,
-            $log->form_id,
-            $log->user_prompt,
-            $response_content,
-            $provider,
-            $model,
-            $execution_time,
-            $status,
-            $error_message,
-            $token_usage,
-            $log->prompt_template,
-            $request_json,
-            $response_json,
-            $form_data  // Pass form_data for name/email extraction
+                $log->prompt_id,
+                $log->entry_id,
+                $log->form_id,
+                $log->user_prompt,
+                $response_content,
+                $provider,
+                $model,
+                $execution_time,
+                $status,
+                $error_message,
+                $token_usage,
+                $log->prompt_template,
+                $request_json,
+                $response_json,
+                $form_data  // Pass form_data for name/email extraction
         );
 
         if ($new_log_id) {
             // Add metadata to indicate this is a restart
             global $wpdb;
             $wpdb->update(
-                $this->table_name,
-                array('error_message' => ($error_message ? $error_message . ' ' : '') . '[Restarted from log #' . $log->id . ']'),
-                array('id' => $new_log_id),
-                array('%s'),
-                array('%d')
+                    $this->table_name,
+                    array('error_message' => ($error_message ? $error_message . ' ' : '') . '[Restarted from log #' . $log->id . ']'),
+                    array('id' => $new_log_id),
+                    array('%s'),
+                    array('%d')
             );
 
             wp_send_json_success(array(
-                'message' => $status === 'success' 
-                    ? __('AI process restarted successfully', 'chatgpt-fluent-connector')
-                    : __('AI process restarted but encountered an error', 'chatgpt-fluent-connector'),
+                'message' => $status === 'success' ? __('AI process restarted successfully', 'chatgpt-fluent-connector') : __('AI process restarted but encountered an error', 'chatgpt-fluent-connector'),
                 'new_log_id' => $new_log_id,
                 'status' => $status,
                 'is_background' => false
@@ -1659,16 +1929,16 @@ class SFAIC_Response_Logger{
         }
 
         $entry = wpFluent()->table('fluentform_submissions')
-            ->where('form_id', $form_id)
-            ->where('id', $entry_id)
-            ->first();
+                ->where('form_id', $form_id)
+                ->where('id', $entry_id)
+                ->first();
 
         if (!$entry) {
             return new WP_Error('entry_not_found', __('Form entry not found', 'chatgpt-fluent-connector'));
         }
 
         $form_data = json_decode($entry->response, true);
-        
+
         if (!$form_data) {
             return new WP_Error('invalid_form_data', __('Invalid form data', 'chatgpt-fluent-connector'));
         }
@@ -1685,8 +1955,8 @@ class SFAIC_Response_Logger{
         }
 
         $form = wpFluent()->table('fluentform_forms')
-            ->where('id', $form_id)
-            ->first();
+                ->where('id', $form_id)
+                ->first();
 
         if (!$form) {
             return new WP_Error('form_not_found', __('Form not found', 'chatgpt-fluent-connector'));
