@@ -1,10 +1,10 @@
 <?php
 
 /**
- * Google Gemini API Class - SUPER OPTIMIZED for Gemini 2.5 Flash Performance
+ * Google Gemini API Class - FULLY OPTIMIZED for Gemini 2.5 Flash Performance
  * 
  * Handles API requests to the Google Gemini API with maximum 2.5 Flash optimization
- * ENCODING FIXES REMOVED - PURE PERFORMANCE FOCUS
+ * Version: 3.0 - Complete rewrite for Gemini 2.5 Flash
  */
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
@@ -58,47 +58,62 @@ class SFAIC_Gemini_API {
     }
 
     /**
-     * SUPER OPTIMIZED: Get optimal chunk size for 2.5 Flash - MUCH MORE AGGRESSIVE
+     * OPTIMIZED: Detect if model is any 2.5 version
+     */
+    private function is_gemini_25($model) {
+        return strpos($model, 'gemini-2.5') !== false;
+    }
+
+    /**
+     * FULLY OPTIMIZED: Get optimal chunk size for 2.5 Flash - MAXIMUM PERFORMANCE
      */
     private function get_optimal_chunk_size($model) {
         // MAXIMUM AGGRESSIVE SETTINGS for 2.5 Flash
         if ($this->is_gemini_25_flash($model)) {
-            return 7500; // INCREASED from 6000 - 2.5 Flash can handle MUCH larger chunks
+            return 50000; // MASSIVE increase - 2.5 Flash can handle very large chunks
+        }
+        
+        // Enhanced settings for other 2.5 models
+        if ($this->is_gemini_25($model)) {
+            return 30000; // High for 2.5 Pro
         }
         
         $chunk_sizes = array(
-            'gemini-1.5-pro-latest' => 4000,
-            'gemini-1.5-flash-latest' => 4000,
-            'gemini-2.0-flash-exp' => 3500,
-            'gemini-2.5-pro' => 5000,
-            'gemini-exp-1219' => 3500,
+            'gemini-1.5-pro-latest' => 8000,
+            'gemini-1.5-flash-latest' => 8000,
+            'gemini-2.0-flash-exp' => 10000,
+            'gemini-exp-1219' => 7000,
         );
         
-        return isset($chunk_sizes[$model]) ? $chunk_sizes[$model] : 3000;
+        return isset($chunk_sizes[$model]) ? $chunk_sizes[$model] : 5000;
     }
 
     /**
-     * SUPER OPTIMIZED: Get safe token limits with MAXIMUM 2.5 Flash optimization
+     * FULLY OPTIMIZED: Get safe token limits with MAXIMUM 2.5 Flash optimization
      */
     private function get_safe_token_limit($model) {
-        // MAXIMUM limits for 2.5 Flash - push the boundaries
+        // MAXIMUM limits for 2.5 Flash - unleash full potential
         if ($this->is_gemini_25_flash($model)) {
-            return 8000; // SAME but more reliable processing
+            return 200000; // MASSIVE increase from 8000 to 200k - still conservative for 1M+ context
+        }
+        
+        // Enhanced limits for other 2.5 models
+        if ($this->is_gemini_25($model)) {
+            return 100000; // High for 2.5 Pro
         }
         
         $safe_limits = array(
-            'gemini-1.5-pro-latest' => 4000,
-            'gemini-1.5-flash-latest' => 4000,
-            'gemini-2.0-flash-exp' => 3500,
-            'gemini-2.5-pro' => 5000,
-            'gemini-exp-1219' => 3500,
+            'gemini-1.5-pro-latest' => 8000,
+            'gemini-1.5-flash-latest' => 8000,
+            'gemini-2.0-flash-exp' => 10000,
+            'gemini-exp-1219' => 7000,
         );
         
-        return isset($safe_limits[$model]) ? $safe_limits[$model] : 2500;
+        return isset($safe_limits[$model]) ? $safe_limits[$model] : 4000;
     }
 
     /**
-     * Make a request to the Gemini API - ENCODING REMOVED, 2.5 FLASH SUPER OPTIMIZED
+     * Make a request to the Gemini API - FULLY OPTIMIZED for 2.5 Flash
      */
     public function make_request($messages, $model = null, $max_tokens = 1000, $temperature = 0.7) {
         $api_key = get_option('sfaic_gemini_api_key');
@@ -112,11 +127,11 @@ class SFAIC_Gemini_API {
             $model = get_option('sfaic_gemini_model', 'gemini-1.5-pro-latest');
         }
 
-        // Handle different Gemini model formats and endpoints
+        // Enhanced model mapping for 2.5 models
         $api_model = $model;
         $api_version = 'v1beta'; // Default to v1beta
         
-        // Model mapping for different Gemini versions
+        // Comprehensive model mapping
         $model_mapping = array(
             'gemini-1.5-pro' => 'gemini-1.5-pro-latest',
             'gemini-1.5-flash' => 'gemini-1.5-flash-latest',
@@ -124,45 +139,48 @@ class SFAIC_Gemini_API {
             'gemini-2.0-flash-latest' => 'gemini-2.0-flash-exp',
             'gemini-2.5-flash' => 'gemini-2.5-flash',
             'gemini-2.5-flash-latest' => 'gemini-2.5-flash',
+            'gemini-2.5-flash-002' => 'gemini-2.5-flash-002',
             'gemini-2.5-pro' => 'gemini-2.5-pro',
             'gemini-2.5-pro-latest' => 'gemini-2.5-pro',
+            'gemini-2.5-pro-002' => 'gemini-2.5-pro-002',
             'gemini-pro' => 'gemini-1.5-pro-latest',
         );
 
-        // Check if model needs mapping
+        // Apply model mapping
         if (isset($model_mapping[$model])) {
             $api_model = $model_mapping[$model];
         }
 
-        // If somehow we still have an empty or invalid model, use default
+        // Default fallback
         if (empty($api_model) || $api_model === 'gemini-pro') {
             $api_model = 'gemini-1.5-pro-latest';
         }
 
-        // Check if trying to use 2.5 models
-        $is_25_model = (strpos($api_model, 'gemini-2.5') !== false);
+        // Check model versions
+        $is_25_model = $this->is_gemini_25($api_model);
         $is_25_flash = $this->is_gemini_25_flash($api_model);
 
-        // Try different API versions for 2.5 models
+        // Use appropriate API version for 2.5 models
         if ($is_25_model) {
-            $api_version = 'v1';
+            $api_version = 'v1'; // 2.5 models use v1
         }
 
-        // SUPER OPTIMIZED: Use dynamic token limits with MAXIMUM 2.5 Flash settings
+        // FULLY OPTIMIZED: Use enhanced token limits for 2.5 Flash
         $safe_limit = $this->get_safe_token_limit($api_model);
         $max_tokens = min(intval($max_tokens), $safe_limit);
 
-        // Ensure minimum tokens for proper response
-        if ($max_tokens < 100) {
-            $max_tokens = 100;
+        // Enhanced minimum tokens for 2.5 Flash
+        $min_tokens = $is_25_flash ? 1000 : 100;
+        if ($max_tokens < $min_tokens) {
+            $max_tokens = $min_tokens;
         }
 
-        error_log("SFAIC: SUPER OPTIMIZED request to {$api_model} with {$max_tokens} tokens (safe limit: {$safe_limit}, is 2.5 Flash: " . ($is_25_flash ? 'YES' : 'NO') . ")");
+        error_log("SFAIC: FULLY OPTIMIZED request to {$api_model} with {$max_tokens} tokens (safe limit: {$safe_limit}, is 2.5 Flash: " . ($is_25_flash ? 'YES' : 'NO') . ")");
 
         // Build the API endpoint
         $api_endpoint = 'https://generativelanguage.googleapis.com/' . $api_version . '/models/' . $api_model . ':generateContent?key=' . $api_key;
 
-        // Convert messages - NO ENCODING FIXES
+        // Convert messages to Gemini format
         $gemini_contents = $this->convert_messages_to_gemini_format($messages);
 
         $headers = array(
@@ -170,7 +188,7 @@ class SFAIC_Gemini_API {
             'Accept' => 'application/json',
         );
 
-        // SUPER OPTIMIZED: Best generation config for 2.5 Flash
+        // FULLY OPTIMIZED: Enhanced generation config for 2.5 Flash
         $generation_config = array(
             'temperature' => floatval($temperature),
             'maxOutputTokens' => intval($max_tokens),
@@ -178,10 +196,13 @@ class SFAIC_Gemini_API {
             'topK' => 40
         );
 
-        // 2.5 Flash MAXIMUM optimization: aggressive settings for performance
+        // 2.5 Flash MAXIMUM optimization
         if ($is_25_flash) {
-            $generation_config['topP'] = 0.85;  // More focused for faster responses
-            $generation_config['topK'] = 100;   // Higher diversity when needed
+            $generation_config['topP'] = 0.9;   // Optimized for quality and speed
+            $generation_config['topK'] = 64;    // Enhanced diversity
+        } elseif ($is_25_model) {
+            $generation_config['topP'] = 0.92;  // Slightly more focused for Pro
+            $generation_config['topK'] = 50;    // Balanced diversity
         }
 
         $body = array(
@@ -207,14 +228,14 @@ class SFAIC_Gemini_API {
             )
         );
 
-        // Store the complete request JSON - NO ENCODING FIXES
+        // Store the complete request JSON
         $this->last_request_json = wp_json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-        // Encode with standard JSON
+        // Encode with optimized JSON settings
         $json_body = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        // SUPER OPTIMIZED: Longer timeout for 2.5 Flash large chunks
-        $timeout = $is_25_flash ? 300 : 120;
+        // FULLY OPTIMIZED: Enhanced timeout for 2.5 Flash large responses
+        $timeout = $is_25_flash ? 600 : 300; // 10 minutes for 2.5 Flash, 5 for others
 
         $args = array(
             'headers' => $headers,
@@ -232,7 +253,7 @@ class SFAIC_Gemini_API {
         // Check for WordPress request errors
         if (is_wp_error($response)) {
             $error_message = $response->get_error_message();
-            error_log('CGPTFC: Gemini API WordPress Request Error: ' . $error_message);
+            error_log('SFAIC: Gemini API WordPress Request Error: ' . $error_message);
             return $response;
         }
 
@@ -240,10 +261,10 @@ class SFAIC_Gemini_API {
         $response_code = wp_remote_retrieve_response_code($response);
         $response_body_raw = wp_remote_retrieve_body($response);
 
-        // Store the response JSON - NO ENCODING FIXES
+        // Store the response JSON
         $this->last_response_json = $response_body_raw;
 
-        // NO ENCODING FIXES - direct JSON decode
+        // Decode JSON response
         $response_body = json_decode($response_body_raw, true);
 
         // Store the response for token tracking
@@ -251,32 +272,35 @@ class SFAIC_Gemini_API {
 
         // Handle HTTP errors
         if ($response_code !== 200) {
-            // Try to extract error message from response if possible
             $error_message = '';
             if (isset($response_body['error']['message'])) {
                 $error_message = $response_body['error']['message'];
 
-                // Handle specific model not found errors
+                // Enhanced model fallback for 2.5 models
                 if ((strpos($error_message, 'not found') !== false ||
                         strpos($error_message, 'is not found') !== false) &&
                         strpos($error_message, 'models/') !== false) {
 
-                    // Special handling for 2.5 models
-                    if (strpos($api_model, 'gemini-2.5') !== false) {
-                        // If 2.5 model not available, try 2.0
-                        if (strpos($api_model, 'flash') !== false) {
-                            return $this->make_request($messages, 'gemini-2.0-flash-exp', $max_tokens, $temperature);
-                        } else {
-                            // Fall back to 1.5 Pro for Pro models
-                            return $this->make_request($messages, 'gemini-1.5-pro-latest', $max_tokens, $temperature);
+                    // Enhanced fallback chain for 2.5 models
+                    if (strpos($api_model, 'gemini-2.5-flash') !== false) {
+                        // Try different 2.5 Flash versions
+                        if ($api_model !== 'gemini-2.5-flash-002') {
+                            return $this->make_request($messages, 'gemini-2.5-flash-002', $max_tokens, $temperature);
                         }
+                        // Fallback to 2.0 Flash
+                        return $this->make_request($messages, 'gemini-2.0-flash-exp', $max_tokens, $temperature);
+                    } elseif (strpos($api_model, 'gemini-2.5-pro') !== false) {
+                        // Try different 2.5 Pro versions
+                        if ($api_model !== 'gemini-2.5-pro-002') {
+                            return $this->make_request($messages, 'gemini-2.5-pro-002', $max_tokens, $temperature);
+                        }
+                        // Fallback to 1.5 Pro
+                        return $this->make_request($messages, 'gemini-1.5-pro-latest', $max_tokens, $temperature);
                     }
 
-                    // If the requested model is not available, try fallback to 1.5 Pro
+                    // Standard fallback to 1.5 Pro
                     if ($api_model !== 'gemini-1.5-pro-latest') {
-                        // Update the model in settings to avoid repeated failures
                         update_option('sfaic_gemini_model', 'gemini-1.5-pro-latest');
-                        // Retry with Gemini 1.5 Pro
                         return $this->make_request($messages, 'gemini-1.5-pro-latest', $max_tokens, $temperature);
                     }
                 }
@@ -287,9 +311,9 @@ class SFAIC_Gemini_API {
             }
 
             // Log error details
-            error_log('CGPTFC: Gemini API Error: ' . $error_message);
+            error_log('SFAIC: Gemini API Error: ' . $error_message);
 
-            // Common error fixes with better messages
+            // Enhanced error handling
             if (strpos($error_message, 'API key not valid') !== false) {
                 return new WP_Error('api_error', __('Invalid Gemini API key. Please check your API key in settings.', 'chatgpt-fluent-connector'));
             } elseif (strpos($error_message, 'models/') !== false &&
@@ -307,7 +331,7 @@ class SFAIC_Gemini_API {
             return new WP_Error('api_error', $error_message);
         }
 
-        // Check for blocked content
+        // Enhanced response validation
         if (isset($response_body['candidates'][0]['finishReason']) &&
                 $response_body['candidates'][0]['finishReason'] === 'SAFETY') {
             return new WP_Error('content_blocked', __('The content was blocked by Gemini safety filters', 'chatgpt-fluent-connector'));
@@ -315,34 +339,34 @@ class SFAIC_Gemini_API {
 
         // Check if we have a valid response
         if (!isset($response_body['candidates'][0]['content'])) {
-            error_log('CGPTFC: Invalid Gemini response structure - missing content: ' . wp_json_encode($response_body));
+            error_log('SFAIC: Invalid Gemini response structure - missing content: ' . wp_json_encode($response_body));
             return new WP_Error('invalid_response', __('Invalid response structure from Gemini API - missing content', 'chatgpt-fluent-connector'));
         }
 
-        // Handle empty response content (common with MAX_TOKENS finish reason)
+        // Enhanced handling of empty response content
         if (!isset($response_body['candidates'][0]['content']['parts']) ||
                 empty($response_body['candidates'][0]['content']['parts']) ||
                 !isset($response_body['candidates'][0]['content']['parts'][0]['text'])) {
 
-            // Check if it's because of MAX_TOKENS
-            if (isset($response_body['candidates'][0]['finishReason']) &&
-                    $response_body['candidates'][0]['finishReason'] === 'MAX_TOKENS') {
-                error_log('CGPTFC: Gemini response truncated due to MAX_TOKENS limit');
-                return new WP_Error('max_tokens_reached',
-                        __('Response was truncated because it reached the maximum token limit. Try increasing the max_tokens setting or using a shorter prompt.', 'chatgpt-fluent-connector'));
-            }
-
-            // Check for other finish reasons
+            // Check finish reason
             if (isset($response_body['candidates'][0]['finishReason'])) {
                 $finish_reason = $response_body['candidates'][0]['finishReason'];
-                error_log('CGPTFC: Gemini response finished with reason: ' . $finish_reason);
+                
+                if ($finish_reason === 'MAX_TOKENS') {
+                    error_log('SFAIC: Gemini response truncated due to MAX_TOKENS limit');
+                    return new WP_Error('max_tokens_reached',
+                            __('Response was truncated because it reached the maximum token limit. Try increasing the max_tokens setting or using chunked processing.', 'chatgpt-fluent-connector'));
+                } elseif ($finish_reason === 'SAFETY') {
+                    return new WP_Error('safety_filter', __('Response blocked by Gemini safety filters', 'chatgpt-fluent-connector'));
+                }
+                
+                error_log('SFAIC: Gemini response finished with reason: ' . $finish_reason);
             }
 
-            error_log('CGPTFC: Invalid Gemini response structure - missing text: ' . wp_json_encode($response_body));
+            error_log('SFAIC: Invalid Gemini response structure - missing text: ' . wp_json_encode($response_body));
             return new WP_Error('invalid_response', __('Invalid response structure from Gemini API - no text content', 'chatgpt-fluent-connector'));
         }
 
-        // NO ENCODING FIXES - return response as-is
         return $response_body;
     }
 
@@ -400,14 +424,14 @@ class SFAIC_Gemini_API {
     }
 
     /**
-     * Get the content from the API response - NO ENCODING FIXES
+     * Get the content from the API response
      */
     public function get_response_content($response) {
         if (is_wp_error($response)) {
             return $response;
         }
 
-        // Check if response has content but no text (empty response)
+        // Enhanced response validation
         if (isset($response['candidates'][0]['content']) &&
                 (!isset($response['candidates'][0]['content']['parts']) ||
                 empty($response['candidates'][0]['content']['parts']))) {
@@ -416,7 +440,7 @@ class SFAIC_Gemini_API {
             if (isset($response['candidates'][0]['finishReason'])) {
                 $finish_reason = $response['candidates'][0]['finishReason'];
                 if ($finish_reason === 'MAX_TOKENS') {
-                    return new WP_Error('max_tokens', __('Response truncated: Maximum token limit reached before any content was generated. Try increasing max_tokens.', 'chatgpt-fluent-connector'));
+                    return new WP_Error('max_tokens', __('Response truncated: Maximum token limit reached before any content was generated. Try increasing max_tokens or enabling chunked processing.', 'chatgpt-fluent-connector'));
                 } elseif ($finish_reason === 'SAFETY') {
                     return new WP_Error('safety_filter', __('Response blocked by Gemini safety filters', 'chatgpt-fluent-connector'));
                 }
@@ -429,13 +453,12 @@ class SFAIC_Gemini_API {
             return new WP_Error('invalid_response', __('Invalid response from Gemini API - no text content', 'chatgpt-fluent-connector'));
         }
 
-        // NO ENCODING FIXES - return content as-is
         $content = $response['candidates'][0]['content']['parts'][0]['text'];
         return $content;
     }
 
     /**
-     * Process a form submission with a prompt - SUPER OPTIMIZED for chunking
+     * FULLY OPTIMIZED: Process a form submission with a prompt for 2.5 Flash
      */
     public function process_form_with_prompt($prompt_id, $form_data, $entry_id = null) {
         // Get prompt settings
@@ -447,24 +470,25 @@ class SFAIC_Gemini_API {
         $enable_chunking = get_post_meta($prompt_id, '_sfaic_enable_chunking', true);
         $model = get_option('sfaic_gemini_model', 'gemini-1.5-pro-latest');
 
-        // SUPER OPTIMIZED: More intelligent chunking trigger for 2.5 Flash
+        // FULLY OPTIMIZED: Enhanced chunking trigger for 2.5 Flash
         $estimated_prompt_length = strlen($system_prompt) + strlen($user_prompt_template) + strlen(serialize($form_data));
         $is_25_flash = $this->is_gemini_25_flash($model);
+        $is_25_model = $this->is_gemini_25($model);
         
-        // 2.5 Flash can handle MUCH larger non-chunked responses
-        $chunking_threshold = $is_25_flash ? 8000 : 6000;
-        $prompt_threshold = $is_25_flash ? 20000 : 10000; // INCREASED for 2.5 Flash
+        // OPTIMIZED: Much more aggressive thresholds for 2.5 models
+        $chunking_threshold = $is_25_flash ? 150000 : ($is_25_model ? 100000 : 8000);
+        $prompt_threshold = $is_25_flash ? 100000 : ($is_25_model ? 50000 : 15000);
         
         $needs_chunking = ($enable_chunking === '1') && (
             intval($max_tokens) > $chunking_threshold ||
             $estimated_prompt_length > $prompt_threshold ||
-            strpos($user_prompt_template, 'HTML') !== false ||
-            strpos($system_prompt, 'comprehensive') !== false ||
-            strpos($system_prompt, 'detailed') !== false
+            strpos($user_prompt_template, 'comprehensive') !== false ||
+            strpos($system_prompt, 'detailed') !== false ||
+            strpos($system_prompt, 'report') !== false
         );
 
         if ($needs_chunking) {
-            error_log('SFAIC Gemini: Using SUPER OPTIMIZED chunked processing - estimated length: ' . $estimated_prompt_length . ', is 2.5 Flash: ' . ($is_25_flash ? 'YES' : 'NO'));
+            error_log('SFAIC Gemini: Using FULLY OPTIMIZED chunked processing - estimated length: ' . $estimated_prompt_length . ', is 2.5 Flash: ' . ($is_25_flash ? 'YES' : 'NO'));
             return $this->process_form_with_prompt_chunked($prompt_id, $form_data, $entry_id);
         }
 
@@ -473,10 +497,21 @@ class SFAIC_Gemini_API {
             $prompt_type = 'template';
         }
 
-        // For non-chunked responses, use optimized limits
+        // OPTIMIZED: Enhanced limits for 2.5 models
         $safe_limit = $this->get_safe_token_limit($model);
         if (intval($max_tokens) > $safe_limit) {
             $max_tokens = $safe_limit;
+        }
+
+        // Enhanced minimum token handling
+        if (empty($max_tokens) || intval($max_tokens) < 1000) {
+            if ($is_25_flash) {
+                $max_tokens = 50000; // High default for 2.5 Flash
+            } elseif ($is_25_model) {
+                $max_tokens = 30000; // High default for 2.5 Pro
+            } else {
+                $max_tokens = 4000; // Standard default
+            }
         }
 
         // Prepare the user prompt based on prompt type
@@ -511,7 +546,7 @@ class SFAIC_Gemini_API {
             return new WP_Error('empty_prompt', __('User prompt is empty after processing', 'chatgpt-fluent-connector'));
         }
 
-        // Apply HTML template filter
+        // Apply template filter
         $user_prompt = apply_filters('sfaic_process_form_with_prompt', $user_prompt, $prompt_id, $form_data);
 
         // Prepare the messages
@@ -544,12 +579,12 @@ class SFAIC_Gemini_API {
         $response = $this->make_request(
                 $messages,
                 $model,
-                !empty($max_tokens) ? intval($max_tokens) : 1000,
+                intval($max_tokens),
                 !empty($temperature) ? floatval($temperature) : 0.7
         );
 
         if (is_wp_error($response)) {
-            error_log('CGPTFC: Error in Gemini API response: ' . $response->get_error_message());
+            error_log('SFAIC: Error in Gemini API response: ' . $response->get_error_message());
             return $response;
         }
 
@@ -567,10 +602,10 @@ class SFAIC_Gemini_API {
     }
 
     /**
-     * SUPER OPTIMIZED: Enhanced chunked processing MAXIMIZED for Gemini 2.5 Flash
+     * FULLY OPTIMIZED: Enhanced chunked processing MAXIMIZED for Gemini 2.5 Flash
      */
     public function process_form_with_prompt_chunked($prompt_id, $form_data, $entry_id = null) {
-        error_log('SFAIC: Starting MAXIMUM OPTIMIZED chunked processing for Gemini 2.5 Flash');
+        error_log('SFAIC: Starting FULLY OPTIMIZED chunked processing for Gemini 2.5 Flash');
 
         // Get chunking settings from prompt
         $chunking_settings = $this->get_chunking_settings($prompt_id);
@@ -591,30 +626,41 @@ class SFAIC_Gemini_API {
             return $user_prompt;
         }
 
-        // SUPER OPTIMIZED: Ultra-short system prompt for 2.5 Flash
+        // FULLY OPTIMIZED: Enhanced system prompt for 2.5 models
         $is_25_flash = $this->is_gemini_25_flash($model);
+        $is_25_model = $this->is_gemini_25($model);
         
         if ($is_25_flash) {
-            // MAXIMUM concise instructions for 2.5 Flash
+            // Ultra-concise instructions for 2.5 Flash
             $chunked_system_prompt = $system_prompt . "\n\n" .
-                "CHUNKING: Generate complete sections. Add " . $chunking_settings['completion_marker'] . " when done.";
+                "OUTPUT: Generate complete sections. Add " . $chunking_settings['completion_marker'] . " when finished.";
+        } elseif ($is_25_model) {
+            // Optimized instructions for 2.5 Pro
+            $chunked_system_prompt = $system_prompt . "\n\n" .
+                "CHUNKING: Generate complete sections. Continue when prompted. Add " . $chunking_settings['completion_marker'] . " when done.";
         } else {
-            // Standard instructions for other models
+            // Standard instructions for older models
             $chunked_system_prompt = $system_prompt . "\n\n" .
                 "CHUNKING INSTRUCTIONS:\n" .
-                "1. Generate valid HTML for PDF conversion\n" .
-                "2. Stop at complete elements if reaching limits\n" .
+                "1. Generate valid content for the request\n" .
+                "2. Stop at complete sections if reaching limits\n" .
                 "3. Continue when prompted\n" .
-                "4. Only conclude with complete report\n" .
+                "4. Only conclude with complete response\n" .
                 "5. Add " . $chunking_settings['completion_marker'] . " when truly finished";
         }
 
-        // SUPER OPTIMIZED: MAXIMUM chunk sizes for 2.5 Flash
+        // FULLY OPTIMIZED: Maximum chunk sizes for 2.5 models
         $target_tokens = intval($max_tokens);
         $chunk_size = $this->get_optimal_chunk_size($model);
         
-        // 2.5 Flash can handle MANY more chunks efficiently - INCREASED LIMITS
-        $max_chunks = $is_25_flash ? min(ceil($target_tokens / $chunk_size), 80) : min(ceil($target_tokens / $chunk_size), 40);
+        // Enhanced chunk limits for 2.5 models
+        if ($is_25_flash) {
+            $max_chunks = min(ceil($target_tokens / $chunk_size), 100); // Maximum for 2.5 Flash
+        } elseif ($is_25_model) {
+            $max_chunks = min(ceil($target_tokens / $chunk_size), 80); // High for 2.5 Pro
+        } else {
+            $max_chunks = min(ceil($target_tokens / $chunk_size), 40); // Standard for others
+        }
         
         $total_tokens_used = 0;
         $full_response = '';
@@ -626,15 +672,15 @@ class SFAIC_Gemini_API {
         }
         $conversation[] = array('role' => 'user', 'content' => $user_prompt);
 
-        error_log("SFAIC: MAXIMUM OPTIMIZED chunking - target: {$target_tokens}, chunk: {$chunk_size}, max chunks: {$max_chunks}, 2.5 Flash: " . ($is_25_flash ? 'YES' : 'NO'));
+        error_log("SFAIC: FULLY OPTIMIZED chunking - target: {$target_tokens}, chunk: {$chunk_size}, max chunks: {$max_chunks}, 2.5 Flash: " . ($is_25_flash ? 'YES' : 'NO'));
 
         for ($chunk_num = 0; $chunk_num < $max_chunks; $chunk_num++) {
             // Calculate remaining tokens
             $remaining_tokens = $target_tokens - $total_tokens_used;
             $current_chunk_size = min($chunk_size, $remaining_tokens);
 
-            // SUPER OPTIMIZED: Lower minimum for 2.5 Flash (it's MUCH more efficient)
-            $min_tokens = $is_25_flash ? 200 : 200;
+            // Enhanced minimum for 2.5 models
+            $min_tokens = $is_25_flash ? 2000 : ($is_25_model ? 1000 : 500);
             if ($current_chunk_size < $min_tokens) {
                 error_log("SFAIC: Stopping - insufficient tokens remaining: {$current_chunk_size}");
                 break;
@@ -642,8 +688,8 @@ class SFAIC_Gemini_API {
 
             error_log("SFAIC: Chunk " . ($chunk_num + 1) . " requesting {$current_chunk_size} tokens");
 
-            // SUPER OPTIMIZED: Enhanced retry logic for 2.5 Flash
-            $response = $this->make_request_with_maximum_retry($conversation, $model, $current_chunk_size, floatval($temperature));
+            // OPTIMIZED: Enhanced retry logic for 2.5 models
+            $response = $this->make_request_with_enhanced_retry($conversation, $model, $current_chunk_size, floatval($temperature));
 
             if (is_wp_error($response)) {
                 if ($chunk_num === 0) {
@@ -669,33 +715,41 @@ class SFAIC_Gemini_API {
 
             error_log("SFAIC: Chunk " . ($chunk_num + 1) . " used {$chunk_tokens_used} tokens. Total: {$total_tokens_used}");
 
-            // Clean chunk content - NO ENCODING FIXES
-            $chunk_content = $this->clean_html_chunk($chunk_content);
+            // Clean chunk content
+            $chunk_content = $this->clean_response_chunk($chunk_content);
             $full_response .= $chunk_content;
 
-            // CHECK FOR DYNAMIC COMPLETION MARKER
+            // CHECK FOR COMPLETION MARKER
             if (strpos($chunk_content, $chunking_settings['completion_marker']) !== false) {
                 error_log("SFAIC: Found completion marker: " . $chunking_settings['completion_marker']);
                 break;
             }
 
-            // DYNAMIC COMPLETION CHECK
-            if ($this->should_continue_chunking_dynamic($chunk_content, $full_response, $total_tokens_used, $target_tokens, $chunking_settings)) {
-                // SUPER OPTIMIZED: Better conversation management for 2.5 Flash
+            // ENHANCED DYNAMIC COMPLETION CHECK
+            if ($this->should_continue_chunking_enhanced($chunk_content, $full_response, $total_tokens_used, $target_tokens, $chunking_settings)) {
+                // OPTIMIZED: Enhanced conversation management for 2.5 models
                 if ($is_25_flash) {
-                    // 2.5 Flash can handle MUCH longer conversations
-                    if (count($conversation) > 20) { // INCREASED from 10
+                    // 2.5 Flash can handle very long conversations
+                    if (count($conversation) > 40) {
                         $conversation = array_merge(
                             array_slice($conversation, 0, 2), // Keep system + original
-                            array_slice($conversation, -12)   // Keep last 12 (INCREASED from 6)
+                            array_slice($conversation, -30)   // Keep last 30
+                        );
+                    }
+                } elseif ($is_25_model) {
+                    // 2.5 Pro enhanced handling
+                    if (count($conversation) > 30) {
+                        $conversation = array_merge(
+                            array_slice($conversation, 0, 2), // Keep system + original
+                            array_slice($conversation, -20)   // Keep last 20
                         );
                     }
                 } else {
                     // Conservative for other models
-                    if (count($conversation) > 6) {
+                    if (count($conversation) > 10) {
                         $conversation = array_merge(
                             array_slice($conversation, 0, 2), // Keep system + original
-                            array_slice($conversation, -2)    // Keep last 2 only
+                            array_slice($conversation, -4)    // Keep last 4
                         );
                     }
                 }
@@ -703,83 +757,106 @@ class SFAIC_Gemini_API {
                 // Add response and continuation
                 $conversation[] = array('role' => $this->get_assistant_role(), 'content' => $chunk_content);
                 
-                $continuation_prompt = $this->generate_maximum_continuation_prompt($chunking_settings, $full_response, $chunk_num, $target_tokens, $total_tokens_used, $is_25_flash);
+                $continuation_prompt = $this->generate_optimized_continuation_prompt($chunking_settings, $full_response, $chunk_num, $target_tokens, $total_tokens_used, $is_25_flash, $is_25_model);
                 $conversation[] = array('role' => 'user', 'content' => $continuation_prompt);
             } else {
-                error_log("SFAIC: Completion detected by dynamic analysis");
+                error_log("SFAIC: Completion detected by enhanced analysis");
                 break;
             }
         }
 
-        // Post-process - NO ENCODING FIXES
-        $full_response = $this->post_process_html_response($full_response, $chunking_settings);
+        // Post-process
+        $full_response = $this->post_process_response($full_response, $chunking_settings);
 
-        // Store metadata
+        // Store enhanced metadata
         if (!empty($entry_id)) {
             update_post_meta($entry_id, '_gemini_chunked_response', true);
             update_post_meta($entry_id, '_gemini_chunks_count', $chunk_num + 1);
             update_post_meta($entry_id, '_gemini_total_tokens_generated', $total_tokens_used);
             update_post_meta($entry_id, '_gemini_response_length', strlen($full_response));
-            update_post_meta($entry_id, '_gemini_completion_reason', 'maximum_optimized_chunking');
+            update_post_meta($entry_id, '_gemini_completion_reason', 'fully_optimized_chunking');
             update_post_meta($entry_id, '_gemini_chunking_settings_used', $chunking_settings);
-            update_post_meta($entry_id, '_gemini_model_optimized', $is_25_flash ? 'gemini_25_flash_maximum' : 'standard');
+            update_post_meta($entry_id, '_gemini_model_optimized', $is_25_flash ? 'gemini_25_flash_optimized' : ($is_25_model ? 'gemini_25_optimized' : 'standard'));
         }
 
-        error_log("SFAIC: MAXIMUM OPTIMIZED chunking complete. " . ($chunk_num + 1) . " chunks, {$total_tokens_used} tokens, " . strlen($full_response) . " chars");
+        error_log("SFAIC: FULLY OPTIMIZED chunking complete. " . ($chunk_num + 1) . " chunks, {$total_tokens_used} tokens, " . strlen($full_response) . " chars");
 
         return $full_response;
     }
 
     /**
-     * SUPER OPTIMIZED: Ultra-efficient continuation prompts for 2.5 Flash
+     * OPTIMIZED: Enhanced continuation prompts for 2.5 models
      */
-    private function generate_maximum_continuation_prompt($settings, $full_response, $chunk_num, $target_tokens, $tokens_used, $is_25_flash) {
+    private function generate_optimized_continuation_prompt($settings, $full_response, $chunk_num, $target_tokens, $tokens_used, $is_25_flash, $is_25_model) {
         $progress_ratio = $tokens_used / $target_tokens;
         $word_count = str_word_count(strip_tags($full_response));
         
         // If we're near the end, encourage completion
-        if ($progress_ratio > 0.85) {
+        if ($progress_ratio > 0.9) {
             return "Complete and add " . $settings['completion_marker'];
         }
         
         // If content is still short, encourage more detail
         if ($word_count < $settings['min_content_length']) {
-            return $is_25_flash ? 
-                "Continue with more detail." :
-                "Please continue developing the HTML report with more detailed content and analysis.";
+            if ($is_25_flash) {
+                return "Continue with more detail.";
+            } elseif ($is_25_model) {
+                return "Continue developing with more detailed content.";
+            } else {
+                return "Please continue developing the response with more detailed content and analysis.";
+            }
         }
         
-        // SUPER OPTIMIZED: Ultra-short prompts for 2.5 Flash
+        // OPTIMIZED: Ultra-efficient prompts for 2.5 Flash
         if ($is_25_flash) {
             $flash_prompts = array(
                 "Continue.",
                 "Next section.",
                 "More content.",
                 "Proceed.",
-                "Expand."
+                "Expand.",
+                "Develop further.",
+                "Add more details.",
+                "Continue building."
             );
             return $flash_prompts[$chunk_num % count($flash_prompts)];
         }
         
+        // Enhanced prompts for 2.5 Pro
+        if ($is_25_model) {
+            $pro_prompts = array(
+                "Continue with the next section.",
+                "Please proceed with additional content.",
+                "Develop the next portion.",
+                "Continue building the response.",
+                "Add the next section with details.",
+                "Proceed with comprehensive coverage.",
+                "Continue with thorough analysis.",
+                "Develop further with detailed content."
+            );
+            return $pro_prompts[$chunk_num % count($pro_prompts)];
+        }
+        
         // Standard prompts for other models
         $prompts = array(
-            "Please continue with the next section of the HTML report, maintaining the same structure and styling.",
-            "Continue generating the HTML report with additional sections and detailed analysis.",
-            "Please proceed with the next portion of the HTML report, ensuring completeness and proper formatting.",
-            "Continue with the subsequent sections of the HTML report, providing comprehensive coverage.",
-            "Please add the next part of the HTML report with detailed content and proper structure."
+            "Please continue with the next section, maintaining the same structure and quality.",
+            "Continue generating the response with additional sections and detailed analysis.",
+            "Please proceed with the next portion, ensuring completeness and proper formatting.",
+            "Continue with the subsequent sections, providing comprehensive coverage.",
+            "Please add the next part with detailed content and proper structure."
         );
         
         return $prompts[$chunk_num % count($prompts)];
     }
 
     /**
-     * SUPER OPTIMIZED: Enhanced retry logic MAXIMIZED for 2.5 Flash
+     * OPTIMIZED: Enhanced retry logic for 2.5 models
      */
-    private function make_request_with_maximum_retry($conversation, $model, $chunk_tokens, $temperature, $max_retries = 3) {
+    private function make_request_with_enhanced_retry($conversation, $model, $chunk_tokens, $temperature, $max_retries = 3) {
         $retry_count = 0;
         $original_chunk_tokens = $chunk_tokens;
         $is_25_flash = $this->is_gemini_25_flash($model);
+        $is_25_model = $this->is_gemini_25($model);
         
         while ($retry_count <= $max_retries) {
             $response = $this->make_request($conversation, $model, $chunk_tokens, $temperature);
@@ -790,16 +867,23 @@ class SFAIC_Gemini_API {
             
             $error_message = $response->get_error_message();
             
-            // Handle token limit errors - 2.5 Flash is MUCH more aggressive in recovery
+            // Handle token limit errors with enhanced recovery for 2.5 models
             if (strpos($error_message, 'maximum token limit') !== false || 
                 strpos($error_message, 'MAX_TOKENS') !== false ||
                 strpos($error_message, 'truncated') !== false) {
                 
-                // SUPER OPTIMIZED: Less aggressive reduction for 2.5 Flash
-                $reduction_factor = $is_25_flash ? 0.8 : 0.5; // INCREASED from 0.7
+                // OPTIMIZED: Less aggressive reduction for 2.5 models
+                if ($is_25_flash) {
+                    $reduction_factor = 0.85; // Minimal reduction for 2.5 Flash
+                } elseif ($is_25_model) {
+                    $reduction_factor = 0.8; // Slight reduction for 2.5 Pro
+                } else {
+                    $reduction_factor = 0.6; // Standard reduction
+                }
+                
                 $chunk_tokens = intval($chunk_tokens * $reduction_factor);
                 
-                $min_tokens = $is_25_flash ? 200 : 100; // REDUCED minimum
+                $min_tokens = $is_25_flash ? 1000 : ($is_25_model ? 500 : 200);
                 if ($chunk_tokens < $min_tokens) {
                     error_log("SFAIC: Chunk size too small ({$chunk_tokens}), giving up");
                     break;
@@ -813,14 +897,18 @@ class SFAIC_Gemini_API {
                 }
             }
             
-            // Handle rate limits - 2.5 Flash has different limits
+            // Handle rate limits with enhanced backoff for 2.5 models
             if (strpos($error_message, 'rate limit') !== false) {
                 $retry_count++;
                 if ($retry_count <= $max_retries) {
-                    // SUPER OPTIMIZED: Even shorter waits for 2.5 Flash (it's MUCH faster)
-                    $wait_time = $is_25_flash ? 
-                        min(pow(1.2, $retry_count), 4) :  // REDUCED exponential backoff
-                        pow(2, $retry_count);             // Standard backoff
+                    // OPTIMIZED: Shorter waits for 2.5 models (they're faster)
+                    if ($is_25_flash) {
+                        $wait_time = min(pow(1.5, $retry_count), 6); // Gentle backoff for 2.5 Flash
+                    } elseif ($is_25_model) {
+                        $wait_time = min(pow(1.8, $retry_count), 8); // Moderate backoff for 2.5 Pro
+                    } else {
+                        $wait_time = pow(2, $retry_count); // Standard backoff
+                    }
                     
                     error_log("SFAIC: Rate limit, waiting {$wait_time}s (attempt {$retry_count})");
                     sleep($wait_time);
@@ -836,7 +924,122 @@ class SFAIC_Gemini_API {
     }
 
     /**
-     * Get dynamic chunking settings for a prompt
+     * Enhanced dynamic completion checking with better heuristics
+     */
+    private function should_continue_chunking_enhanced($chunk_content, $full_response, $tokens_used, $target_tokens, $settings) {
+        // Check for explicit completion marker
+        if (strpos($chunk_content, $settings['completion_marker']) !== false) {
+            error_log("SFAIC: Found completion marker, stopping");
+            return false;
+        }
+
+        // If smart completion is disabled, use simple logic
+        if (!$settings['enable_smart_completion']) {
+            return $tokens_used < $target_tokens * 0.95;
+        }
+
+        // Check minimum content length
+        $content_length = strlen(strip_tags($full_response));
+        if ($content_length < $settings['min_content_length']) {
+            error_log("SFAIC: Content too short ({$content_length} < {$settings['min_content_length']}), continuing");
+            return true;
+        }
+
+        // Enhanced word count and completion keyword checking
+        $word_count = str_word_count(strip_tags($full_response));
+        if ($word_count > $settings['completion_word_count']) {
+            // Parse completion keywords
+            $keywords = array_map('trim', explode(',', $settings['completion_keywords']));
+            $keywords = array_filter($keywords); // Remove empty values
+            
+            // Check for completion keywords in the recent chunk
+            foreach ($keywords as $keyword) {
+                if (!empty($keyword) && stripos($chunk_content, $keyword) !== false) {
+                    // Enhanced check: look for natural endings
+                    if (preg_match('/\b' . preg_quote($keyword, '/') . '\b.*?(\.|!|\?|<\/[^>]+>)\s*$/i', $chunk_content)) {
+                        error_log("SFAIC: Found completion keyword '{$keyword}' with natural ending");
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Enhanced token percentage checking
+        if ($settings['use_token_percentage']) {
+            $token_percentage = ($tokens_used / $target_tokens) * 100;
+            if ($token_percentage >= $settings['token_completion_threshold']) {
+                error_log("SFAIC: Token threshold reached ({$token_percentage}% >= {$settings['token_completion_threshold']}%)");
+                
+                // If we're over the threshold and have reasonable content, check for natural ending
+                if ($word_count > $settings['min_chunk_words']) {
+                    $keywords = array_map('trim', explode(',', $settings['completion_keywords']));
+                    foreach ($keywords as $keyword) {
+                        if (!empty($keyword) && stripos($chunk_content, $keyword) !== false) {
+                            error_log("SFAIC: Natural ending found at token threshold");
+                            return false;
+                        }
+                    }
+                }
+                
+                // Force completion if we're way over threshold
+                if ($token_percentage >= $settings['token_completion_threshold'] + 15) {
+                    error_log("SFAIC: Force stopping due to high token usage");
+                    return false;
+                }
+            }
+        }
+
+        // Continue by default
+        return true;
+    }
+
+    /**
+     * Enhanced response post-processing
+     */
+    private function post_process_response($response, $settings) {
+        // Remove the completion marker from the final response
+        $response = str_replace($settings['completion_marker'], '', $response);
+        
+        // Remove any continuation markers
+        $response = preg_replace('/\[(continued|part \d+)\]/i', '', $response);
+        
+        // Clean up any duplicate HTML tags
+        $response = preg_replace('/<html[^>]*>.*?<html[^>]*>/i', '<html>', $response);
+        
+        // Ensure proper HTML structure if it looks like HTML
+        if (strpos($response, '<html') !== false || strpos($response, '<!DOCTYPE') !== false) {
+            // It's already HTML, just clean it up
+            $response = preg_replace('/(<\/html>).*$/is', '$1', $response);
+        } elseif (strpos($response, '<') !== false && strpos($response, '>') !== false) {
+            // Has HTML tags but not complete document
+            if (strpos($response, '<html') === false && strpos($response, '<!DOCTYPE') === false) {
+                $response = "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\"></head>\n<body>\n" . $response . "\n</body>\n</html>";
+            }
+        }
+        
+        return trim($response);
+    }
+
+    /**
+     * Enhanced response chunk cleaning
+     */
+    private function clean_response_chunk($chunk) {
+        // Remove any stray markdown that might have slipped in
+        $chunk = preg_replace('/```html\s*/', '', $chunk);
+        $chunk = preg_replace('/```\s*$/', '', $chunk);
+        
+        // Clean up any formatting artifacts
+        $chunk = preg_replace('/^\s*\[continued\]\s*/i', '', $chunk);
+        $chunk = preg_replace('/^\s*\[part \d+\]\s*/i', '', $chunk);
+        
+        // Ensure proper structure
+        $chunk = trim($chunk);
+        
+        return $chunk;
+    }
+
+    /**
+     * Get chunking settings for a prompt
      */
     private function get_chunking_settings($prompt_id) {
         // Get the prompt manager instance to access the settings
@@ -858,112 +1061,6 @@ class SFAIC_Gemini_API {
     }
 
     /**
-     * Dynamic completion checking with configurable settings
-     */
-    private function should_continue_chunking_dynamic($chunk_content, $full_response, $tokens_used, $target_tokens, $settings) {
-        // Check for explicit completion marker
-        if (strpos($chunk_content, $settings['completion_marker']) !== false) {
-            error_log("SFAIC: Found completion marker, stopping");
-            return false;
-        }
-
-        // If smart completion is disabled, use simple logic
-        if (!$settings['enable_smart_completion']) {
-            return $tokens_used < $target_tokens * 0.9;
-        }
-
-        // Check minimum content length
-        $content_length = strlen(strip_tags($full_response));
-        if ($content_length < $settings['min_content_length']) {
-            error_log("SFAIC: Content too short ({$content_length} < {$settings['min_content_length']}), continuing");
-            return true;
-        }
-
-        // Check word count and completion keywords
-        $word_count = str_word_count(strip_tags($full_response));
-        if ($word_count > $settings['completion_word_count']) {
-            // Parse completion keywords
-            $keywords = array_map('trim', explode(',', $settings['completion_keywords']));
-            $keywords = array_filter($keywords); // Remove empty values
-            
-            // Check for completion keywords in the recent chunk
-            foreach ($keywords as $keyword) {
-                if (!empty($keyword) && stripos($chunk_content, $keyword) !== false) {
-                    // Additional check: is this near the end with HTML closing tags?
-                    if (preg_match('/\b' . preg_quote($keyword, '/') . '\b.*?<\/html>/i', $chunk_content)) {
-                        error_log("SFAIC: Found completion keyword '{$keyword}' with HTML ending");
-                        return false;
-                    }
-                }
-            }
-        }
-
-        // Check token percentage if enabled
-        if ($settings['use_token_percentage']) {
-            $token_percentage = ($tokens_used / $target_tokens) * 100;
-            if ($token_percentage >= $settings['token_completion_threshold']) {
-                error_log("SFAIC: Token threshold reached ({$token_percentage}% >= {$settings['token_completion_threshold']}%)");
-                
-                // If we're over the threshold and have reasonable content, check for natural ending
-                if ($word_count > $settings['min_chunk_words']) {
-                    $keywords = array_map('trim', explode(',', $settings['completion_keywords']));
-                    foreach ($keywords as $keyword) {
-                        if (!empty($keyword) && stripos($chunk_content, $keyword) !== false) {
-                            error_log("SFAIC: Natural ending found at token threshold");
-                            return false;
-                        }
-                    }
-                }
-                
-                // Force completion if we're way over threshold
-                if ($token_percentage >= $settings['token_completion_threshold'] + 10) {
-                    error_log("SFAIC: Force stopping due to high token usage");
-                    return false;
-                }
-            }
-        }
-
-        // Continue by default
-        return true;
-    }
-
-    /**
-     * Post-process HTML response with dynamic completion marker - NO ENCODING FIXES
-     */
-    private function post_process_html_response($response, $settings) {
-        // Remove the completion marker from the final response
-        $response = str_replace($settings['completion_marker'], '', $response);
-        
-        // Remove any continuation markers
-        $response = preg_replace('/\[(continued|part \d+)\]/i', '', $response);
-        
-        // Clean up any duplicate HTML tags
-        $response = preg_replace('/<html[^>]*>.*?<html[^>]*>/i', '<html>', $response);
-        
-        // Ensure proper HTML structure
-        if (strpos($response, '<html') === false && strpos($response, '<!DOCTYPE') === false) {
-            // If it's not a complete HTML document, wrap it properly
-            $response = "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\"></head>\n<body>\n" . $response . "\n</body>\n</html>";
-        }
-        
-        return trim($response);
-    }
-
-    /**
-     * Clean HTML chunks - NO ENCODING FIXES
-     */
-    private function clean_html_chunk($chunk) {
-        // Remove any stray markdown that might have slipped in
-        $chunk = preg_replace('/```html\s*/', '', $chunk);
-        $chunk = preg_replace('/```\s*$/', '', $chunk);
-        
-        // Ensure proper HTML structure
-        $chunk = trim($chunk);
-        
-        return $chunk;
-    }
-
-    /**
      * Helper method implementations
      */
     protected function get_assistant_role() {
@@ -979,7 +1076,7 @@ class SFAIC_Gemini_API {
     }
 
     /**
-     * Format all form data into a structured text for Gemini - NO ENCODING FIXES
+     * Format all form data into a structured text for Gemini
      */
     private function format_all_form_data($form_data, $prompt_id) {
         $output = __('Here is the submitted form data:', 'chatgpt-fluent-connector') . "\n\n";
@@ -1005,7 +1102,7 @@ class SFAIC_Gemini_API {
                 continue;
             }
 
-            // Add to output - NO ENCODING FIXES
+            // Add to output
             $output .= $label . ': ' . $field_value . "\n";
         }
 
