@@ -591,3 +591,416 @@ function sfaic_main() {
 
 // Initialize the plugin
 sfaic_main();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Background Jobs Diagnostic Tool
+ * Add this to your functions.php temporarily or create as a separate plugin
+ */
+
+// Add admin page for diagnostics
+add_action('admin_menu', function() {
+    add_submenu_page(
+        'tools.php',
+        'AI Jobs Diagnostics',
+        'AI Jobs Diagnostics',
+        'manage_options',
+        'ai-jobs-diagnostics',
+        'sfaic_render_diagnostics_page'
+    );
+});
+
+function sfaic_render_diagnostics_page() {
+    if (!current_user_can('manage_options')) {
+        wp_die('Unauthorized');
+    }
+
+    // Handle actions
+    if (isset($_POST['action'])) {
+        $action = sanitize_text_field($_POST['action']);
+        
+        switch ($action) {
+            case 'reset_all_jobs':
+                sfaic_reset_all_stuck_jobs();
+                echo '<div class="notice notice-success"><p>All stuck jobs have been reset!</p></div>';
+                break;
+                
+            case 'force_cron':
+                sfaic_force_cron_setup();
+                echo '<div class="notice notice-success"><p>Cron events have been reset and scheduled!</p></div>';
+                break;
+                
+            case 'process_immediate':
+                sfaic_process_jobs_immediately();
+                echo '<div class="notice notice-success"><p>Attempted immediate job processing!</p></div>';
+                break;
+        }
+    }
+
+    // Get diagnostic info
+    $diagnostics = sfaic_get_diagnostic_info();
+    ?>
+    <div class="wrap">
+        <h1>AI Background Jobs Diagnostics</h1>
+        
+        <div class="card">
+            <h2>System Status</h2>
+            <table class="form-table">
+                <tr>
+                    <th>WordPress Cron</th>
+                    <td>
+                        <?php if ($diagnostics['wp_cron_disabled']): ?>
+                            <span style="color: red;">❌ DISABLED</span>
+                            <p class="description">WordPress cron is disabled. This is likely the cause of stuck jobs.</p>
+                        <?php else: ?>
+                            <span style="color: green;">✅ ENABLED</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Next Scheduled Job</th>
+                    <td>
+                        <?php if ($diagnostics['next_scheduled']): ?>
+                            <?php echo esc_html($diagnostics['next_scheduled']); ?>
+                        <?php else: ?>
+                            <span style="color: red;">❌ No cron scheduled</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Pending Jobs</th>
+                    <td>
+                        <?php if ($diagnostics['pending_jobs'] > 0): ?>
+                            <span style="color: orange;">⚠️ <?php echo $diagnostics['pending_jobs']; ?> pending jobs</span>
+                        <?php else: ?>
+                            <span style="color: green;">✅ No pending jobs</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Stuck Jobs</th>
+                    <td>
+                        <?php if ($diagnostics['stuck_jobs'] > 0): ?>
+                            <span style="color: red;">❌ <?php echo $diagnostics['stuck_jobs']; ?> stuck jobs</span>
+                        <?php else: ?>
+                            <span style="color: green;">✅ No stuck jobs</span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Processing Jobs</th>
+                    <td><?php echo $diagnostics['processing_jobs']; ?></td>
+                </tr>
+                <tr>
+                    <th>Server Time</th>
+                    <td><?php echo current_time('mysql'); ?></td>
+                </tr>
+                <tr>
+                    <th>Last Cron Run</th>
+                    <td>
+                        <?php 
+                        $last_run = get_option('sfaic_last_cron_run', 0);
+                        if ($last_run > 0) {
+                            $minutes_ago = (time() - $last_run) / 60;
+                            echo date('Y-m-d H:i:s', $last_run) . ' (' . round($minutes_ago) . ' minutes ago)';
+                            if ($minutes_ago > 5) {
+                                echo ' <span style="color: red;">⚠️ Too long ago</span>';
+                            }
+                        } else {
+                            echo '<span style="color: red;">❌ Never</span>';
+                        }
+                        ?>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Recent Stuck Jobs</h2>
+            <?php $stuck_jobs = sfaic_get_stuck_jobs(); ?>
+            <?php if (!empty($stuck_jobs)): ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th>Job ID</th>
+                            <th>User</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Age (minutes)</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($stuck_jobs as $job): ?>
+                            <tr>
+                                <td><?php echo esc_html($job->id); ?></td>
+                                <td><?php echo esc_html($job->user_name ?: 'Unknown'); ?></td>
+                                <td>
+                                    <span class="status-badge status-<?php echo esc_attr($job->status); ?>">
+                                        <?php echo esc_html(ucfirst($job->status)); ?>
+                                    </span>
+                                </td>
+                                <td><?php echo esc_html($job->created_at); ?></td>
+                                <td>
+                                    <?php 
+                                    $age = (time() - strtotime($job->created_at)) / 60;
+                                    echo round($age);
+                                    if ($age > 10) echo ' <span style="color: red;">⚠️</span>';
+                                    ?>
+                                </td>
+                                <td><?php echo esc_html(substr($job->error_message ?: 'No error', 0, 50)); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else: ?>
+                <p>No stuck jobs found.</p>
+            <?php endif; ?>
+        </div>
+
+        <div class="card">
+            <h2>Diagnostic Actions</h2>
+            <form method="post">
+                <p>
+                    <button type="submit" name="action" value="reset_all_jobs" class="button button-primary" 
+                            onclick="return confirm('This will reset all stuck jobs to pending status. Continue?')">
+                        Reset All Stuck Jobs
+                    </button>
+                    <span class="description">Reset all jobs stuck in processing or old pending jobs</span>
+                </p>
+                
+                <p>
+                    <button type="submit" name="action" value="force_cron" class="button button-secondary">
+                        Force Cron Setup
+                    </button>
+                    <span class="description">Clear and reschedule all cron events</span>
+                </p>
+                
+                <p>
+                    <button type="submit" name="action" value="process_immediate" class="button button-secondary">
+                        Process Jobs Immediately
+                    </button>
+                    <span class="description">Attempt to process pending jobs right now</span>
+                </p>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Recommended Solutions</h2>
+            <ol>
+                <?php if ($diagnostics['wp_cron_disabled']): ?>
+                    <li><strong>WordPress Cron is disabled!</strong> 
+                        <ul>
+                            <li>Remove <code>define('DISABLE_WP_CRON', true);</code> from wp-config.php, OR</li>
+                            <li>Set up a real cron job: <code>*/1 * * * * wget -q -O - "<?php echo site_url('/wp-cron.php'); ?>" >/dev/null 2>&1</code></li>
+                        </ul>
+                    </li>
+                <?php endif; ?>
+                
+                <?php if ($diagnostics['pending_jobs'] > 0): ?>
+                    <li><strong>Pending jobs found:</strong> Click "Reset All Stuck Jobs" above</li>
+                <?php endif; ?>
+                
+                <li><strong>Add to wp-config.php for better debugging:</strong>
+                    <code>define('WP_DEBUG', true);<br>
+                    define('WP_DEBUG_LOG', true);</code>
+                </li>
+                
+                <li><strong>Increase PHP limits in wp-config.php:</strong>
+                    <code>ini_set('max_execution_time', 300);<br>
+                    ini_set('memory_limit', '256M');</code>
+                </li>
+            </ol>
+        </div>
+
+        <div class="card">
+            <h2>Manual Test</h2>
+            <p>Test URL to trigger cron manually:</p>
+            <p><a href="<?php echo site_url('/wp-cron.php'); ?>" target="_blank"><?php echo site_url('/wp-cron.php'); ?></a></p>
+            <p class="description">Click this link to manually trigger WordPress cron. If it loads quickly, cron is working.</p>
+        </div>
+    </div>
+
+    <style>
+    .card {
+        background: white;
+        border: 1px solid #ccd0d4;
+        border-radius: 4px;
+        margin-bottom: 20px;
+        padding: 20px;
+    }
+    .status-badge {
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-weight: bold;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-processing { background: #d1ecf1; color: #0c5460; }
+    .status-failed { background: #f8d7da; color: #721c24; }
+    </style>
+    <?php
+}
+
+function sfaic_get_diagnostic_info() {
+    global $wpdb;
+    
+    $jobs_table = $wpdb->prefix . 'sfaic_background_jobs';
+    
+    return array(
+        'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
+        'next_scheduled' => wp_next_scheduled('sfaic_process_background_job') ? 
+            date('Y-m-d H:i:s', wp_next_scheduled('sfaic_process_background_job')) : false,
+        'pending_jobs' => $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$jobs_table} WHERE status = %s",
+            'pending'
+        )) ?: 0,
+        'processing_jobs' => $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$jobs_table} WHERE status = %s",
+            'processing'
+        )) ?: 0,
+        'stuck_jobs' => $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$jobs_table} 
+             WHERE (status = 'processing' AND started_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE))
+             OR (status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE))",
+        )) ?: 0,
+    );
+}
+
+function sfaic_get_stuck_jobs() {
+    global $wpdb;
+    
+    $jobs_table = $wpdb->prefix . 'sfaic_background_jobs';
+    
+    return $wpdb->get_results($wpdb->prepare(
+        "SELECT * FROM {$jobs_table} 
+         WHERE (status = 'processing' AND started_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE))
+         OR (status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         ORDER BY created_at DESC 
+         LIMIT 20"
+    ));
+}
+
+function sfaic_reset_all_stuck_jobs() {
+    global $wpdb;
+    
+    $jobs_table = $wpdb->prefix . 'sfaic_background_jobs';
+    
+    // Reset processing jobs that are stuck
+    $wpdb->query($wpdb->prepare(
+        "UPDATE {$jobs_table} 
+         SET status = 'pending', 
+             started_at = NULL,
+             error_message = CONCAT(COALESCE(error_message, ''), ' [Reset by diagnostic tool]'),
+             updated_at = %s,
+             scheduled_at = %s
+         WHERE status = 'processing' 
+         AND started_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)",
+        current_time('mysql'),
+        current_time('mysql')
+    ));
+    
+    // Reset very old pending jobs
+    $wpdb->query($wpdb->prepare(
+        "UPDATE {$jobs_table} 
+         SET error_message = CONCAT(COALESCE(error_message, ''), ' [Reset by diagnostic tool]'),
+             updated_at = %s,
+             scheduled_at = %s
+         WHERE status = 'pending' 
+         AND created_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE)",
+        current_time('mysql'),
+        current_time('mysql')
+    ));
+}
+
+function sfaic_force_cron_setup() {
+    // Clear all existing cron events
+    wp_clear_scheduled_hook('sfaic_process_background_job');
+    wp_clear_scheduled_hook('sfaic_cleanup_old_jobs');
+    wp_clear_scheduled_hook('sfaic_cleanup_stuck_jobs_periodic');
+    
+    // Reschedule them
+    wp_schedule_event(time() + 30, 'every_30_seconds', 'sfaic_process_background_job');
+    wp_schedule_event(time() + 60, 'daily', 'sfaic_cleanup_old_jobs');
+    wp_schedule_event(time() + 45, 'every_30_seconds', 'sfaic_cleanup_stuck_jobs_periodic');
+    
+    // Update last run time
+    update_option('sfaic_last_cron_run', time());
+}
+
+function sfaic_process_jobs_immediately() {
+    if (isset(sfaic_main()->background_job_manager)) {
+        sfaic_main()->background_job_manager->process_background_job();
+    }
+}
