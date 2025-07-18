@@ -3,7 +3,7 @@
  * ChatGPT Prompt Custom Post Type - Enhanced Version
  * 
  * Handles registration and management of the ChatGPT Prompt custom post type
- * with improved chunking settings and better UI organization
+ * with improved chunking settings and per-prompt background processing
  */
 
 // Exit if accessed directly
@@ -105,6 +105,16 @@ class SFAIC_Prompt_Manager {
             'default'
         );
 
+        // NEW: Background Processing Settings
+        add_meta_box(
+            'sfaic_background_processing',
+            __('Background Processing Settings', 'chatgpt-fluent-connector'),
+            array($this, 'render_background_processing_meta_box'),
+            'sfaic_prompt',
+            'side',
+            'default'
+        );
+
         add_meta_box(
             'sfaic_field_mapping',
             __('User Field Mapping', 'chatgpt-fluent-connector'),
@@ -113,6 +123,169 @@ class SFAIC_Prompt_Manager {
             'side',
             'default'
         );
+    }
+
+    /**
+     * NEW: Render background processing settings meta box
+     */
+    public function render_background_processing_meta_box($post) {
+        // Get saved values with defaults
+        $enable_background_processing = get_post_meta($post->ID, '_sfaic_enable_background_processing', true);
+        $background_processing_delay = get_post_meta($post->ID, '_sfaic_background_processing_delay', true);
+        $job_priority = get_post_meta($post->ID, '_sfaic_job_priority', true);
+        $job_timeout = get_post_meta($post->ID, '_sfaic_job_timeout', true);
+
+        // Set defaults if empty
+        if ($enable_background_processing === '') {
+            $enable_background_processing = '1'; // Default to enabled
+        }
+        if (empty($background_processing_delay)) {
+            $background_processing_delay = 5;
+        }
+        if (empty($job_priority)) {
+            $job_priority = 0;
+        }
+        if (empty($job_timeout)) {
+            $job_timeout = 300; // 5 minutes
+        }
+
+        // Check if background job manager is available
+        $background_available = isset(sfaic_main()->background_job_manager);
+        ?>
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+            <h4 style="margin-top: 0; color: #0073aa;">⚙️ Processing Method</h4>
+            
+            <?php if (!$background_available): ?>
+                <div class="notice notice-warning inline" style="margin: 0 0 15px 0;">
+                    <p style="margin: 5px 0; font-size: 12px;">
+                        <strong>⚠️ Notice:</strong> Background job manager is not available. All processing will be immediate.
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <table class="form-table" style="margin: 0;">
+                <tr>
+                    <th style="width: 120px;"><label for="sfaic_enable_background_processing"><?php _e('Processing Mode:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <label style="display: block; margin-bottom: 8px;">
+                            <input type="radio" name="sfaic_enable_background_processing" value="1" <?php checked($enable_background_processing, '1'); ?> <?php echo !$background_available ? 'disabled' : ''; ?>>
+                            <strong><?php _e('Background Processing (Recommended)', 'chatgpt-fluent-connector'); ?></strong>
+                        </label>
+                        <p class="description" style="margin: 0 0 10px 20px; font-size: 11px;">
+                            <?php _e('AI requests are processed in the background. Users get immediate form confirmation and receive responses via email.', 'chatgpt-fluent-connector'); ?>
+                        </p>
+                        
+                        <label style="display: block;">
+                            <input type="radio" name="sfaic_enable_background_processing" value="0" <?php checked($enable_background_processing, '0'); ?>>
+                            <strong><?php _e('Immediate Processing', 'chatgpt-fluent-connector'); ?></strong>
+                        </label>
+                        <p class="description" style="margin: 0 0 0 20px; font-size: 11px;">
+                            <?php _e('AI requests are processed immediately during form submission. Users wait for AI response to complete.', 'chatgpt-fluent-connector'); ?>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Background Processing Options (shown when enabled) -->
+            <div id="background-processing-options" <?php echo ($enable_background_processing != '1' || !$background_available) ? 'style="display:none;"' : ''; ?>>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+                <h4 style="margin: 10px 0; color: #0073aa;">⏱️ Background Processing Options</h4>
+                
+                <table class="form-table" style="margin: 0;">
+                    <tr>
+                        <th><label for="sfaic_background_processing_delay"><?php _e('Processing Delay:', 'chatgpt-fluent-connector'); ?></label></th>
+                        <td>
+                            <input type="number" 
+                                   name="sfaic_background_processing_delay" 
+                                   id="sfaic_background_processing_delay" 
+                                   value="<?php echo esc_attr($background_processing_delay); ?>" 
+                                   min="0" 
+                                   max="300" 
+                                   class="small-text"> seconds
+                            <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                                <?php _e('Delay before starting AI processing. Useful for allowing form validation to complete.', 'chatgpt-fluent-connector'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th><label for="sfaic_job_priority"><?php _e('Job Priority:', 'chatgpt-fluent-connector'); ?></label></th>
+                        <td>
+                            <select name="sfaic_job_priority" id="sfaic_job_priority" class="regular-text">
+                                <option value="0" <?php selected($job_priority, '0'); ?>><?php _e('Normal (0)', 'chatgpt-fluent-connector'); ?></option>
+                                <option value="1" <?php selected($job_priority, '1'); ?>><?php _e('High (1)', 'chatgpt-fluent-connector'); ?></option>
+                                <option value="2" <?php selected($job_priority, '2'); ?>><?php _e('Urgent (2)', 'chatgpt-fluent-connector'); ?></option>
+                                <option value="-1" <?php selected($job_priority, '-1'); ?>><?php _e('Low (-1)', 'chatgpt-fluent-connector'); ?></option>
+                            </select>
+                            <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                                <?php _e('Higher priority jobs are processed first. Use for important forms.', 'chatgpt-fluent-connector'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <tr>
+                        <th><label for="sfaic_job_timeout"><?php _e('Timeout:', 'chatgpt-fluent-connector'); ?></label></th>
+                        <td>
+                            <input type="number" 
+                                   name="sfaic_job_timeout" 
+                                   id="sfaic_job_timeout" 
+                                   value="<?php echo esc_attr($job_timeout); ?>" 
+                                   min="30" 
+                                   max="900" 
+                                   class="small-text"> seconds
+                            <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                                <?php _e('Maximum time to wait for AI response before marking as failed.', 'chatgpt-fluent-connector'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Processing Impact Notice -->
+            <div style="background: #e8f4fd; padding: 10px; border-radius: 3px; margin-top: 15px; border-left: 4px solid #0073aa;">
+                <p style="margin: 0; font-size: 11px; color: #0073aa;">
+                    <strong>💡 User Experience Impact:</strong><br>
+                    <span id="processing-impact-text">
+                        <?php if ($enable_background_processing == '1'): ?>
+                            Users will receive immediate form confirmation and get AI responses via email within minutes.
+                        <?php else: ?>
+                            Users will wait for AI processing to complete (5-30 seconds) before seeing form confirmation.
+                        <?php endif; ?>
+                    </span>
+                </p>
+            </div>
+
+            <!-- Background Jobs Monitor Link -->
+            <?php if ($background_available): ?>
+                <div style="margin-top: 15px; text-align: center;">
+                    <a href="<?php echo admin_url('edit.php?post_type=sfaic_prompt&page=sfaic-background-jobs'); ?>" 
+                       class="button button-secondary" 
+                       style="font-size: 11px;">
+                        <span class="dashicons dashicons-admin-tools" style="vertical-align: middle; font-size: 12px;"></span>
+                        <?php _e('Monitor Background Jobs', 'chatgpt-fluent-connector'); ?>
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <script>
+            jQuery(document).ready(function ($) {
+                // Toggle background processing options visibility
+                $('input[name="sfaic_enable_background_processing"]').change(function () {
+                    var isEnabled = $('input[name="sfaic_enable_background_processing"]:checked').val() === '1';
+                    var isAvailable = <?php echo $background_available ? 'true' : 'false'; ?>;
+                    
+                    if (isEnabled && isAvailable) {
+                        $('#background-processing-options').show();
+                        $('#processing-impact-text').text('Users will receive immediate form confirmation and get AI responses via email within minutes.');
+                    } else {
+                        $('#background-processing-options').hide();
+                        $('#processing-impact-text').text('Users will wait for AI processing to complete (5-30 seconds) before seeing form confirmation.');
+                    }
+                });
+            });
+        </script>
+        <?php
     }
 
     /**
@@ -331,7 +504,7 @@ class SFAIC_Prompt_Manager {
                                        id="sfaic_min_content_length" 
                                        value="<?php echo esc_attr($min_content_length); ?>" 
                                        min="100" 
-                                       max="10000" 
+                                       max="60000" 
                                        class="small-text"> characters
                             </td>
                         </tr>
@@ -343,7 +516,7 @@ class SFAIC_Prompt_Manager {
                                        id="sfaic_completion_word_count" 
                                        value="<?php echo esc_attr($completion_word_count); ?>" 
                                        min="200" 
-                                       max="5000" 
+                                       max="25000" 
                                        class="small-text"> words
                             </td>
                         </tr>
@@ -390,23 +563,6 @@ class SFAIC_Prompt_Manager {
                         </tr>
                     </table>
                 </div>
-            </div>
-
-            <!-- Background Processing Notice -->
-            <div style="background: #e8f4fd; padding: 10px; border-radius: 3px; margin-top: 15px; border-left: 4px solid #0073aa;">
-                <p style="margin: 0; font-size: 12px; color: #0073aa;">
-                    <strong>ℹ️ Background Processing:</strong> 
-                    <?php 
-                    $background_enabled = get_option('sfaic_enable_background_processing', true);
-                    if ($background_enabled) {
-                        _e('Enabled - AI responses are processed in the background for better user experience.', 'chatgpt-fluent-connector');
-                        echo ' <a href="' . admin_url('options-general.php?page=sfaic-settings') . '">' . __('Configure', 'chatgpt-fluent-connector') . '</a>';
-                    } else {
-                        _e('Disabled - AI responses are processed immediately, which may cause delays.', 'chatgpt-fluent-connector');
-                        echo ' <a href="' . admin_url('options-general.php?page=sfaic-settings') . '">' . __('Enable', 'chatgpt-fluent-connector') . '</a>';
-                    }
-                    ?>
-                </p>
             </div>
         </div>
 
@@ -860,7 +1016,7 @@ class SFAIC_Prompt_Manager {
     }
 
     /**
-     * Enhanced save method for all settings including improved chunking settings
+     * Enhanced save method for all settings including background processing settings
      */
     public function save_post_meta($post_id) {
         // Check nonce and permissions
@@ -915,14 +1071,14 @@ class SFAIC_Prompt_Manager {
 
         if (isset($_POST['sfaic_min_content_length'])) {
             $min_content = intval($_POST['sfaic_min_content_length']);
-            if ($min_content >= 100 && $min_content <= 10000) {
+            if ($min_content >= 100 && $min_content <= 600000) {
                 update_post_meta($post_id, '_sfaic_min_content_length', $min_content);
             }
         }
 
         if (isset($_POST['sfaic_completion_word_count'])) {
             $word_count = intval($_POST['sfaic_completion_word_count']);
-            if ($word_count >= 200 && $word_count <= 5000) {
+            if ($word_count >= 200 && $word_count <= 25000) {
                 update_post_meta($post_id, '_sfaic_completion_word_count', $word_count);
             }
         }
@@ -939,6 +1095,31 @@ class SFAIC_Prompt_Manager {
             $threshold = intval($_POST['sfaic_token_completion_threshold']);
             if ($threshold >= 50 && $threshold <= 95) {
                 update_post_meta($post_id, '_sfaic_token_completion_threshold', $threshold);
+            }
+        }
+
+        // NEW: Save background processing settings
+        $enable_background_processing = isset($_POST['sfaic_enable_background_processing']) && $_POST['sfaic_enable_background_processing'] === '1' ? '1' : '0';
+        update_post_meta($post_id, '_sfaic_enable_background_processing', $enable_background_processing);
+
+        if (isset($_POST['sfaic_background_processing_delay'])) {
+            $delay = intval($_POST['sfaic_background_processing_delay']);
+            if ($delay >= 0 && $delay <= 300) {
+                update_post_meta($post_id, '_sfaic_background_processing_delay', $delay);
+            }
+        }
+
+        if (isset($_POST['sfaic_job_priority'])) {
+            $priority = intval($_POST['sfaic_job_priority']);
+            if ($priority >= -1 && $priority <= 2) {
+                update_post_meta($post_id, '_sfaic_job_priority', $priority);
+            }
+        }
+
+        if (isset($_POST['sfaic_job_timeout'])) {
+            $timeout = intval($_POST['sfaic_job_timeout']);
+            if ($timeout >= 30 && $timeout <= 900) {
+                update_post_meta($post_id, '_sfaic_job_timeout', $timeout);
             }
         }
 
