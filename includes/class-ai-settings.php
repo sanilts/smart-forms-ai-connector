@@ -1,6 +1,6 @@
 <?php
 /**
- * AI API Settings Class - Complete with Background Processing Options
+ * AI API Settings Class - Simplified without Background Processing and Chunking Options
  * 
  * Handles the plugin settings page and API credentials for multiple providers
  */
@@ -27,25 +27,6 @@ class SFAIC_Settings {
         
         // Enqueue admin scripts
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
-        
-        // Add chunking settings
-        add_action('admin_init', array($this, 'add_chunking_settings'));
-    }
-
-    /**
-     * Add chunking settings
-     */
-    public function add_chunking_settings() {
-        // Register chunking settings
-        register_setting('sfaic_settings', 'sfaic_enable_chunking', array(
-            'default' => true
-        ));
-        register_setting('sfaic_settings', 'sfaic_chunk_size', array(
-            'default' => 7500
-        ));
-        register_setting('sfaic_settings', 'sfaic_max_chunks', array(
-            'default' => 20
-        ));
     }
 
     /**
@@ -299,31 +280,6 @@ class SFAIC_Settings {
             'default' => 'openai'
         ));
 
-        // Background Processing Settings
-        register_setting('sfaic_settings', 'sfaic_enable_background_processing', array(
-            'default' => true
-        ));
-        register_setting('sfaic_settings', 'sfaic_background_processing_delay', array(
-            'default' => 5
-        ));
-        register_setting('sfaic_settings', 'sfaic_max_concurrent_jobs', array(
-            'default' => 3
-        ));
-        register_setting('sfaic_settings', 'sfaic_job_timeout', array(
-            'default' => 300
-        ));
-
-        // Chunking Settings
-        register_setting('sfaic_settings', 'sfaic_enable_chunking', array(
-            'default' => true
-        ));
-        register_setting('sfaic_settings', 'sfaic_chunk_size', array(
-            'default' => 7500
-        ));
-        register_setting('sfaic_settings', 'sfaic_max_chunks', array(
-            'default' => 20
-        ));
-
         // OpenAI Settings
         register_setting('sfaic_settings', 'sfaic_api_key');
         register_setting('sfaic_settings', 'sfaic_api_endpoint', array(
@@ -373,78 +329,6 @@ class SFAIC_Settings {
             array($this, 'api_provider_field_callback'),
             'sfaic_settings',
             'sfaic_general_section'
-        );
-
-        // Background Processing Section
-        add_settings_section(
-            'sfaic_background_section',
-            __('Background Processing Settings', 'chatgpt-fluent-connector'),
-            array($this, 'background_section_callback'),
-            'sfaic_settings'
-        );
-
-        add_settings_field(
-            'sfaic_enable_background_processing',
-            __('Enable Background Processing', 'chatgpt-fluent-connector'),
-            array($this, 'enable_background_processing_field_callback'),
-            'sfaic_settings',
-            'sfaic_background_section'
-        );
-
-        add_settings_field(
-            'sfaic_background_processing_delay',
-            __('Processing Delay', 'chatgpt-fluent-connector'),
-            array($this, 'background_processing_delay_field_callback'),
-            'sfaic_settings',
-            'sfaic_background_section'
-        );
-
-        add_settings_field(
-            'sfaic_max_concurrent_jobs',
-            __('Max Concurrent Jobs', 'chatgpt-fluent-connector'),
-            array($this, 'max_concurrent_jobs_field_callback'),
-            'sfaic_settings',
-            'sfaic_background_section'
-        );
-
-        add_settings_field(
-            'sfaic_job_timeout',
-            __('Job Timeout', 'chatgpt-fluent-connector'),
-            array($this, 'job_timeout_field_callback'),
-            'sfaic_settings',
-            'sfaic_background_section'
-        );
-
-        // Chunking Section
-        add_settings_section(
-            'sfaic_chunking_section',
-            __('Chunking Settings', 'chatgpt-fluent-connector'),
-            array($this, 'chunking_section_callback'),
-            'sfaic_settings'
-        );
-
-        add_settings_field(
-            'sfaic_enable_chunking',
-            __('Enable Chunking', 'chatgpt-fluent-connector'),
-            array($this, 'enable_chunking_field_callback'),
-            'sfaic_settings',
-            'sfaic_chunking_section'
-        );
-
-        add_settings_field(
-            'sfaic_chunk_size',
-            __('Chunk Size', 'chatgpt-fluent-connector'),
-            array($this, 'chunk_size_field_callback'),
-            'sfaic_settings',
-            'sfaic_chunking_section'
-        );
-
-        add_settings_field(
-            'sfaic_max_chunks',
-            __('Max Chunks', 'chatgpt-fluent-connector'),
-            array($this, 'max_chunks_field_callback'),
-            'sfaic_settings',
-            'sfaic_chunking_section'
         );
 
         // OpenAI Section
@@ -559,49 +443,6 @@ class SFAIC_Settings {
         echo '<p>' . esc_html__('Choose which AI provider to use and configure general settings.', 'chatgpt-fluent-connector') . '</p>';
     }
 
-    public function background_section_callback() {
-        $jobs_url = admin_url('edit.php?post_type=sfaic_prompt&page=sfaic-background-jobs');
-        
-        echo '<div style="background: #f0f8ff; padding: 20px; margin: 15px 0; border-left: 4px solid #0073aa; border-radius: 0 3px 3px 0;">';
-        echo '<h3 style="margin-top: 0; color: #0073aa;">🚀 ' . esc_html__('Background Processing', 'chatgpt-fluent-connector') . '</h3>';
-        echo '<p>' . esc_html__('When enabled, AI requests are processed in the background using WordPress cron jobs. This prevents users from experiencing delays when submitting forms.', 'chatgpt-fluent-connector') . '</p>';
-        
-        echo '<div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-top: 15px;">';
-        echo '<h4 style="margin-top: 0; color: #0073aa;">✨ ' . esc_html__('Benefits of Background Processing', 'chatgpt-fluent-connector') . '</h4>';
-        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666;">';
-        echo '<li>✅ ' . esc_html__('Faster form submission response for users', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Automatic retry on failures with exponential backoff', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Job monitoring and status tracking', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Better handling of API rate limits', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('Prevents timeouts on slow API responses', 'chatgpt-fluent-connector') . '</li>';
-        echo '</ul>';
-        
-        if (function_exists('admin_url')) {
-            echo '<p><a href="' . esc_url($jobs_url) . '" class="button button-secondary" target="_blank">';
-            echo '<span class="dashicons dashicons-admin-tools" style="vertical-align: middle; margin-right: 5px;"></span>';
-            echo esc_html__('Monitor Background Jobs', 'chatgpt-fluent-connector') . '</a></p>';
-        }
-        echo '</div>';
-        echo '</div>';
-    }
-
-    public function chunking_section_callback() {
-        echo '<div style="background: #e8f5e8; padding: 20px; margin: 15px 0; border-left: 4px solid #28a745; border-radius: 0 3px 3px 0;">';
-        echo '<h3 style="margin-top: 0; color: #28a745;">🔧 ' . esc_html__('Chunking for Long Responses', 'chatgpt-fluent-connector') . '</h3>';
-        echo '<p>' . esc_html__('Chunking allows generating longer responses by breaking them into multiple API calls. Essential for comprehensive reports and HTML generation.', 'chatgpt-fluent-connector') . '</p>';
-        
-        echo '<div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin-top: 15px;">';
-        echo '<h4 style="margin-top: 0; color: #28a745;">✨ ' . esc_html__('When Chunking is Used', 'chatgpt-fluent-connector') . '</h4>';
-        echo '<ul style="margin: 10px 0; padding-left: 20px; color: #666;">';
-        echo '<li>✅ ' . esc_html__('When max tokens > 6000', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('For HTML report generation', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('For comprehensive/detailed prompts', 'chatgpt-fluent-connector') . '</li>';
-        echo '<li>✅ ' . esc_html__('When prompt content is large (>10K chars)', 'chatgpt-fluent-connector') . '</li>';
-        echo '</ul>';
-        echo '</div>';
-        echo '</div>';
-    }
-
     public function openai_section_callback() {
         echo '<p>' . esc_html__('Enter your ChatGPT (OpenAI) API credentials below.', 'chatgpt-fluent-connector') . '</p>';
     }
@@ -673,100 +514,6 @@ class SFAIC_Settings {
             <option value="claude" <?php selected($provider, 'claude'); ?>><?php echo esc_html__('Anthropic Claude', 'chatgpt-fluent-connector'); ?></option>
         </select>
         <p class="description"><?php echo esc_html__('Select which AI provider you want to use', 'chatgpt-fluent-connector'); ?></p>
-        <?php
-    }
-
-    public function enable_background_processing_field_callback() {
-        $enabled = get_option('sfaic_enable_background_processing', true);
-        ?>
-        <label>
-            <input type="checkbox" name="sfaic_enable_background_processing" value="1" <?php checked($enabled, true); ?> />
-            <?php echo esc_html__('Enable background processing for AI requests', 'chatgpt-fluent-connector'); ?>
-        </label>
-        <p class="description">
-            <?php echo esc_html__('When enabled, AI requests will be processed in the background using WordPress cron jobs. This prevents form submission delays but requires WordPress cron to be working properly.', 'chatgpt-fluent-connector'); ?>
-            <br><strong><?php echo esc_html__('Recommended: Enabled', 'chatgpt-fluent-connector'); ?></strong>
-        </p>
-        
-        <?php
-        // Check if WP Cron is working
-        $wp_cron_disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
-        
-        if ($wp_cron_disabled) {
-            echo '<div class="notice notice-warning inline" style="margin-top: 10px;">';
-            echo '<p><strong>' . esc_html__('Warning:', 'chatgpt-fluent-connector') . '</strong> ';
-            echo esc_html__('WordPress cron is disabled (DISABLE_WP_CRON is set to true). Background processing may not work properly. Consider setting up a real cron job to trigger wp-cron.php.', 'chatgpt-fluent-connector');
-            echo '</p></div>';
-        }
-        ?>
-        <?php
-    }
-
-    public function background_processing_delay_field_callback() {
-        $delay = get_option('sfaic_background_processing_delay', 5);
-        ?>
-        <input type="number" name="sfaic_background_processing_delay" value="<?php echo esc_attr($delay); ?>" min="0" max="300" step="1" class="small-text" />
-        <span><?php echo esc_html__('seconds', 'chatgpt-fluent-connector'); ?></span>
-        <p class="description">
-            <?php echo esc_html__('Delay before starting background job processing. Set to 0 for immediate processing, or add a small delay to ensure form data is fully saved.', 'chatgpt-fluent-connector'); ?>
-        </p>
-        <?php
-    }
-
-    public function max_concurrent_jobs_field_callback() {
-        $max_jobs = get_option('sfaic_max_concurrent_jobs', 3);
-        ?>
-        <input type="number" name="sfaic_max_concurrent_jobs" value="<?php echo esc_attr($max_jobs); ?>" min="1" max="10" step="1" class="small-text" />
-        <p class="description">
-            <?php echo esc_html__('Maximum number of AI jobs that can run simultaneously. Higher values may increase server load and API costs.', 'chatgpt-fluent-connector'); ?>
-        </p>
-        <?php
-    }
-
-    public function job_timeout_field_callback() {
-        $timeout = get_option('sfaic_job_timeout', 300);
-        ?>
-        <input type="number" name="sfaic_job_timeout" value="<?php echo esc_attr($timeout); ?>" min="30" max="1800" step="30" class="small-text" />
-        <span><?php echo esc_html__('seconds', 'chatgpt-fluent-connector'); ?></span>
-        <p class="description">
-            <?php echo esc_html__('Maximum time a background job can run before being considered failed. Adjust based on your AI provider response times.', 'chatgpt-fluent-connector'); ?>
-        </p>
-        <?php
-    }
-
-    public function enable_chunking_field_callback() {
-        $enabled = get_option('sfaic_enable_chunking', true);
-        ?>
-        <label>
-            <input type="checkbox" name="sfaic_enable_chunking" value="1" <?php checked($enabled, true); ?> />
-            <?php echo esc_html__('Enable chunking for long responses', 'chatgpt-fluent-connector'); ?>
-        </label>
-        <p class="description">
-            <?php echo esc_html__('When enabled, long responses will be generated in multiple chunks to avoid token limits. Essential for comprehensive reports.', 'chatgpt-fluent-connector'); ?>
-            <br><strong><?php echo esc_html__('Recommended: Enabled for reports and HTML generation', 'chatgpt-fluent-connector'); ?></strong>
-        </p>
-        <?php
-    }
-
-    public function chunk_size_field_callback() {
-        $chunk_size = get_option('sfaic_chunk_size', 7500);
-        ?>
-        <input type="number" name="sfaic_chunk_size" value="<?php echo esc_attr($chunk_size); ?>" min="1000" max="8000" step="100" class="small-text" />
-        <span><?php echo esc_html__('tokens per chunk', 'chatgpt-fluent-connector'); ?></span>
-        <p class="description">
-            <?php echo esc_html__('Size of each chunk in tokens. Lower values = more chunks but safer. Higher values = fewer chunks but may hit limits.', 'chatgpt-fluent-connector'); ?>
-        </p>
-        <?php
-    }
-
-    public function max_chunks_field_callback() {
-        $max_chunks = get_option('sfaic_max_chunks', 20);
-        ?>
-        <input type="number" name="sfaic_max_chunks" value="<?php echo esc_attr($max_chunks); ?>" min="5" max="50" step="1" class="small-text" />
-        <span><?php echo esc_html__('maximum chunks', 'chatgpt-fluent-connector'); ?></span>
-        <p class="description">
-            <?php echo esc_html__('Maximum number of chunks allowed per response. Prevents infinite loops and controls costs.', 'chatgpt-fluent-connector'); ?>
-        </p>
         <?php
     }
 
@@ -908,8 +655,6 @@ class SFAIC_Settings {
         }
 
         $api_provider = get_option('sfaic_api_provider', 'openai');
-        $background_enabled = get_option('sfaic_enable_background_processing', true);
-        $chunking_enabled = get_option('sfaic_enable_chunking', true);
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
@@ -931,21 +676,12 @@ class SFAIC_Settings {
                         }
                         ?></li>
                     <li><?php
-                        echo $background_enabled ? '✅' : '⚠️';
-                        echo ' ' . __('Background Processing:', 'chatgpt-fluent-connector') . ' ';
-                        echo $background_enabled ? 'Enabled' : 'Disabled';
-                        ?></li>
-                    <li><?php
-                        echo $chunking_enabled ? '✅' : '⚠️';
-                        echo ' ' . __('Chunking:', 'chatgpt-fluent-connector') . ' ';
-                        echo $chunking_enabled ? 'Enabled' : 'Disabled';
-                        ?></li>
-                    <li><?php
                         echo class_exists('Mpdf\Mpdf') ? '✅' : '⚠️';
                         echo ' ' . __('PDF Generation:', 'chatgpt-fluent-connector') . ' ';
                         echo class_exists('Mpdf\Mpdf') ? 'Local mPDF (Ready)' : 'Local mPDF (Library Missing)';
                         ?></li>
                 </ul>
+                <p><strong><?php _e('Note:', 'chatgpt-fluent-connector'); ?></strong> <?php _e('Background processing and chunking settings are now configured per-prompt when editing individual prompts.', 'chatgpt-fluent-connector'); ?></p>
             </div>
 
             <form method="post" action="options.php">
@@ -960,52 +696,6 @@ class SFAIC_Settings {
                         <tr>
                             <th scope="row"><?php _e('AI Provider', 'chatgpt-fluent-connector'); ?></th>
                             <td><?php $this->api_provider_field_callback(); ?></td>
-                        </tr>
-                    </table>
-                </div>
-
-                <!-- Background Processing Settings Section -->
-                <div class="sfaic-settings-section">
-                    <h2><?php _e('Background Processing Settings', 'chatgpt-fluent-connector'); ?> <span class="sfaic-processing-badge">⚡ PERFORMANCE</span></h2>
-                    <?php $this->background_section_callback(); ?>
-
-                    <table class="form-table" role="presentation">
-                        <tr>
-                            <th scope="row"><?php _e('Enable Background Processing', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->enable_background_processing_field_callback(); ?></td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><?php _e('Processing Delay', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->background_processing_delay_field_callback(); ?></td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><?php _e('Max Concurrent Jobs', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->max_concurrent_jobs_field_callback(); ?></td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><?php _e('Job Timeout', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->job_timeout_field_callback(); ?></td>
-                        </tr>
-                    </table>
-                </div>
-
-                <!-- Chunking Settings Section -->
-                <div class="sfaic-settings-section">
-                    <h2><?php _e('Chunking Settings', 'chatgpt-fluent-connector'); ?> <span class="sfaic-chunking-badge">🔧 CHUNKING</span></h2>
-                    <?php $this->chunking_section_callback(); ?>
-
-                    <table class="form-table" role="presentation">
-                        <tr>
-                            <th scope="row"><?php _e('Enable Chunking', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->enable_chunking_field_callback(); ?></td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><?php _e('Chunk Size', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->chunk_size_field_callback(); ?></td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><?php _e('Max Chunks', 'chatgpt-fluent-connector'); ?></th>
-                            <td><?php $this->max_chunks_field_callback(); ?></td>
                         </tr>
                     </table>
                 </div>
@@ -1128,12 +818,10 @@ class SFAIC_Settings {
                     <span class="dashicons dashicons-list-view"></span>
                     <?php echo esc_html__('View Response Logs', 'chatgpt-fluent-connector'); ?>
                 </a>
-                <?php if ($background_enabled): ?>
                 <a href="<?php echo esc_url(admin_url('edit.php?post_type=sfaic_prompt&page=sfaic-background-jobs')); ?>" class="button" style="display: flex; align-items: center; gap: 8px;">
                     <span class="dashicons dashicons-admin-tools"></span>
                     <?php echo esc_html__('Monitor Background Jobs', 'chatgpt-fluent-connector'); ?>
                 </a>
-                <?php endif; ?>
             </div>
 
             <script type="text/javascript">
@@ -1319,30 +1007,6 @@ class SFAIC_Settings {
 
                 .sfaic-pdf-badge {
                     background-color: #28a745;
-                    color: white;
-                    display: inline-block;
-                    padding: 4px 10px;
-                    border-radius: 12px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    vertical-align: middle;
-                    margin-left: 8px;
-                }
-
-                .sfaic-processing-badge {
-                    background-color: #ff6b35;
-                    color: white;
-                    display: inline-block;
-                    padding: 4px 10px;
-                    border-radius: 12px;
-                    font-size: 11px;
-                    font-weight: 600;
-                    vertical-align: middle;
-                    margin-left: 8px;
-                }
-
-                .sfaic-chunking-badge {
-                    background-color: #17a2b8;
                     color: white;
                     display: inline-block;
                     padding: 4px 10px;

@@ -27,55 +27,95 @@ class SFAIC_Forms_Integration {
      * @param array $form_data The submitted form data
      * @param object $form The form object
      */
-    public function handle_form_submission($entry_id, $form_data, $form) {
-        error_log('SFAIC: Form submission received - Entry ID: ' . $entry_id . ', Form ID: ' . $form->id);
-        
-        $form_id = $form->id;
+    public function handle_form_submission($insertId, $formData, $form) {
+        error_log('SFAIC: Form submission received - Entry ID: ' . $insertId . ', Form ID: ' . $form->id);
 
-        // Find prompts configured for this form
-        $args = array(
+        // Find all prompts associated with this form
+        $prompts = get_posts(array(
             'post_type' => 'sfaic_prompt',
-            'posts_per_page' => -1,
             'meta_query' => array(
                 array(
                     'key' => '_sfaic_fluent_form_id',
-                    'value' => $form_id,
+                    'value' => $form->id,
                     'compare' => '='
                 )
-            )
-        );
-
-        $prompts = get_posts($args);
-        
-        error_log('SFAIC: Found ' . count($prompts) . ' prompts for form ID: ' . $form_id);
+            ),
+            'posts_per_page' => -1
+        ));
 
         if (empty($prompts)) {
-            error_log('SFAIC: No prompts found for form ID: ' . $form_id);
+            error_log('SFAIC: No prompts found for form ID: ' . $form->id);
             return;
         }
 
-        // Check if background processing is enabled
-        $background_enabled = get_option('sfaic_enable_background_processing', true);
-        error_log('SFAIC: Background processing enabled: ' . ($background_enabled ? 'Yes' : 'No'));
-        
-        if ($background_enabled && isset(sfaic_main()->background_job_manager)) {
-            // Process each prompt as a background job
-            foreach ($prompts as $prompt) {
-                error_log('SFAIC: Scheduling background job for prompt ID: ' . $prompt->ID);
-                $job_id = $this->schedule_background_job($prompt->ID, $form_data, $entry_id, $form_id);
-                if ($job_id) {
-                    error_log('SFAIC: Successfully scheduled job ID: ' . $job_id);
-                } else {
-                    error_log('SFAIC: Failed to schedule job for prompt ID: ' . $prompt->ID);
-                }
-            }
+        error_log('SFAIC: Found ' . count($prompts) . ' prompt(s) for form ID: ' . $form->id);
+
+        // Process each prompt
+        foreach ($prompts as $prompt) {
+            error_log('SFAIC: Processing prompt ID: ' . $prompt->ID . ' (' . $prompt->post_title . ')');
+
+            // NEW: Check if background processing is enabled for THIS prompt
+            $enable_background_processing = get_post_meta($prompt->ID, '_sfaic_enable_background_processing', true);
             
-            // Add user feedback message (optional)
-            $this->add_submission_feedback_message();
+            // Default to enabled if not set (backwards compatibility)
+            if ($enable_background_processing === '') {
+                $enable_background_processing = '1';
+            }
+
+            if ($enable_background_processing === '1') {
+                // Process in background
+                $this->schedule_background_processing($prompt->ID, $insertId, $formData, $form);
+            } else {
+                // Process immediately (synchronous)
+                error_log('SFAIC: Processing prompt ID: ' . $prompt->ID . ' immediately (background processing disabled)');
+                $this->process_prompt($prompt->ID, $formData, $insertId, $form);
+            }
+        }
+    }
+    
+    /**
+     * NEW: Schedule background processing for a specific prompt
+     */
+    private function schedule_background_processing($prompt_id, $entry_id, $form_data, $form) {
+        // Get prompt-specific background processing settings
+        $delay = get_post_meta($prompt_id, '_sfaic_background_processing_delay', true);
+        if (empty($delay)) {
+            $delay = 5; // Default delay
+        }
+
+        $priority = get_post_meta($prompt_id, '_sfaic_job_priority', true);
+        if (empty($priority)) {
+            $priority = 0; // Default priority
+        }
+
+        // Check if background job manager is available
+        if (!isset(sfaic_main()->background_job_manager)) {
+            error_log('SFAIC: Background job manager not available, processing immediately');
+            $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
+            return;
+        }
+
+        // Schedule the background job
+        $job_id = sfaic_main()->background_job_manager->schedule_job(
+            'ai_form_processing',
+            $prompt_id,
+            $form->id,
+            $entry_id,
+            array(
+                'form_data' => $form_data,
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '',
+                'timestamp' => current_time('mysql')
+            ),
+            intval($delay),
+            intval($priority)
+        );
+
+        if ($job_id) {
+            error_log('SFAIC: Scheduled background job ID: ' . $job_id . ' for prompt: ' . $prompt_id);
         } else {
-            // Process synchronously (legacy behavior)
-            error_log('SFAIC: Processing synchronously');
-            $this->process_prompts_synchronously($prompts, $form_data, $entry_id, $form);
+            error_log('SFAIC: Failed to schedule background job, processing immediately');
+            $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
         }
     }
 
@@ -148,198 +188,179 @@ class SFAIC_Forms_Integration {
      * @return bool Success status
      */
     public function process_prompt($prompt_id, $form_data, $entry_id, $form) {
-        error_log('SFAIC: Processing prompt ID: ' . $prompt_id . ' for entry: ' . $entry_id);
-        
         $start_time = microtime(true);
 
-        try {
-            // Get the active provider setting
-            $provider = get_option('sfaic_api_provider', 'openai');
-            error_log('SFAIC: Using provider: ' . $provider);
+        // Get the active provider setting
+        $provider = get_option('sfaic_api_provider', 'openai');
 
-            // Get the correct model based on the provider
-            if ($provider === 'gemini') {
-                $model = get_option('sfaic_gemini_model', 'gemini-2.5-pro-preview-05-06');
-            } elseif ($provider === 'claude') {
-                $model = get_option('sfaic_claude_model', 'claude-opus-4-20250514');
-            } else {
-                $model = get_option('sfaic_model', 'gpt-3.5-turbo');
-            }
+        if ($provider === 'gemini') {
+            $model = get_option('sfaic_gemini_model', 'gemini-2.5-pro-preview-05-06');
+        } elseif ($provider === 'claude') {
+            $model = get_option('sfaic_claude_model', 'claude-opus-4-20250514');
+        } else {
+            $model = get_option('sfaic_model', 'gpt-3.5-turbo');
+        }
 
-            // Get the API instance based on the provider
-            $api = sfaic_main()->get_active_api();
+        // Get the API instance based on the provider
+        $api = sfaic_main()->get_active_api();
 
-            if (!$api) {
-                throw new Exception('API instance not available for provider: ' . $provider);
-            }
-
-            // Get prompt settings
-            $system_prompt = get_post_meta($prompt_id, '_sfaic_system_prompt', true);
-            $user_prompt_template = get_post_meta($prompt_id, '_sfaic_user_prompt_template', true);
-            $prompt_type = get_post_meta($prompt_id, '_sfaic_prompt_type', true);
-
-            // Store the original template for logging
-            $original_template = '';
-            if ($prompt_type === 'all_form_data') {
-                $original_template = '[All Form Data Mode]';
-            } else {
-                $original_template = $user_prompt_template;
-            }
-
-            // Set default prompt type if not set
-            if (empty($prompt_type)) {
-                $prompt_type = 'template';
-            }
-
-            // Prepare the user prompt based on prompt type
-            $user_prompt = '';
-            if ($prompt_type === 'all_form_data') {
-                // Use all form data
-                $user_prompt = $this->format_all_form_data($form_data, $prompt_id);
-            } else {
-                // Use custom template
-                if (empty($user_prompt_template)) {
-                    throw new Exception('No user prompt template configured for prompt ID: ' . $prompt_id);
-                }
-
-                // Replace placeholders in user prompt
-                $user_prompt = $user_prompt_template;
-
-                // Replace field placeholders with actual values
-                foreach ($form_data as $field_key => $field_value) {
-                    // Skip if field_key is not a scalar (string/number)
-                    if (!is_scalar($field_key)) {
-                        continue;
-                    }
-
-                    // Handle array values (like checkboxes)
-                    if (is_array($field_value)) {
-                        $field_value = implode(', ', $field_value);
-                    } elseif (!is_scalar($field_value)) {
-                        // Skip non-scalar values
-                        continue;
-                    }
-
-                    $user_prompt = str_replace('{' . $field_key . '}', $field_value, $user_prompt);
-                }
-
-                // Check for any remaining placeholders and replace with empty string
-                $user_prompt = preg_replace('/\{[^}]+\}/', '', $user_prompt);
-            }
-
-            // Build the complete prompt that will be sent
-            $complete_prompt = '';
-            if (!empty($system_prompt)) {
-                $complete_prompt .= "System: " . $system_prompt . "\n\n";
-            }
-            $complete_prompt .= "User: " . $user_prompt;
-
-            error_log('SFAIC: Making API request to provider: ' . $provider);
-
-            // Process the form with the prompt
-            $ai_response_raw = $api->process_form_with_prompt($prompt_id, $form_data, $entry_id);
-            
-            if (is_wp_error($ai_response_raw)) {
-                throw new Exception($ai_response_raw->get_error_message());
-            }
-
-            $ai_response = $this->clean_html_response($ai_response_raw);
-            
-            error_log('SFAIC: API response received successfully');
-
-            // Calculate execution time
-            $execution_time = microtime(true) - $start_time;
-
-            // Get token usage from the API
-            $token_usage = array();
-            if (method_exists($api, 'get_last_token_usage')) {
-                $token_usage = $api->get_last_token_usage();
-            }
-
-            // Get JSON data from the API
-            $request_json = '';
-            $response_json = '';
-            if (method_exists($api, 'get_last_request_json')) {
-                $request_json = $api->get_last_request_json();
-            }
-            if (method_exists($api, 'get_last_response_json')) {
-                $response_json = $api->get_last_response_json();
-            }
-
-            // TRIGGER PDF GENERATION ACTION
-            if (isset(sfaic_main()->pdf_generator)) {
-                error_log('SFAIC: Triggering PDF generation');
-                do_action('sfaic_after_ai_response_processed', $ai_response, $prompt_id, $entry_id, $form_data, $form);
-            }
-
-            // Save the response if logging is enabled
-            $log_responses = get_post_meta($prompt_id, '_sfaic_log_responses', true);
-            if ($log_responses == '1') {
-                error_log('SFAIC: Logging response to database');
-                if (isset(sfaic_main()->response_logger)) {
-                    $result = sfaic_main()->response_logger->log_response(
-                        $prompt_id,
-                        $entry_id,
-                        $form->id,
-                        $complete_prompt,
-                        $ai_response,
-                        $provider,
-                        $model,
-                        $execution_time,
-                        'success',
-                        '',
-                        $token_usage,
-                        $original_template,
-                        $request_json,
-                        $response_json
-                    );
-                }
-            }
-
-            // Handle user email sending if configured
-            $response_action = get_post_meta($prompt_id, '_sfaic_response_action', true);
-            $admin_email_enabled = get_post_meta($prompt_id, '_sfaic_admin_email_enabled', true);
-
-            $user_email_sent = false;
-            $admin_email_sent = false;
-
-            if ($response_action === 'email') {
-                error_log('SFAIC: Sending user email response');
-                $user_email_sent = $this->send_email_response($prompt_id, $entry_id, $form_data, $ai_response, $provider);
-                error_log('SFAIC: User email sent: ' . ($user_email_sent ? 'Yes' : 'No'));
-            } elseif ($admin_email_enabled == '1') {
-                // If only admin email is enabled, still call the method but it will only send admin email
-                error_log('SFAIC: Sending admin-only email');
-                $admin_email_sent = $this->send_admin_email($prompt_id, $entry_id, $form_data, $ai_response, $provider);
-                error_log('SFAIC: Admin email sent: ' . ($admin_email_sent ? 'Yes' : 'No'));
-            }
-
-            return true;
-
-        } catch (Exception $e) {
-            // Calculate execution time even for failures
-            $execution_time = microtime(true) - $start_time;
-            
-            error_log('SFAIC: Error processing prompt ' . $prompt_id . ': ' . $e->getMessage());
-            
-            // Log the error
+        if (!$api) {
+            // Log the error if possible
             if (isset(sfaic_main()->response_logger)) {
                 sfaic_main()->response_logger->log_response(
                     $prompt_id,
                     $entry_id,
-                    isset($form) ? $form->id : 0,
-                    isset($complete_prompt) ? $complete_prompt : 'Error occurred before prompt creation',
-                    '',
-                    isset($provider) ? $provider : get_option('sfaic_api_provider', 'openai'),
-                    isset($model) ? $model : '',
-                    $execution_time,
-                    'error',
-                    $e->getMessage()
+                    $form->id,
+                    "Error: API instance not available",
+                    "",
+                    $provider,
+                    "",
+                    0,
+                    "error",
+                    "API instance not available"
                 );
             }
-
             return false;
         }
+
+        // Get prompt settings
+        $system_prompt = get_post_meta($prompt_id, '_sfaic_system_prompt', true);
+        $user_prompt_template = get_post_meta($prompt_id, '_sfaic_user_prompt_template', true);
+        $prompt_type = get_post_meta($prompt_id, '_sfaic_prompt_type', true);
+
+        // Set default prompt type if not set
+        if (empty($prompt_type)) {
+            $prompt_type = 'template';
+        }
+
+        // Prepare the user prompt based on prompt type
+        $user_prompt = '';
+        if ($prompt_type === 'all_form_data') {
+            // Use all form data
+            $user_prompt = $this->format_all_form_data($form_data, $prompt_id);
+        } else {
+            // Use custom template
+            if (empty($user_prompt_template)) {
+                // Log the error
+                if (isset(sfaic_main()->response_logger)) {
+                    sfaic_main()->response_logger->log_response(
+                        $prompt_id,
+                        $entry_id,
+                        $form->id,
+                        "Error: No user prompt template configured",
+                        "",
+                        $provider,
+                        "",
+                        0,
+                        "error",
+                        "No user prompt template configured"
+                    );
+                }
+                return false;
+            }
+
+            // Replace placeholders in user prompt
+            $user_prompt = $user_prompt_template;
+
+            // Replace field placeholders with actual values
+            foreach ($form_data as $field_key => $field_value) {
+                // Skip if field_key is not a scalar (string/number)
+                if (!is_scalar($field_key)) {
+                    continue;
+                }
+
+                // Handle array values (like checkboxes)
+                if (is_array($field_value)) {
+                    $field_value = implode(', ', $field_value);
+                } elseif (!is_scalar($field_value)) {
+                    // Skip non-scalar values
+                    continue;
+                }
+
+                $user_prompt = str_replace('{' . $field_key . '}', $field_value, $user_prompt);
+            }
+
+            // Check for any remaining placeholders and replace with empty string
+            $user_prompt = preg_replace('/\{[^}]+\}/', '', $user_prompt);
+        }
+
+        // Build the complete prompt that will be sent
+        $complete_prompt = '';
+        if (!empty($system_prompt)) {
+            $complete_prompt .= $system_prompt . "\n";
+        }
+        $complete_prompt .= $user_prompt;
+
+        // Process the form with the prompt (handle potential errors)
+        try {
+            $ai_response_raw = $api->process_form_with_prompt($prompt_id, $form_data, $entry_id);
+            $ai_response = is_wp_error($ai_response_raw) ? $ai_response_raw : $this->clean_html_response($ai_response_raw);
+        } catch (Exception $e) {
+            // Convert exception to WP_Error
+            $ai_response = new WP_Error('exception', $e->getMessage());
+        }
+
+        // Calculate execution time
+        $execution_time = microtime(true) - $start_time;
+
+        // Get token usage from the API
+        $token_usage = array();
+        if (method_exists($api, 'get_last_token_usage')) {
+            $token_usage = $api->get_last_token_usage();
+        }
+
+        // Check if we got a valid response or an error
+        $status = 'success';
+        $error_message = '';
+        $response_content = '';
+
+        if (is_wp_error($ai_response)) {
+            $status = 'error';
+            $error_message = $ai_response->get_error_message();
+        } else {
+            $response_content = $ai_response;
+
+            // TRIGGER PDF GENERATION ACTION - This is the key addition for PDF support
+            if (isset(sfaic_main()->pdf_generator)) {
+                do_action('sfaic_after_ai_response_processed', $response_content, $prompt_id, $entry_id, $form_data, $form);
+            }
+        }
+
+        // Save the response if logging is enabled
+        $log_responses = get_post_meta($prompt_id, '_sfaic_log_responses', true);
+        if ($log_responses == '1' || $status === 'error') {
+            // Use the enhanced response logger with proper provider, model information, and token usage
+            if (isset(sfaic_main()->response_logger)) {
+                $result = sfaic_main()->response_logger->log_response(
+                    $prompt_id,
+                    $entry_id,
+                    $form->id,
+                    $complete_prompt, // Save the actual prompt sent
+                    $response_content,
+                    $provider, // Pass the correct provider
+                    $model, // Pass the correct model
+                    $execution_time,
+                    $status,
+                    $error_message,
+                    $token_usage // Pass the token usage
+                );
+            }
+        }
+
+        // Don't proceed with email if there was an error
+        if ($status === 'error') {
+            return false;
+        }
+
+        // Handle the response according to settings
+        $response_action = get_post_meta($prompt_id, '_sfaic_response_action', true);
+
+        // Send email if configured
+        if ($response_action === 'email') {
+            $email_sent = $this->send_email_response($prompt_id, $entry_id, $form_data, $response_content, $provider);
+        }
+
+        return true;
     }
 
     /**
@@ -377,7 +398,7 @@ class SFAIC_Forms_Integration {
             $output .= $label . ': ' . $field_value . "\n";
         }
 
-        $output .= "\n" . __('Please analyze this information and provide a response. You can use HTML formatting in your response for better presentation.', 'chatgpt-fluent-connector');
+        $output .= "\n" . __('Please analyze this information and provide a response.', 'chatgpt-fluent-connector');
         return $output;
     }
 
@@ -1027,37 +1048,8 @@ class SFAIC_Forms_Integration {
      * @param string|WP_Error $response The response from the API
      * @return string The cleaned HTML response or error message
      */
-    private function clean_html_response($response) {
-        // First check if the response is an error
-        if (is_wp_error($response)) {
-            return '<div class="sfaic-error-message">' .
-                    esc_html__('There was an error processing your request: ', 'chatgpt-fluent-connector') .
-                    esc_html($response->get_error_message()) .
-                    '</div>';
-        }
-
-        // First, check if the response contains HTML code blocks
-        if (preg_match('/```html\s*([\s\S]*?)\s*```/i', $response, $matches)) {
-            // Extract the HTML from the code block
-            $html = $matches[1];
-        } else {
-            // If no code block found, use the entire response
-            $html = $response;
-        }
-
-        // Remove <br> tags that might have been added
-        $html = str_replace('<br>', '', $html);
-        $html = str_replace('\n', '', $html);
-
-        // Clean up other potential issues
-        $html = trim($html);
-
-        // Verify content is valid HTML - use a permissive approach
-        if (strpos($html, '<') === false) {
-            // If no HTML tags are found, wrap the content in a paragraph
-            $html = '<p>' . nl2br($html) . '</p>';
-        }
-
-        return $html;
+     private function clean_html_response($response) {
+        // Basic HTML cleaning if needed
+        return $response;
     }
 }

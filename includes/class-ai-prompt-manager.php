@@ -1,6 +1,6 @@
 <?php
 /**
- * ChatGPT Prompt Custom Post Type - Updated with Dynamic Chunking Settings
+ * ChatGPT Prompt Custom Post Type - Updated with Background Processing and Chunking Settings
  * 
  * Handles registration and management of the ChatGPT Prompt custom post type
  */
@@ -93,7 +93,27 @@ class SFAIC_Prompt_Manager {
                 'default'
         );
 
-        // Add new chunking settings meta box
+        // NEW: Background Processing Settings
+        add_meta_box(
+                'sfaic_background_processing',
+                __('Background Processing Settings', 'chatgpt-fluent-connector'),
+                array($this, 'render_background_processing_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
+        );
+
+        // NEW: Basic Chunking Settings
+        add_meta_box(
+                'sfaic_basic_chunking',
+                __('Chunking Settings', 'chatgpt-fluent-connector'),
+                array($this, 'render_basic_chunking_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
+        );
+
+        // EXISTING: Advanced chunking settings
         add_meta_box(
                 'sfaic_chunking_settings',
                 __('Advanced Chunking Settings', 'chatgpt-fluent-connector'),
@@ -102,6 +122,372 @@ class SFAIC_Prompt_Manager {
                 'side',
                 'default'
         );
+
+        // User field mapping
+        add_meta_box(
+                'sfaic_field_mapping',
+                __('User Field Mapping', 'chatgpt-fluent-connector'),
+                array($this, 'render_field_mapping_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
+        );
+    }
+
+    /**
+     * NEW: Render background processing meta box
+     */
+    public function render_background_processing_meta_box($post) {
+        // Get saved values with defaults
+        $enable_background_processing = get_post_meta($post->ID, '_sfaic_enable_background_processing', true);
+        if ($enable_background_processing === '') {
+            $enable_background_processing = '1'; // Default to enabled
+        }
+
+        $background_processing_delay = get_post_meta($post->ID, '_sfaic_background_processing_delay', true);
+        if (empty($background_processing_delay)) {
+            $background_processing_delay = 5;
+        }
+
+        $max_concurrent_jobs = get_post_meta($post->ID, '_sfaic_max_concurrent_jobs', true);
+        if (empty($max_concurrent_jobs)) {
+            $max_concurrent_jobs = 3;
+        }
+
+        $job_timeout = get_post_meta($post->ID, '_sfaic_job_timeout', true);
+        if (empty($job_timeout)) {
+            $job_timeout = 300;
+        }
+
+        $priority = get_post_meta($post->ID, '_sfaic_job_priority', true);
+        if (empty($priority)) {
+            $priority = 0;
+        }
+        ?>
+        <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+            <h4 style="margin-top: 0; color: #0073aa;">🚀 Background Processing</h4>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
+                Configure how this prompt is processed in the background to prevent user delays.
+            </p>
+
+            <table class="form-table" style="margin-top: 0;">
+                <tr>
+                    <th style="width: 180px;"><label for="sfaic_enable_background_processing"><?php _e('Enable Background Processing:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="sfaic_enable_background_processing" 
+                                   id="sfaic_enable_background_processing" 
+                                   value="1" 
+                                   <?php checked($enable_background_processing, '1'); ?>>
+                            <?php _e('Process this prompt in the background', 'chatgpt-fluent-connector'); ?>
+                        </label>
+                        <p class="description"><?php _e('When enabled, AI requests will be processed in the background using WordPress cron jobs.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="background-processing-settings" <?php echo ($enable_background_processing != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_background_processing_delay"><?php _e('Processing Delay:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_background_processing_delay" 
+                               id="sfaic_background_processing_delay" 
+                               value="<?php echo esc_attr($background_processing_delay); ?>" 
+                               min="0" 
+                               max="300" 
+                               step="1" 
+                               class="small-text">
+                        <span><?php _e('seconds', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Delay before starting background job processing.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="background-processing-settings" <?php echo ($enable_background_processing != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_job_priority"><?php _e('Job Priority:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <select name="sfaic_job_priority" id="sfaic_job_priority">
+                            <option value="0" <?php selected($priority, '0'); ?>><?php _e('Normal', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="1" <?php selected($priority, '1'); ?>><?php _e('High', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="2" <?php selected($priority, '2'); ?>><?php _e('Urgent', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="-1" <?php selected($priority, '-1'); ?>><?php _e('Low', 'chatgpt-fluent-connector'); ?></option>
+                        </select>
+                        <p class="description"><?php _e('Higher priority jobs are processed first.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="background-processing-settings" <?php echo ($enable_background_processing != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_job_timeout"><?php _e('Job Timeout:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_job_timeout" 
+                               id="sfaic_job_timeout" 
+                               value="<?php echo esc_attr($job_timeout); ?>" 
+                               min="30" 
+                               max="1800" 
+                               step="30" 
+                               class="small-text">
+                        <span><?php _e('seconds', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Maximum time a background job can run before being considered failed.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="background: #e8f5e8; padding: 10px; border-radius: 3px; margin-top: 15px;">
+                <p style="margin: 0; font-size: 12px; color: #155724;">
+                    <strong><?php _e('Benefits:', 'chatgpt-fluent-connector'); ?></strong> 
+                    <?php _e('Faster form responses, automatic retries, better handling of API limits.', 'chatgpt-fluent-connector'); ?>
+                </p>
+            </div>
+        </div>
+
+        <script>
+            jQuery(document).ready(function ($) {
+                // Show/hide background processing settings
+                $('#sfaic_enable_background_processing').change(function () {
+                    if ($(this).is(':checked')) {
+                        $('.background-processing-settings').show();
+                    } else {
+                        $('.background-processing-settings').hide();
+                    }
+                });
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * NEW: Render basic chunking meta box
+     */
+    public function render_basic_chunking_meta_box($post) {
+        // Get saved values with defaults
+        $enable_chunking = get_post_meta($post->ID, '_sfaic_enable_chunking', true);
+        if ($enable_chunking === '') {
+            $enable_chunking = '1'; // Default to enabled
+        }
+
+        $chunk_size = get_post_meta($post->ID, '_sfaic_chunk_size', true);
+        if (empty($chunk_size)) {
+            $chunk_size = 7500;
+        }
+
+        $max_chunks = get_post_meta($post->ID, '_sfaic_max_chunks', true);
+        if (empty($max_chunks)) {
+            $max_chunks = 20;
+        }
+
+        $chunking_strategy = get_post_meta($post->ID, '_sfaic_chunking_strategy', true);
+        if (empty($chunking_strategy)) {
+            $chunking_strategy = 'balanced';
+        }
+
+        $require_completion = get_post_meta($post->ID, '_sfaic_require_completion', true);
+        ?>
+        <div style="background: #e8f5e8; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+            <h4 style="margin-top: 0; color: #28a745;">🔧 Response Chunking</h4>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
+                Configure chunking for longer responses that exceed model token limits.
+            </p>
+
+            <table class="form-table" style="margin-top: 0;">
+                <tr>
+                    <th style="width: 180px;"><label for="sfaic_enable_chunking_basic"><?php _e('Enable Chunking:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="sfaic_enable_chunking" 
+                                   id="sfaic_enable_chunking_basic" 
+                                   value="1" 
+                                   <?php checked($enable_chunking, '1'); ?>>
+                            <?php _e('Enable chunking for responses longer than model limits', 'chatgpt-fluent-connector'); ?>
+                        </label>
+                        <p class="description"><?php _e('When enabled, the plugin will make multiple API calls to generate longer responses.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="chunking-settings" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_chunk_size"><?php _e('Chunk Size:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_chunk_size" 
+                               id="sfaic_chunk_size" 
+                               value="<?php echo esc_attr($chunk_size); ?>" 
+                               min="1000" 
+                               max="8000" 
+                               step="100" 
+                               class="small-text">
+                        <span><?php _e('tokens per chunk', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Size of each chunk in tokens. Lower values = more chunks but safer.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="chunking-settings" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_max_chunks"><?php _e('Max Chunks:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_max_chunks" 
+                               id="sfaic_max_chunks" 
+                               value="<?php echo esc_attr($max_chunks); ?>" 
+                               min="5" 
+                               max="50" 
+                               step="1" 
+                               class="small-text">
+                        <span><?php _e('maximum chunks', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Maximum number of chunks allowed per response.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="chunking-settings" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_chunking_strategy"><?php _e('Chunking Strategy:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <select name="sfaic_chunking_strategy" id="sfaic_chunking_strategy">
+                            <option value="balanced" <?php selected($chunking_strategy, 'balanced'); ?>><?php _e('Balanced (Recommended)', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="aggressive" <?php selected($chunking_strategy, 'aggressive'); ?>><?php _e('Aggressive (Maximum Length)', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="conservative" <?php selected($chunking_strategy, 'conservative'); ?>><?php _e('Conservative (Safe & Fast)', 'chatgpt-fluent-connector'); ?></option>
+                        </select>
+                        <p class="description"><?php _e('Balanced: Good for most use cases. Aggressive: Maximizes response length. Conservative: Faster processing.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+
+                <tr class="chunking-settings" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_require_completion"><?php _e('Require Completion:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="sfaic_require_completion" 
+                                   id="sfaic_require_completion" 
+                                   value="1" 
+                                   <?php checked($require_completion, '1'); ?>>
+                            <?php _e('Require natural completion (may use more tokens)', 'chatgpt-fluent-connector'); ?>
+                        </label>
+                        <p class="description"><?php _e('When enabled, the system will try harder to generate complete responses.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="background: #fff3cd; padding: 10px; border-radius: 3px; margin-top: 15px;">
+                <p style="margin: 0; font-size: 12px; color: #856404;">
+                    <strong><?php _e('Note:', 'chatgpt-fluent-connector'); ?></strong> 
+                    <?php _e('Chunking increases API costs but allows for comprehensive responses and reports.', 'chatgpt-fluent-connector'); ?>
+                </p>
+            </div>
+        </div>
+
+        <script>
+            jQuery(document).ready(function ($) {
+                // Show/hide chunking settings
+                $('#sfaic_enable_chunking_basic').change(function () {
+                    if ($(this).is(':checked')) {
+                        $('.chunking-settings').show();
+                    } else {
+                        $('.chunking-settings').hide();
+                    }
+                });
+            });
+        </script>
+        <?php
+    }
+
+    /**
+     * Add this new method to render the field mapping meta box
+     */
+    public function render_field_mapping_meta_box($post) {
+        // Get saved field mappings
+        $first_name_field = get_post_meta($post->ID, '_sfaic_first_name_field', true);
+        $last_name_field = get_post_meta($post->ID, '_sfaic_last_name_field', true);
+        $email_field = get_post_meta($post->ID, '_sfaic_email_field_mapping', true); // Different from existing email field
+        // Get form ID to fetch available fields
+        $form_id = get_post_meta($post->ID, '_sfaic_fluent_form_id', true);
+
+        if (empty($form_id)) {
+            ?>
+            <p class="description"><?php _e('Please select a form first to see available fields.', 'chatgpt-fluent-connector'); ?></p>
+            <?php
+            return;
+        }
+
+        // Get all form fields
+        $all_fields = $this->get_form_fields($form_id);
+        ?>
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+            <p class="description" style="margin-top: 0;">
+        <?php _e('Map form fields to user information for logs and background job listings. If not set, the system will try to auto-detect these fields.', 'chatgpt-fluent-connector'); ?>
+            </p>
+
+            <table class="form-table" style="margin-top: 15px;">
+                <tr>
+                    <th style="padding: 10px 0;">
+                        <label for="sfaic_first_name_field"><?php _e('First Name Field:', 'chatgpt-fluent-connector'); ?></label>
+                    </th>
+                </tr>
+                <tr>
+                    <td style="padding: 0 0 10px 0;">
+                        <select name="sfaic_first_name_field" id="sfaic_first_name_field" class="widefat">
+                            <option value=""><?php _e('Auto-detect (default)', 'chatgpt-fluent-connector'); ?></option>
+        <?php foreach ($all_fields as $field_key => $field_label) : ?>
+                                <option value="<?php echo esc_attr($field_key); ?>" <?php selected($first_name_field, $field_key); ?>>
+                                <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
+                                </option>
+                                <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+
+                <tr>
+                    <th style="padding: 10px 0;">
+                        <label for="sfaic_last_name_field"><?php _e('Last Name Field:', 'chatgpt-fluent-connector'); ?></label>
+                    </th>
+                </tr>
+                <tr>
+                    <td style="padding: 0 0 10px 0;">
+                        <select name="sfaic_last_name_field" id="sfaic_last_name_field" class="widefat">
+                            <option value=""><?php _e('Auto-detect (default)', 'chatgpt-fluent-connector'); ?></option>
+        <?php foreach ($all_fields as $field_key => $field_label) : ?>
+                                <option value="<?php echo esc_attr($field_key); ?>" <?php selected($last_name_field, $field_key); ?>>
+                                <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
+                                </option>
+                                <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+
+                <tr>
+                    <th style="padding: 10px 0;">
+                        <label for="sfaic_email_field_mapping"><?php _e('Email Field:', 'chatgpt-fluent-connector'); ?></label>
+                    </th>
+                </tr>
+                <tr>
+                    <td style="padding: 0;">
+                        <select name="sfaic_email_field_mapping" id="sfaic_email_field_mapping" class="widefat">
+                            <option value=""><?php _e('Auto-detect (default)', 'chatgpt-fluent-connector'); ?></option>
+        <?php foreach ($all_fields as $field_key => $field_label) : ?>
+                                <option value="<?php echo esc_attr($field_key); ?>" <?php selected($email_field, $field_key); ?>>
+                                <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
+                                </option>
+                                <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="background: #e8f5e8; padding: 10px; border-radius: 3px; margin-top: 15px;">
+                <p style="margin: 0; font-size: 12px; color: #155724;">
+                    <strong><?php _e('Tip:', 'chatgpt-fluent-connector'); ?></strong> 
+        <?php _e('These mappings are used to display user information in response logs and background job listings.', 'chatgpt-fluent-connector'); ?>
+                </p>
+            </div>
+        </div>
+
+        <script>
+            jQuery(document).ready(function ($) {
+                // Update field mappings when form selection changes
+                $('#sfaic_fluent_form_id').on('change', function () {
+                    // Clear the field mapping selections when form changes
+                    $('#sfaic_first_name_field, #sfaic_last_name_field, #sfaic_email_field_mapping').val('');
+                });
+            });
+        </script>
+        <?php
     }
 
     /**
@@ -142,12 +528,12 @@ class SFAIC_Prompt_Manager {
                 <td>
                     <label>
                         <input type="radio" name="sfaic_prompt_type" value="template" <?php checked($prompt_type, 'template'); ?> class="prompt-type-radio">
-                        <?php _e('Use custom template', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Use custom template', 'chatgpt-fluent-connector'); ?>
                     </label><br>
 
                     <label>
                         <input type="radio" name="sfaic_prompt_type" value="all_form_data" <?php checked($prompt_type, 'all_form_data'); ?> class="prompt-type-radio">
-                        <?php _e('Send all form questions and answers', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Send all form questions and answers', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description"><?php _e('If selected, all form field labels and values will be sent to ChatGPT in a structured format.', 'chatgpt-fluent-connector'); ?></p>
                 </td>
@@ -157,8 +543,8 @@ class SFAIC_Prompt_Manager {
                 <td>
                     <textarea name="sfaic_user_prompt_template" id="sfaic_user_prompt_template" class="large-text code" rows="5"><?php echo esc_textarea($user_prompt_template); ?></textarea>
                     <p class="description">
-                        <?php _e('The template for the user\'s message. You can use form field placeholders like {field_key} to insert form data.', 'chatgpt-fluent-connector'); ?><br>
-                        <?php _e('Example: "Please analyze the following information: Name: {name}, Email: {email}, Message: {message}"', 'chatgpt-fluent-connector'); ?>
+        <?php _e('The template for the user\'s message. You can use form field placeholders like {field_key} to insert form data.', 'chatgpt-fluent-connector'); ?><br>
+        <?php _e('Example: "Please analyze the following information: Name: {name}, Email: {email}, Message: {message}"', 'chatgpt-fluent-connector'); ?>
                     </p>
                 </td>
             </tr>
@@ -182,7 +568,7 @@ class SFAIC_Prompt_Manager {
                            value="<?php echo esc_attr($max_tokens); ?>" 
                            class="small-text">
                     <p class="description">
-                        <?php _e('Maximum tokens for the complete response when chunking is enabled.', 'chatgpt-fluent-connector'); ?><br>
+        <?php _e('Maximum tokens for the complete response when chunking is enabled.', 'chatgpt-fluent-connector'); ?><br>
                         <strong><?php _e('With chunking:', 'chatgpt-fluent-connector'); ?></strong> 
                         <?php _e('Can generate up to 128,000 tokens (≈500k characters)', 'chatgpt-fluent-connector'); ?><br>
                         <strong><?php _e('Without chunking:', 'chatgpt-fluent-connector'); ?></strong> 
@@ -190,59 +576,6 @@ class SFAIC_Prompt_Manager {
                     </p>
                 </td>
             </tr>
-            <?php $enable_chunking = get_post_meta($post->ID, '_sfaic_enable_chunking', true); ?>
-            <tr>
-                <th><label for="sfaic_enable_chunking"><?php _e('Enable Response Chunking:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <label>
-                        <input type="checkbox" name="sfaic_enable_chunking" id="sfaic_enable_chunking" value="1" <?php checked(get_post_meta($post->ID, '_sfaic_enable_chunking', true), '1'); ?>>
-                        <?php _e('Enable chunking for responses longer than 4096 tokens', 'chatgpt-fluent-connector'); ?>
-                    </label>
-                    <p class="description">
-                        <?php _e('When enabled, the plugin will make multiple API calls to generate longer responses. This may increase API costs.', 'chatgpt-fluent-connector'); ?>
-                    </p>
-                </td>
-            </tr>
-            <tr id="chunking-settings-row" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_chunking_strategy"><?php _e('Chunking Strategy:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <?php $chunking_strategy = get_post_meta($post->ID, '_sfaic_chunking_strategy', true); ?>
-                    <select name="sfaic_chunking_strategy" id="sfaic_chunking_strategy">
-                        <option value="balanced" <?php selected($chunking_strategy, 'balanced'); ?>><?php _e('Balanced (Recommended)', 'chatgpt-fluent-connector'); ?></option>
-                        <option value="aggressive" <?php selected($chunking_strategy, 'aggressive'); ?>><?php _e('Aggressive (Maximum Length)', 'chatgpt-fluent-connector'); ?></option>
-                        <option value="conservative" <?php selected($chunking_strategy, 'conservative'); ?>><?php _e('Conservative (Safe & Fast)', 'chatgpt-fluent-connector'); ?></option>
-                    </select>
-                    <p class="description">
-                        <?php _e('Balanced: Good for most use cases. Aggressive: Maximizes response length but may take longer. Conservative: Faster processing, shorter responses.', 'chatgpt-fluent-connector'); ?>
-                    </p>
-                </td>
-            </tr>
-
-            <tr id="chunking-quality-row" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_require_completion"><?php _e('Completion Requirements:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <?php $require_completion = get_post_meta($post->ID, '_sfaic_require_completion', true); ?>
-                    <label>
-                        <input type="checkbox" name="sfaic_require_completion" id="sfaic_require_completion" value="1" <?php checked($require_completion, '1'); ?>>
-                        <?php _e('Require natural completion (may use more tokens)', 'chatgpt-fluent-connector'); ?>
-                    </label>
-                    <p class="description"><?php _e('When enabled, the system will try harder to generate complete responses, even if it means using more tokens.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
-
-            <script>
-                jQuery(document).ready(function ($) {
-                    // Show/hide chunking settings
-                    $('#sfaic_enable_chunking').change(function () {
-                        if ($(this).is(':checked')) {
-                            $('#chunking-settings-row, #chunking-quality-row').show();
-                        } else {
-                            $('#chunking-settings-row, #chunking-quality-row').hide();
-                        }
-                    });
-                });
-            </script>
-
         </table>
         <script>
             jQuery(document).ready(function ($) {
@@ -265,232 +598,229 @@ class SFAIC_Prompt_Manager {
     }
 
     /**
-     * NEW: Render chunking settings meta box
+     * EXISTING: Render chunking settings meta box (Advanced)
      */
-    /**
- * NEW: Render chunking settings meta box - FIXED VERSION
- */
-public function render_chunking_settings_meta_box($post) {
-    // Get saved values with defaults
-    $completion_marker = get_post_meta($post->ID, '_sfaic_completion_marker', true);
-    if (empty($completion_marker)) {
-        $completion_marker = '<!-- REPORT_END -->';
-    }
+    public function render_chunking_settings_meta_box($post) {
+        // Get saved values with defaults
+        $completion_marker = get_post_meta($post->ID, '_sfaic_completion_marker', true);
+        if (empty($completion_marker)) {
+            $completion_marker = '<!-- REPORT_END -->';
+        }
 
-    $min_content_length = get_post_meta($post->ID, '_sfaic_min_content_length', true);
-    if (empty($min_content_length)) {
-        $min_content_length = 500;
-    }
+        $min_content_length = get_post_meta($post->ID, '_sfaic_min_content_length', true);
+        if (empty($min_content_length)) {
+            $min_content_length = 500;
+        }
 
-    $completion_word_count = get_post_meta($post->ID, '_sfaic_completion_word_count', true);
-    if (empty($completion_word_count)) {
-        $completion_word_count = 800;
-    }
+        $completion_word_count = get_post_meta($post->ID, '_sfaic_completion_word_count', true);
+        if (empty($completion_word_count)) {
+            $completion_word_count = 800;
+        }
 
-    $min_chunk_words = get_post_meta($post->ID, '_sfaic_min_chunk_words', true);
-    if (empty($min_chunk_words)) {
-        $min_chunk_words = 300;
-    }
+        $min_chunk_words = get_post_meta($post->ID, '_sfaic_min_chunk_words', true);
+        if (empty($min_chunk_words)) {
+            $min_chunk_words = 300;
+        }
 
-    $completion_keywords = get_post_meta($post->ID, '_sfaic_completion_keywords', true);
-    if (empty($completion_keywords)) {
-        $completion_keywords = 'conclusion, summary, final, recommendations, regards, sincerely';
-    }
+        $completion_keywords = get_post_meta($post->ID, '_sfaic_completion_keywords', true);
+        if (empty($completion_keywords)) {
+            $completion_keywords = 'conclusion, summary, final, recommendations, regards, sincerely';
+        }
 
-    $enable_smart_completion = get_post_meta($post->ID, '_sfaic_enable_smart_completion', true);
-    $use_token_percentage = get_post_meta($post->ID, '_sfaic_use_token_percentage', true);
-    
-    $token_completion_threshold = get_post_meta($post->ID, '_sfaic_token_completion_threshold', true);
-    if (empty($token_completion_threshold)) {
-        $token_completion_threshold = 70;
-    }
+        $enable_smart_completion = get_post_meta($post->ID, '_sfaic_enable_smart_completion', true);
+        $use_token_percentage = get_post_meta($post->ID, '_sfaic_use_token_percentage', true);
 
-    // DEBUG: Log current values
-    error_log('SFAIC: Loading chunking settings for post ' . $post->ID);
-    error_log('SFAIC: completion_marker = ' . $completion_marker);
-    error_log('SFAIC: enable_smart_completion = ' . $enable_smart_completion);
-    error_log('SFAIC: min_content_length = ' . $min_content_length);
-    ?>
-    <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-        <h4 style="margin-top: 0; color: #0073aa;">🎯 Smart Completion Controls</h4>
-        <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
-            Configure how the AI determines when a response is complete during chunking.
-        </p>
+        $token_completion_threshold = get_post_meta($post->ID, '_sfaic_token_completion_threshold', true);
+        if (empty($token_completion_threshold)) {
+            $token_completion_threshold = 70;
+        }
 
-        <table class="form-table" style="margin-top: 0;">
-            <tr>
-                <th style="width: 180px;"><label for="sfaic_completion_marker"><?php _e('Completion Marker:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <input type="text" 
-                           name="sfaic_completion_marker" 
-                           id="sfaic_completion_marker" 
-                           value="<?php echo esc_attr($completion_marker); ?>" 
-                           class="regular-text" 
-                           placeholder="<!-- REPORT_END -->">
-                    <p class="description">
-                        <?php _e('HTML comment or text marker that signals completion. The AI will stop chunking when this marker is found.', 'chatgpt-fluent-connector'); ?>
-                    </p>
-                </td>
-            </tr>
+        // DEBUG: Log current values
+        error_log('SFAIC: Loading chunking settings for post ' . $post->ID);
+        error_log('SFAIC: completion_marker = ' . $completion_marker);
+        error_log('SFAIC: enable_smart_completion = ' . $enable_smart_completion);
+        error_log('SFAIC: min_content_length = ' . $min_content_length);
+        ?>
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+            <h4 style="margin-top: 0; color: #0073aa;">🎯 Smart Completion Controls</h4>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">
+                Configure how the AI determines when a response is complete during chunking.
+            </p>
 
-            <tr>
-                <th><label for="sfaic_enable_smart_completion"><?php _e('Smart Completion:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <label>
-                        <input type="checkbox" 
-                               name="sfaic_enable_smart_completion" 
-                               id="sfaic_enable_smart_completion" 
-                               value="1" 
-                               <?php checked($enable_smart_completion, '1'); ?>>
-                        <?php _e('Enable intelligent completion detection', 'chatgpt-fluent-connector'); ?>
-                    </label>
-                    <p class="description"><?php _e('When enabled, the system will analyze content patterns to detect natural completion points.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
+            <table class="form-table" style="margin-top: 0;">
+                <tr>
+                    <th style="width: 180px;"><label for="sfaic_completion_marker"><?php _e('Completion Marker:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="text" 
+                               name="sfaic_completion_marker" 
+                               id="sfaic_completion_marker" 
+                               value="<?php echo esc_attr($completion_marker); ?>" 
+                               class="regular-text" 
+                               placeholder="<!-- REPORT_END -->">
+                        <p class="description">
+        <?php _e('HTML comment or text marker that signals completion. The AI will stop chunking when this marker is found.', 'chatgpt-fluent-connector'); ?>
+                        </p>
+                    </td>
+                </tr>
 
-            <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_min_content_length"><?php _e('Min Content Length:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <input type="number" 
-                           name="sfaic_min_content_length" 
-                           id="sfaic_min_content_length" 
-                           value="<?php echo esc_attr($min_content_length); ?>" 
-                           min="100" 
-                           max="50000" 
-                           step="50" 
-                           class="small-text">
-                    <span><?php _e('characters', 'chatgpt-fluent-connector'); ?></span>
-                    <p class="description"><?php _e('Minimum content length before checking for completion patterns.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
+                <tr>
+                    <th><label for="sfaic_enable_smart_completion"><?php _e('Smart Completion:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="sfaic_enable_smart_completion" 
+                                   id="sfaic_enable_smart_completion" 
+                                   value="1" 
+        <?php checked($enable_smart_completion, '1'); ?>>
+                                   <?php _e('Enable intelligent completion detection', 'chatgpt-fluent-connector'); ?>
+                        </label>
+                        <p class="description"><?php _e('When enabled, the system will analyze content patterns to detect natural completion points.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
 
-            <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_completion_word_count"><?php _e('Completion Word Count:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <input type="number" 
-                           name="sfaic_completion_word_count" 
-                           id="sfaic_completion_word_count" 
-                           value="<?php echo esc_attr($completion_word_count); ?>" 
-                           min="200" 
-                           max="20000" 
-                           step="50" 
-                           class="small-text">
-                    <span><?php _e('words', 'chatgpt-fluent-connector'); ?></span>
-                    <p class="description"><?php _e('Word count threshold for natural completion detection.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
+                <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_min_content_length"><?php _e('Min Content Length:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_min_content_length" 
+                               id="sfaic_min_content_length" 
+                               value="<?php echo esc_attr($min_content_length); ?>" 
+                               min="100" 
+                               max="50000" 
+                               step="50" 
+                               class="small-text">
+                        <span><?php _e('characters', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Minimum content length before checking for completion patterns.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
 
-            <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_min_chunk_words"><?php _e('Min Chunk Words:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <input type="number" 
-                           name="sfaic_min_chunk_words" 
-                           id="sfaic_min_chunk_words" 
-                           value="<?php echo esc_attr($min_chunk_words); ?>" 
-                           min="100" 
-                           max="5000" 
-                           step="25" 
-                           class="small-text">
-                    <span><?php _e('words', 'chatgpt-fluent-connector'); ?></span>
-                    <p class="description"><?php _e('Minimum words required in each chunk before completion analysis.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
+                <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_completion_word_count"><?php _e('Completion Word Count:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_completion_word_count" 
+                               id="sfaic_completion_word_count" 
+                               value="<?php echo esc_attr($completion_word_count); ?>" 
+                               min="200" 
+                               max="20000" 
+                               step="50" 
+                               class="small-text">
+                        <span><?php _e('words', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Word count threshold for natural completion detection.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
 
-            <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_completion_keywords"><?php _e('Completion Keywords:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <textarea name="sfaic_completion_keywords" 
-                              id="sfaic_completion_keywords" 
-                              rows="3" 
-                              class="regular-text"
-                              placeholder="conclusion, summary, final, recommendations"><?php echo esc_textarea($completion_keywords); ?></textarea>
-                    <p class="description">
-                        <?php _e('Comma-separated keywords that indicate completion. Used for natural ending detection.', 'chatgpt-fluent-connector'); ?>
-                        <br><strong><?php _e('Examples:', 'chatgpt-fluent-connector'); ?></strong> 
-                        <?php _e('conclusion, summary, final thoughts, recommendations, regards, best wishes, thank you', 'chatgpt-fluent-connector'); ?>
-                    </p>
-                </td>
-            </tr>
+                <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_min_chunk_words"><?php _e('Min Chunk Words:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="number" 
+                               name="sfaic_min_chunk_words" 
+                               id="sfaic_min_chunk_words" 
+                               value="<?php echo esc_attr($min_chunk_words); ?>" 
+                               min="100" 
+                               max="5000" 
+                               step="25" 
+                               class="small-text">
+                        <span><?php _e('words', 'chatgpt-fluent-connector'); ?></span>
+                        <p class="description"><?php _e('Minimum words required in each chunk before completion analysis.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
 
-            <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_use_token_percentage"><?php _e('Token-Based Completion:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <label>
-                        <input type="checkbox" 
-                               name="sfaic_use_token_percentage" 
-                               id="sfaic_use_token_percentage" 
-                               value="1" 
-                               <?php checked($use_token_percentage, '1'); ?>>
-                        <?php _e('Use token percentage for completion timing', 'chatgpt-fluent-connector'); ?>
-                    </label>
-                    <p class="description"><?php _e('When enabled, the system will consider token usage percentage when deciding completion.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
+                <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_completion_keywords"><?php _e('Completion Keywords:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <textarea name="sfaic_completion_keywords" 
+                                  id="sfaic_completion_keywords" 
+                                  rows="3" 
+                                  class="regular-text"
+                                  placeholder="conclusion, summary, final, recommendations"><?php echo esc_textarea($completion_keywords); ?></textarea>
+                        <p class="description">
+        <?php _e('Comma-separated keywords that indicate completion. Used for natural ending detection.', 'chatgpt-fluent-connector'); ?>
+                            <br><strong><?php _e('Examples:', 'chatgpt-fluent-connector'); ?></strong> 
+                            <?php _e('conclusion, summary, final thoughts, recommendations, regards, best wishes, thank you', 'chatgpt-fluent-connector'); ?>
+                        </p>
+                    </td>
+                </tr>
 
-            <tr class="token-completion-settings" <?php echo ($enable_smart_completion != '1' || $use_token_percentage != '1') ? 'style="display:none;"' : ''; ?>>
-                <th><label for="sfaic_token_completion_threshold"><?php _e('Token Threshold:', 'chatgpt-fluent-connector'); ?></label></th>
-                <td>
-                    <input type="range" 
-                           name="sfaic_token_completion_threshold" 
-                           id="sfaic_token_completion_threshold" 
-                           value="<?php echo esc_attr($token_completion_threshold); ?>" 
-                           min="50" 
-                           max="95" 
-                           step="5" 
-                           oninput="document.getElementById('token_threshold_value').innerHTML = this.value + '%'">
-                    <span id="token_threshold_value"><?php echo esc_html($token_completion_threshold); ?>%</span>
-                    <p class="description"><?php _e('Percentage of target tokens used before triggering completion analysis.', 'chatgpt-fluent-connector'); ?></p>
-                </td>
-            </tr>
-        </table>
+                <tr class="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_use_token_percentage"><?php _e('Token-Based Completion:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="sfaic_use_token_percentage" 
+                                   id="sfaic_use_token_percentage" 
+                                   value="1" 
+        <?php checked($use_token_percentage, '1'); ?>>
+                                   <?php _e('Use token percentage for completion timing', 'chatgpt-fluent-connector'); ?>
+                        </label>
+                        <p class="description"><?php _e('When enabled, the system will consider token usage percentage when deciding completion.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
 
-        <div style="background: #e8f5e8; padding: 10px; border-radius: 3px; margin-top: 15px;">
-            <h5 style="margin: 0 0 5px 0; color: #155724;">💡 <?php _e('Pro Tips:', 'chatgpt-fluent-connector'); ?></h5>
-            <ul style="margin: 5px 0 0 20px; font-size: 12px; color: #155724;">
-                <li><?php _e('Lower word counts = faster completion, higher word counts = more thorough responses', 'chatgpt-fluent-connector'); ?></li>
-                <li><?php _e('Add domain-specific completion keywords for better detection (e.g., "diagnosis, treatment" for medical)', 'chatgpt-fluent-connector'); ?></li>
-                <li><?php _e('Token percentage completion helps balance thoroughness with cost control', 'chatgpt-fluent-connector'); ?></li>
-            </ul>
+                <tr class="token-completion-settings" <?php echo ($enable_smart_completion != '1' || $use_token_percentage != '1') ? 'style="display:none;"' : ''; ?>>
+                    <th><label for="sfaic_token_completion_threshold"><?php _e('Token Threshold:', 'chatgpt-fluent-connector'); ?></label></th>
+                    <td>
+                        <input type="range" 
+                               name="sfaic_token_completion_threshold" 
+                               id="sfaic_token_completion_threshold" 
+                               value="<?php echo esc_attr($token_completion_threshold); ?>" 
+                               min="50" 
+                               max="95" 
+                               step="5" 
+                               oninput="document.getElementById('token_threshold_value').innerHTML = this.value + '%'">
+                        <span id="token_threshold_value"><?php echo esc_html($token_completion_threshold); ?>%</span>
+                        <p class="description"><?php _e('Percentage of target tokens used before triggering completion analysis.', 'chatgpt-fluent-connector'); ?></p>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="background: #e8f5e8; padding: 10px; border-radius: 3px; margin-top: 15px;">
+                <h5 style="margin: 0 0 5px 0; color: #155724;">💡 <?php _e('Pro Tips:', 'chatgpt-fluent-connector'); ?></h5>
+                <ul style="margin: 5px 0 0 20px; font-size: 12px; color: #155724;">
+                    <li><?php _e('Lower word counts = faster completion, higher word counts = more thorough responses', 'chatgpt-fluent-connector'); ?></li>
+                    <li><?php _e('Add domain-specific completion keywords for better detection (e.g., "diagnosis, treatment" for medical)', 'chatgpt-fluent-connector'); ?></li>
+                    <li><?php _e('Token percentage completion helps balance thoroughness with cost control', 'chatgpt-fluent-connector'); ?></li>
+                </ul>
+            </div>
         </div>
-    </div>
 
-    <script>
-    jQuery(document).ready(function($) {
-        // Show/hide smart completion settings
-        $('#sfaic_enable_smart_completion').change(function() {
-            if ($(this).is(':checked')) {
-                $('.smart-completion-settings').show();
-                // Also check token percentage settings
-                if ($('#sfaic_use_token_percentage').is(':checked')) {
-                    $('.token-completion-settings').show();
-                }
-            } else {
-                $('.smart-completion-settings, .token-completion-settings').hide();
-            }
-        });
+        <script>
+            jQuery(document).ready(function ($) {
+                // Show/hide smart completion settings
+                $('#sfaic_enable_smart_completion').change(function () {
+                    if ($(this).is(':checked')) {
+                        $('.smart-completion-settings').show();
+                        // Also check token percentage settings
+                        if ($('#sfaic_use_token_percentage').is(':checked')) {
+                            $('.token-completion-settings').show();
+                        }
+                    } else {
+                        $('.smart-completion-settings, .token-completion-settings').hide();
+                    }
+                });
 
-        // Show/hide token completion settings
-        $('#sfaic_use_token_percentage').change(function() {
-            if ($(this).is(':checked') && $('#sfaic_enable_smart_completion').is(':checked')) {
-                $('.token-completion-settings').show();
-            } else {
-                $('.token-completion-settings').hide();
-            }
-        });
+                // Show/hide token completion settings
+                $('#sfaic_use_token_percentage').change(function () {
+                    if ($(this).is(':checked') && $('#sfaic_enable_smart_completion').is(':checked')) {
+                        $('.token-completion-settings').show();
+                    } else {
+                        $('.token-completion-settings').hide();
+                    }
+                });
 
-        // Token threshold slider update
-        document.getElementById('sfaic_token_completion_threshold').addEventListener('input', function() {
-            document.getElementById('token_threshold_value').innerHTML = this.value + '%';
-        });
+                // Token threshold slider update
+                document.getElementById('sfaic_token_completion_threshold').addEventListener('input', function () {
+                    document.getElementById('token_threshold_value').innerHTML = this.value + '%';
+                });
 
-        // DEBUG: Log form values on change
-        $('input, textarea', '.form-table').change(function() {
-            console.log('SFAIC: Field changed - ' + this.name + ' = ' + this.value);
-        });
-    });
-    </script>
-    <?php
-}
+                // DEBUG: Log form values on change
+                $('input, textarea', '.form-table').change(function () {
+                    console.log('SFAIC: Field changed - ' + this.name + ' = ' + this.value);
+                });
+            });
+        </script>
+        <?php
+    }
 
     /**
      * Render form selection meta box
@@ -516,7 +846,7 @@ public function render_chunking_settings_meta_box($post) {
         $selected_form_id = get_post_meta($post->ID, '_sfaic_fluent_form_id', true);
         ?>
         <p>
-            <?php if (empty($fluent_forms)) : ?>
+        <?php if (empty($fluent_forms)) : ?>
             <div class="notice notice-warning inline">
                 <p><?php _e('No Fluent Forms found. Please create at least one form first.', 'chatgpt-fluent-connector'); ?></p>
             </div>
@@ -524,116 +854,116 @@ public function render_chunking_settings_meta_box($post) {
             <label for="sfaic_fluent_form_id"><?php _e('Select Form:', 'chatgpt-fluent-connector'); ?></label><br>
             <select name="sfaic_fluent_form_id" id="sfaic_fluent_form_id" class="widefat">
                 <option value=""><?php _e('-- Select a form --', 'chatgpt-fluent-connector'); ?></option>
-                <?php foreach ($fluent_forms as $form_id => $form_title) : ?>
+            <?php foreach ($fluent_forms as $form_id => $form_title) : ?>
                     <option value="<?php echo esc_attr($form_id); ?>" <?php selected($selected_form_id, $form_id); ?>>
-                        <?php echo esc_html($form_title); ?> (ID: <?php echo esc_html($form_id); ?>)
+                    <?php echo esc_html($form_title); ?> (ID: <?php echo esc_html($form_id); ?>)
                     </option>
-                <?php endforeach; ?>
+                    <?php endforeach; ?>
             </select>
-        <?php endif; ?>
+            <?php endif; ?>
         </p>
 
         <?php if (!empty($selected_form_id)) : ?>
             <p>
                 <strong><?php _e('Available Form Fields:', 'chatgpt-fluent-connector'); ?></strong><br>
             <div style="max-height: 200px; overflow-y: auto; margin-top: 5px; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
-                <?php
-                // Try multiple field storage methods in Fluent Forms
-                $fields_found = false;
+            <?php
+            // Try multiple field storage methods in Fluent Forms
+            $fields_found = false;
 
-                // Method 1: Try formDatenation first (older versions)
-                if (function_exists('wpFluent')) {
-                    $formFields = wpFluent()->table('fluentform_form_meta')
-                            ->where('form_id', $selected_form_id)
-                            ->where('meta_key', 'formDatenation')
-                            ->first();
+            // Method 1: Try formDatenation first (older versions)
+            if (function_exists('wpFluent')) {
+                $formFields = wpFluent()->table('fluentform_form_meta')
+                        ->where('form_id', $selected_form_id)
+                        ->where('meta_key', 'formDatenation')
+                        ->first();
 
-                    if ($formFields && !empty($formFields->value)) {
-                        $fields = json_decode($formFields->value, true);
-                        if (!empty($fields['fields'])) {
-                            echo '<ul style="margin-top: 0;">';
-                            foreach ($fields['fields'] as $field) {
-                                if (!empty($field['element']) && !empty($field['attributes']['name'])) {
-                                    echo '<li><code>{' . esc_html($field['attributes']['name']) . '}</code> - ' . esc_html($field['element']) . '</li>';
-                                }
+                if ($formFields && !empty($formFields->value)) {
+                    $fields = json_decode($formFields->value, true);
+                    if (!empty($fields['fields'])) {
+                        echo '<ul style="margin-top: 0;">';
+                        foreach ($fields['fields'] as $field) {
+                            if (!empty($field['element']) && !empty($field['attributes']['name'])) {
+                                echo '<li><code>{' . esc_html($field['attributes']['name']) . '}</code> - ' . esc_html($field['element']) . '</li>';
                             }
-                            echo '</ul>';
-                            $fields_found = true;
                         }
+                        echo '</ul>';
+                        $fields_found = true;
                     }
                 }
+            }
 
-                // Method 2: Try form_fields_meta (newer versions)
-                if (!$fields_found && function_exists('wpFluent')) {
-                    $formFields = wpFluent()->table('fluentform_form_meta')
-                            ->where('form_id', $selected_form_id)
-                            ->where('meta_key', 'form_fields_meta')
-                            ->first();
+            // Method 2: Try form_fields_meta (newer versions)
+            if (!$fields_found && function_exists('wpFluent')) {
+                $formFields = wpFluent()->table('fluentform_form_meta')
+                        ->where('form_id', $selected_form_id)
+                        ->where('meta_key', 'form_fields_meta')
+                        ->first();
 
-                    if ($formFields && !empty($formFields->value)) {
-                        $fields = json_decode($formFields->value, true);
-                        if (!empty($fields)) {
-                            echo '<ul style="margin-top: 0;">';
-                            foreach ($fields as $field) {
-                                if (!empty($field['element']) && !empty($field['attributes']['name'])) {
-                                    echo '<li><code>{' . esc_html($field['attributes']['name']) . '}</code> - ' . esc_html($field['element']) . '</li>';
-                                }
+                if ($formFields && !empty($formFields->value)) {
+                    $fields = json_decode($formFields->value, true);
+                    if (!empty($fields)) {
+                        echo '<ul style="margin-top: 0;">';
+                        foreach ($fields as $field) {
+                            if (!empty($field['element']) && !empty($field['attributes']['name'])) {
+                                echo '<li><code>{' . esc_html($field['attributes']['name']) . '}</code> - ' . esc_html($field['element']) . '</li>';
                             }
-                            echo '</ul>';
-                            $fields_found = true;
                         }
+                        echo '</ul>';
+                        $fields_found = true;
                     }
                 }
+            }
 
-                // Method 3: Try direct form structure (fallback)
-                if (!$fields_found && function_exists('wpFluent')) {
-                    $form = wpFluent()->table('fluentform_forms')
-                            ->where('id', $selected_form_id)
-                            ->first();
+            // Method 3: Try direct form structure (fallback)
+            if (!$fields_found && function_exists('wpFluent')) {
+                $form = wpFluent()->table('fluentform_forms')
+                        ->where('id', $selected_form_id)
+                        ->first();
 
-                    if ($form && !empty($form->form_fields)) {
-                        $formFields = json_decode($form->form_fields, true);
+                if ($form && !empty($form->form_fields)) {
+                    $formFields = json_decode($form->form_fields, true);
 
-                        if (!empty($formFields['fields'])) {
-                            echo '<ul style="margin-top: 0;">';
-                            foreach ($formFields['fields'] as $field) {
-                                if (!empty($field['element']) && !empty($field['attributes']['name'])) {
-                                    echo '<li><code>{' . esc_html($field['attributes']['name']) . '}</code> - ' . esc_html($field['element']) . '</li>';
-                                }
+                    if (!empty($formFields['fields'])) {
+                        echo '<ul style="margin-top: 0;">';
+                        foreach ($formFields['fields'] as $field) {
+                            if (!empty($field['element']) && !empty($field['attributes']['name'])) {
+                                echo '<li><code>{' . esc_html($field['attributes']['name']) . '}</code> - ' . esc_html($field['element']) . '</li>';
                             }
-                            echo '</ul>';
-                            $fields_found = true;
                         }
+                        echo '</ul>';
+                        $fields_found = true;
                     }
                 }
+            }
 
-                // Method 4: Use Fluent Forms API if available (most reliable)
-                if (!$fields_found && class_exists('\FluentForm\App\Api\FormFields')) {
-                    try {
-                        $formFields = (new \FluentForm\App\Api\FormFields())->getFormInputs($selected_form_id);
-                        if (!empty($formFields)) {
-                            echo '<ul style="margin-top: 0;">';
-                            foreach ($formFields as $fieldName => $fieldDetails) {
-                                echo '<li><code>{' . esc_html($fieldName) . '}</code> - ' . esc_html($fieldDetails['element']) . '</li>';
-                            }
-                            echo '</ul>';
-                            $fields_found = true;
+            // Method 4: Use Fluent Forms API if available (most reliable)
+            if (!$fields_found && class_exists('\FluentForm\App\Api\FormFields')) {
+                try {
+                    $formFields = (new \FluentForm\App\Api\FormFields())->getFormInputs($selected_form_id);
+                    if (!empty($formFields)) {
+                        echo '<ul style="margin-top: 0;">';
+                        foreach ($formFields as $fieldName => $fieldDetails) {
+                            echo '<li><code>{' . esc_html($fieldName) . '}</code> - ' . esc_html($fieldDetails['element']) . '</li>';
                         }
-                    } catch (\Exception $e) {
-                        // Silently fail, we'll show the default message below
+                        echo '</ul>';
+                        $fields_found = true;
                     }
+                } catch (\Exception $e) {
+                    // Silently fail, we'll show the default message below
                 }
+            }
 
-                // If no fields found with any method
-                if (!$fields_found) {
-                    echo '<div class="notice notice-info inline"><p>' . esc_html__('To see available form fields, please edit and save the selected form in Fluent Forms first.', 'chatgpt-fluent-connector') . '</p>';
-                    echo '<p>' . esc_html__('Alternatively, you can manually determine field keys by checking the form structure in Fluent Forms.', 'chatgpt-fluent-connector') . '</p></div>';
+            // If no fields found with any method
+            if (!$fields_found) {
+                echo '<div class="notice notice-info inline"><p>' . esc_html__('To see available form fields, please edit and save the selected form in Fluent Forms first.', 'chatgpt-fluent-connector') . '</p>';
+                echo '<p>' . esc_html__('Alternatively, you can manually determine field keys by checking the form structure in Fluent Forms.', 'chatgpt-fluent-connector') . '</p></div>';
 
-                    // Add link to edit the form
-                    $edit_link = admin_url('admin.php?page=fluent_forms&route=editor&form_id=' . $selected_form_id);
-                    echo '<p><a href="' . esc_url($edit_link) . '" class="button" target="_blank">' . esc_html__('Edit Form in Fluent Forms', 'chatgpt-fluent-connector') . '</a></p>';
-                }
-                ?>
+                // Add link to edit the form
+                $edit_link = admin_url('admin.php?page=fluent_forms&route=editor&form_id=' . $selected_form_id);
+                echo '<p><a href="' . esc_url($edit_link) . '" class="button" target="_blank">' . esc_html__('Edit Form in Fluent Forms', 'chatgpt-fluent-connector') . '</a></p>';
+            }
+            ?>
             </div>
             </p>
         <?php endif; ?>
@@ -698,12 +1028,12 @@ public function render_chunking_settings_meta_box($post) {
                 <td>
                     <label>
                         <input type="radio" name="sfaic_response_action" value="email" <?php checked($response_action, 'email'); ?>>
-                        <?php _e('Send via email', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Send via email', 'chatgpt-fluent-connector'); ?>
                     </label><br>
 
                     <label>
                         <input type="radio" name="sfaic_response_action" value="store" <?php checked($response_action, 'store'); ?>>
-                        <?php _e('Store only (no email)', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Store only (no email)', 'chatgpt-fluent-connector'); ?>
                     </label>
                 </td>
             </tr>
@@ -713,7 +1043,7 @@ public function render_chunking_settings_meta_box($post) {
                 <td>
                     <label>
                         <input type="checkbox" name="sfaic_email_to_user" id="sfaic_email_to_user" value="1" <?php checked($email_to_user, '1'); ?>>
-                        <?php _e('Send response to the person who submitted the form', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Send response to the person who submitted the form', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description"><?php _e('When enabled, the response will be sent to the email address from the form submission.', 'chatgpt-fluent-connector'); ?></p>
                 </td>
@@ -722,21 +1052,21 @@ public function render_chunking_settings_meta_box($post) {
             <tr class="email-field-settings" <?php echo ($response_action != 'email' || $email_to_user != '1') ? 'style="display:none;"' : ''; ?>>
                 <th><label for="sfaic_email_field"><?php _e('Email Field:', 'chatgpt-fluent-connector'); ?></label></th>
                 <td>
-                    <?php if (empty($email_fields)): ?>
+        <?php if (empty($email_fields)): ?>
                         <div class="notice notice-warning inline">
                             <p><?php _e('No email fields found in the selected form. Please select a form with an email field or manually specify the recipient email.', 'chatgpt-fluent-connector'); ?></p>
                         </div>
-                    <?php else: ?>
+        <?php else: ?>
                         <select name="sfaic_email_field" id="sfaic_email_field">
                             <option value=""><?php _e('Auto-detect (recommended)', 'chatgpt-fluent-connector'); ?></option>
-                            <?php foreach ($email_fields as $field_key => $field_label): ?>
+            <?php foreach ($email_fields as $field_key => $field_label): ?>
                                 <option value="<?php echo esc_attr($field_key); ?>" <?php selected($selected_email_field, $field_key); ?>>
-                                    <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
+                                <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
                                 </option>
-                            <?php endforeach; ?>
+                                <?php endforeach; ?>
                         </select>
                         <p class="description"><?php _e('Select which form field contains the email address. Auto-detect will try to find the first valid email field.', 'chatgpt-fluent-connector'); ?></p>
-                    <?php endif; ?>
+        <?php endif; ?>
                 </td>
             </tr>
 
@@ -760,21 +1090,21 @@ public function render_chunking_settings_meta_box($post) {
             <tr class="email-settings" <?php echo ($response_action != 'email') ? 'style="display:none;"' : ''; ?>>
                 <th><label for="sfaic_email_content_template"><?php _e('Email Content Template:', 'chatgpt-fluent-connector'); ?></label></th>
                 <td>
-                    <?php
-                    wp_editor($email_content_template, 'sfaic_email_content_template', array(
-                        'textarea_name' => 'sfaic_email_content_template',
-                        'textarea_rows' => 15,
-                        'media_buttons' => false,
-                        'teeny' => false,
-                        'quicktags' => true,
-                        'tinymce' => array(
-                            'toolbar1' => 'formatselect,bold,italic,underline,bullist,numlist,blockquote,alignleft,aligncenter,alignright,link,unlink,undo,redo',
-                            'toolbar2' => '',
-                        )
-                    ));
-                    ?>
+        <?php
+        wp_editor($email_content_template, 'sfaic_email_content_template', array(
+            'textarea_name' => 'sfaic_email_content_template',
+            'textarea_rows' => 15,
+            'media_buttons' => false,
+            'teeny' => false,
+            'quicktags' => true,
+            'tinymce' => array(
+                'toolbar1' => 'formatselect,bold,italic,underline,bullist,numlist,blockquote,alignleft,aligncenter,alignright,link,unlink,undo,redo',
+                'toolbar2' => '',
+            )
+        ));
+        ?>
                     <p class="description" style="margin-top: 10px;">
-                        <?php _e('Customize the email content sent to users. Available placeholders:', 'chatgpt-fluent-connector'); ?><br>
+                    <?php _e('Customize the email content sent to users. Available placeholders:', 'chatgpt-fluent-connector'); ?><br>
                         <code>{ai_response}</code> - <?php _e('The AI-generated response', 'chatgpt-fluent-connector'); ?><br>
                         <code>{first_name}, {last_name}, {email}</code> - <?php _e('Form field values (use your form field names)', 'chatgpt-fluent-connector'); ?><br>
                         <code>{form_title}</code> - <?php _e('The form title', 'chatgpt-fluent-connector'); ?><br>
@@ -790,7 +1120,7 @@ public function render_chunking_settings_meta_box($post) {
                 <td>
                     <label>
                         <input type="checkbox" name="sfaic_email_include_form_data" id="sfaic_email_include_form_data" value="1" <?php checked($email_include_form_data, '1'); ?>>
-                        <?php _e('Include all form questions and answers at the bottom of the email', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Include all form questions and answers at the bottom of the email', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description"><?php _e('When enabled, a table with all form data will be added below the email content.', 'chatgpt-fluent-connector'); ?></p>
                 </td>
@@ -800,7 +1130,7 @@ public function render_chunking_settings_meta_box($post) {
             <tr>
                 <th colspan="2">
                     <h3 style="margin-bottom: 0; padding-top: 20px; border-top: 1px solid #ddd;">
-                        <?php _e('Admin Notification Email', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Admin Notification Email', 'chatgpt-fluent-connector'); ?>
                     </h3>
                 </th>
             </tr>
@@ -810,7 +1140,7 @@ public function render_chunking_settings_meta_box($post) {
                 <td>
                     <label>
                         <input type="checkbox" name="sfaic_admin_email_enabled" id="sfaic_admin_email_enabled" value="1" <?php checked($admin_email_enabled, '1'); ?>>
-                        <?php _e('Send a notification email to admin with all form data', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Send a notification email to admin with all form data', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description"><?php _e('Admin email will always include complete form data and AI response.', 'chatgpt-fluent-connector'); ?></p>
                 </td>
@@ -837,7 +1167,7 @@ public function render_chunking_settings_meta_box($post) {
                 <td>
                     <label>
                         <input type="checkbox" name="sfaic_log_responses" id="sfaic_log_responses" value="1" <?php checked($log_responses, '1'); ?>>
-                        <?php _e('Save responses to the database', 'chatgpt-fluent-connector'); ?>
+        <?php _e('Save responses to the database', 'chatgpt-fluent-connector'); ?>
                     </label>
                     <p class="description"><?php _e('Useful for debugging and analytics', 'chatgpt-fluent-connector'); ?></p>
                 </td>
@@ -944,13 +1274,23 @@ public function render_chunking_settings_meta_box($post) {
     }
 
     /**
-     * Save post meta - UPDATED with new chunking settings
-     */
-
-    /**
-     * Save post meta - UPDATED with ALL chunking settings
+     * Save post meta - UPDATED with new background and chunking settings
      */
     public function save_post_meta($post_id) {
+
+        // Save field mappings
+        if (isset($_POST['sfaic_first_name_field'])) {
+            update_post_meta($post_id, '_sfaic_first_name_field', sanitize_text_field($_POST['sfaic_first_name_field']));
+        }
+
+        if (isset($_POST['sfaic_last_name_field'])) {
+            update_post_meta($post_id, '_sfaic_last_name_field', sanitize_text_field($_POST['sfaic_last_name_field']));
+        }
+
+        if (isset($_POST['sfaic_email_field_mapping'])) {
+            update_post_meta($post_id, '_sfaic_email_field_mapping', sanitize_text_field($_POST['sfaic_email_field_mapping']));
+        }
+
         // Check if our nonce is set
         if (!isset($_POST['sfaic_prompt_nonce'])) {
             return;
@@ -1054,9 +1394,48 @@ public function render_chunking_settings_meta_box($post) {
             update_post_meta($post_id, '_sfaic_prompt_type', sanitize_text_field($_POST['sfaic_prompt_type']));
         }
 
-        // Save the enable chunking option
+        // ==== NEW: Save background processing settings ====
+        $enable_background_processing = isset($_POST['sfaic_enable_background_processing']) ? '1' : '0';
+        update_post_meta($post_id, '_sfaic_enable_background_processing', $enable_background_processing);
+
+        if (isset($_POST['sfaic_background_processing_delay'])) {
+            $delay = intval($_POST['sfaic_background_processing_delay']);
+            if ($delay >= 0 && $delay <= 300) {
+                update_post_meta($post_id, '_sfaic_background_processing_delay', $delay);
+            }
+        }
+
+        if (isset($_POST['sfaic_job_priority'])) {
+            $priority = intval($_POST['sfaic_job_priority']);
+            if ($priority >= -1 && $priority <= 2) {
+                update_post_meta($post_id, '_sfaic_job_priority', $priority);
+            }
+        }
+
+        if (isset($_POST['sfaic_job_timeout'])) {
+            $timeout = intval($_POST['sfaic_job_timeout']);
+            if ($timeout >= 30 && $timeout <= 1800) {
+                update_post_meta($post_id, '_sfaic_job_timeout', $timeout);
+            }
+        }
+
+        // ==== NEW: Save basic chunking settings ====
         $enable_chunking = isset($_POST['sfaic_enable_chunking']) ? '1' : '0';
         update_post_meta($post_id, '_sfaic_enable_chunking', $enable_chunking);
+
+        if (isset($_POST['sfaic_chunk_size'])) {
+            $chunk_size = intval($_POST['sfaic_chunk_size']);
+            if ($chunk_size >= 1000 && $chunk_size <= 8000) {
+                update_post_meta($post_id, '_sfaic_chunk_size', $chunk_size);
+            }
+        }
+
+        if (isset($_POST['sfaic_max_chunks'])) {
+            $max_chunks = intval($_POST['sfaic_max_chunks']);
+            if ($max_chunks >= 5 && $max_chunks <= 50) {
+                update_post_meta($post_id, '_sfaic_max_chunks', $max_chunks);
+            }
+        }
 
         if (isset($_POST['sfaic_chunking_strategy'])) {
             update_post_meta($post_id, '_sfaic_chunking_strategy', sanitize_text_field($_POST['sfaic_chunking_strategy']));
@@ -1065,7 +1444,7 @@ public function render_chunking_settings_meta_box($post) {
         $require_completion = isset($_POST['sfaic_require_completion']) ? '1' : '0';
         update_post_meta($post_id, '_sfaic_require_completion', $require_completion);
 
-        // ==== FIXED: Save ALL dynamic chunking settings ====
+        // ==== EXISTING: Save ALL dynamic chunking settings ====
         // Completion Marker
         if (isset($_POST['sfaic_completion_marker'])) {
             update_post_meta($post_id, '_sfaic_completion_marker', sanitize_text_field($_POST['sfaic_completion_marker']));
@@ -1117,15 +1496,30 @@ public function render_chunking_settings_meta_box($post) {
         }
 
         // ==== Debug logging to check if values are being received ====
-        error_log('SFAIC: Saving chunking settings for post ' . $post_id);
+        error_log('SFAIC: Saving settings for post ' . $post_id);
+        error_log('SFAIC: enable_background_processing = ' . ($enable_background_processing ? 'YES' : 'NO'));
+        error_log('SFAIC: enable_chunking = ' . ($enable_chunking ? 'YES' : 'NO'));
         error_log('SFAIC: completion_marker = ' . ($_POST['sfaic_completion_marker'] ?? 'NOT SET'));
         error_log('SFAIC: enable_smart_completion = ' . ($enable_smart_completion ? 'YES' : 'NO'));
-        error_log('SFAIC: min_content_length = ' . ($_POST['sfaic_min_content_length'] ?? 'NOT SET'));
-        error_log('SFAIC: completion_word_count = ' . ($_POST['sfaic_completion_word_count'] ?? 'NOT SET'));
-        error_log('SFAIC: min_chunk_words = ' . ($_POST['sfaic_min_chunk_words'] ?? 'NOT SET'));
-        error_log('SFAIC: completion_keywords = ' . ($_POST['sfaic_completion_keywords'] ?? 'NOT SET'));
-        error_log('SFAIC: use_token_percentage = ' . ($use_token_percentage ? 'YES' : 'NO'));
-        error_log('SFAIC: token_completion_threshold = ' . ($_POST['sfaic_token_completion_threshold'] ?? 'NOT SET'));
+    }
+
+    /**
+     * NEW: Get dynamic chunking settings for a prompt
+     * 
+     * @param int $prompt_id The prompt ID
+     * @return array Chunking settings array
+     */
+    public function get_chunking_settings($prompt_id) {
+        return array(
+            'completion_marker' => get_post_meta($prompt_id, '_sfaic_completion_marker', true) ?: '<!-- REPORT_END -->',
+            'min_content_length' => intval(get_post_meta($prompt_id, '_sfaic_min_content_length', true)) ?: 500,
+            'completion_word_count' => intval(get_post_meta($prompt_id, '_sfaic_completion_word_count', true)) ?: 800,
+            'min_chunk_words' => intval(get_post_meta($prompt_id, '_sfaic_min_chunk_words', true)) ?: 300,
+            'completion_keywords' => get_post_meta($prompt_id, '_sfaic_completion_keywords', true) ?: 'conclusion, summary, final, recommendations, regards, sincerely',
+            'enable_smart_completion' => get_post_meta($prompt_id, '_sfaic_enable_smart_completion', true) === '1',
+            'use_token_percentage' => get_post_meta($prompt_id, '_sfaic_use_token_percentage', true) === '1',
+            'token_completion_threshold' => intval(get_post_meta($prompt_id, '_sfaic_token_completion_threshold', true)) ?: 70
+        );
     }
 
     /**
@@ -1218,394 +1612,5 @@ public function render_chunking_settings_meta_box($post) {
         }
 
         return $field_labels;
-    }
-
-    /**
-     * NEW: Get dynamic chunking settings for a prompt
-     * 
-     * @param int $prompt_id The prompt ID
-     * @return array Chunking settings array
-     */
-    public function get_chunking_settings($prompt_id) {
-        return array(
-            'completion_marker' => get_post_meta($prompt_id, '_sfaic_completion_marker', true) ?: '<!-- REPORT_END -->',
-            'min_content_length' => intval(get_post_meta($prompt_id, '_sfaic_min_content_length', true)) ?: 500,
-            'completion_word_count' => intval(get_post_meta($prompt_id, '_sfaic_completion_word_count', true)) ?: 800,
-            'min_chunk_words' => intval(get_post_meta($prompt_id, '_sfaic_min_chunk_words', true)) ?: 300,
-            'completion_keywords' => get_post_meta($prompt_id, '_sfaic_completion_keywords', true) ?: 'conclusion, summary, final, recommendations, regards, sincerely',
-            'enable_smart_completion' => get_post_meta($prompt_id, '_sfaic_enable_smart_completion', true) === '1',
-            'use_token_percentage' => get_post_meta($prompt_id, '_sfaic_use_token_percentage', true) === '1',
-            'token_completion_threshold' => intval(get_post_meta($prompt_id, '_sfaic_token_completion_threshold', true)) ?: 70
-        );
-    }
-
-    /**
-     * Send email with the AI response
-     * 
-     * @param int $prompt_id The prompt ID
-     * @param int $entry_id The submission entry ID
-     * @param array $form_data The submitted form data
-     * @param string $ai_response The AI response
-     * @return bool True if email sent successfully, false otherwise
-     */
-    private function send_email_response($prompt_id, $entry_id, $form_data, $ai_response) {
-        // Get email settings
-        $email_to = get_post_meta($prompt_id, '_sfaic_email_to', true);
-        $email_subject = get_post_meta($prompt_id, '_sfaic_email_subject', true);
-        $email_to_user = get_post_meta($prompt_id, '_sfaic_email_to_user', true);
-        $selected_email_field = get_post_meta($prompt_id, '_sfaic_email_field', true);
-
-        $recipient_email = '';
-
-        // First try to find an email field in the form if email_to_user is enabled
-        if ($email_to_user == '1') {
-
-            // If a specific email field is selected, try to use that first
-            if (!empty($selected_email_field) && isset($form_data[$selected_email_field])) {
-                $field_value = $form_data[$selected_email_field];
-
-                // Make sure it's a valid email
-                if (is_string($field_value) && filter_var($field_value, FILTER_VALIDATE_EMAIL)) {
-                    $recipient_email = $field_value;
-                }
-            }
-
-            // If no specific field selected or the selected field didn't work, try auto-detection
-            if (empty($recipient_email)) {
-                // Look for common email field names
-                $common_email_fields = array('email', 'your_email', 'user_email', 'email_address', 'customer_email');
-
-                foreach ($form_data as $field_key => $field_value) {
-                    // If the field name contains "email" and the value looks like an email
-                    if ((is_string($field_value) && filter_var($field_value, FILTER_VALIDATE_EMAIL)) &&
-                            (strpos(strtolower($field_key), 'email') !== false || in_array(strtolower($field_key), $common_email_fields))) {
-                        $recipient_email = $field_value;
-                        break;
-                    }
-                }
-
-                // If no direct match found, try to look for nested arrays or complex field structures
-                if (empty($recipient_email)) {
-                    foreach ($form_data as $field_key => $field_value) {
-                        if (is_array($field_value)) {
-                            foreach ($field_value as $sub_key => $sub_value) {
-                                if (is_string($sub_value) && filter_var($sub_value, FILTER_VALIDATE_EMAIL)) {
-                                    $recipient_email = $sub_value;
-                                    break 2;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Process additional recipients from email_to setting
-        $additional_recipients = array();
-
-        if (!empty($email_to)) {
-            // If email_to contains placeholders, replace them with form values
-            if (strpos($email_to, '{') !== false) {
-                foreach ($form_data as $field_key => $field_value) {
-                    if (is_string($field_value) && strpos($email_to, '{' . $field_key . '}') !== false) {
-                        $email_to = str_replace('{' . $field_key . '}', $field_value, $email_to);
-                    }
-                }
-            }
-
-            // Split by comma for multiple recipients
-            $additional_emails = explode(',', $email_to);
-            foreach ($additional_emails as $email) {
-                $email = trim($email);
-                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $additional_recipients[] = $email;
-                }
-            }
-        }
-
-        // Combine all recipients
-        $all_recipients = array();
-
-        if (!empty($recipient_email)) {
-            $all_recipients[] = $recipient_email;
-        }
-
-        if (!empty($additional_recipients)) {
-            $all_recipients = array_merge($all_recipients, $additional_recipients);
-        }
-
-        // If no recipients found, use admin email as fallback
-        if (empty($all_recipients)) {
-            $all_recipients[] = get_option('admin_email');
-        }
-
-        // Make recipients unique
-        $all_recipients = array_unique($all_recipients);
-
-        // Set default subject if empty
-        if (empty($email_subject)) {
-            $email_subject = __('Response for Your Form Submission', 'chatgpt-fluent-connector');
-        }
-
-        // Prepare email content
-        $email_content = '
-    <html>
-    <head>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                line-height: 1.6;
-                color: #333;
-            }
-            .container {
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-            }
-            .header {
-                background-color: #f5f5f5;
-                padding: 10px 20px;
-                border-radius: 5px 5px 0 0;
-                border-bottom: 1px solid #ddd;
-            }
-            .content {
-                padding: 20px;
-            }
-            .response {
-                background-color: #f9f9f9;
-                padding: 15px;
-                border-left: 4px solid #0073aa;
-                margin-bottom: 20px;
-            }
-            .footer {
-                font-size: 12px;
-                color: #777;
-                border-top: 1px solid #ddd;
-                padding-top: 15px;
-                margin-top: 20px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h2>' . __('ChatGPT Response', 'chatgpt-fluent-connector') . '</h2>
-            </div>
-            <div class="content">
-                <p>' . __('Thank you for your submission. Here\'s the response from ChatGPT:', 'chatgpt-fluent-connector') . '</p>
-                
-                <div class="response">
-                    ' . nl2br(esc_html($ai_response)) . '
-                </div>
-            </div>
-            <div class="footer">
-                ' . __('This is an automated email sent in response to your form submission.', 'chatgpt-fluent-connector') . '
-            </div>
-        </div>
-    </body>
-    </html>';
-
-        // Set email headers
-        $headers = array('Content-Type: text/html; charset=UTF-8');
-
-        // Track success
-        $success = true;
-
-        // Send email to each recipient
-        foreach ($all_recipients as $to_email) {
-            $sent = wp_mail($to_email, $email_subject, $email_content, $headers);
-
-            // If any send fails, mark as unsuccessful
-            if (!$sent) {
-                $success = false;
-            }
-        }
-
-        return $success;
-    }
-
-    /**
-     * Process a prompt with form data
-     * 
-     * @param int $prompt_id The prompt ID
-     * @param array $form_data The form data
-     * @param int $entry_id The entry ID
-     * @param object $form The form object
-     * @return void
-     */
-    private function process_prompt($prompt_id, $form_data, $entry_id, $form) {
-        $start_time = microtime(true);
-
-        // Get the active provider setting
-        $provider = get_option('sfaic_api_provider', 'openai');
-
-        if ($provider === 'gemini') {
-            $model = get_option('sfaic_gemini_model', 'gemini-2.5-pro-preview-05-06');
-        } elseif ($provider === 'claude') {
-            $model = get_option('sfaic_claude_model', 'claude-opus-4-20250514');
-        } else {
-            $model = get_option('sfaic_model', 'gpt-3.5-turbo');
-        }
-
-        // Get the API instance based on the provider
-        $api = sfaic_main()->get_active_api();
-
-        if (!$api) {
-            // Log the error if possible
-            if (isset(sfaic_main()->response_logger)) {
-                sfaic_main()->response_logger->log_response(
-                        $prompt_id,
-                        $entry_id,
-                        $form->id,
-                        "Error: API instance not available",
-                        "",
-                        $provider,
-                        "",
-                        0,
-                        "error",
-                        "API instance not available"
-                );
-            }
-            return;
-        }
-
-        // Get prompt settings
-        $system_prompt = get_post_meta($prompt_id, '_sfaic_system_prompt', true);
-        $user_prompt_template = get_post_meta($prompt_id, '_sfaic_user_prompt_template', true);
-        $prompt_type = get_post_meta($prompt_id, '_sfaic_prompt_type', true);
-
-        // Set default prompt type if not set
-        if (empty($prompt_type)) {
-            $prompt_type = 'template';
-        }
-
-        // Prepare the user prompt based on prompt type
-        $user_prompt = '';
-        if ($prompt_type === 'all_form_data') {
-            // Use all form data
-            $user_prompt = $this->format_all_form_data($form_data, $prompt_id);
-        } else {
-            // Use custom template
-            if (empty($user_prompt_template)) {
-                // Log the error
-                if (isset(sfaic_main()->response_logger)) {
-                    sfaic_main()->response_logger->log_response(
-                            $prompt_id,
-                            $entry_id,
-                            $form->id,
-                            "Error: No user prompt template configured",
-                            "",
-                            $provider,
-                            "",
-                            0,
-                            "error",
-                            "No user prompt template configured"
-                    );
-                }
-                return;
-            }
-
-            // Replace placeholders in user prompt
-            $user_prompt = $user_prompt_template;
-
-            // Replace field placeholders with actual values
-            foreach ($form_data as $field_key => $field_value) {
-                // Skip if field_key is not a scalar (string/number)
-                if (!is_scalar($field_key)) {
-                    continue;
-                }
-
-                // Handle array values (like checkboxes)
-                if (is_array($field_value)) {
-                    $field_value = implode(', ', $field_value);
-                } elseif (!is_scalar($field_value)) {
-                    // Skip non-scalar values
-                    continue;
-                }
-
-                $user_prompt = str_replace('{' . $field_key . '}', $field_value, $user_prompt);
-            }
-
-            // Check for any remaining placeholders and replace with empty string
-            $user_prompt = preg_replace('/\{[^}]+\}/', '', $user_prompt);
-        }
-
-        // Build the complete prompt that will be sent
-        $complete_prompt = '';
-        if (!empty($system_prompt)) {
-            $complete_prompt .= $system_prompt . "\n";
-        }
-        $complete_prompt .= $user_prompt;
-
-        // Process the form with the prompt (handle potential errors)
-        try {
-            $ai_response_raw = $api->process_form_with_prompt($prompt_id, $form_data, $entry_id);
-            $ai_response = is_wp_error($ai_response_raw) ? $ai_response_raw : $this->clean_html_response($ai_response_raw);
-        } catch (Exception $e) {
-            // Convert exception to WP_Error
-            $ai_response = new WP_Error('exception', $e->getMessage());
-        }
-
-        // Calculate execution time
-        $execution_time = microtime(true) - $start_time;
-
-        // Get token usage from the API
-        $token_usage = array();
-        if (method_exists($api, 'get_last_token_usage')) {
-            $token_usage = $api->get_last_token_usage();
-        }
-
-        // Check if we got a valid response or an error
-        $status = 'success';
-        $error_message = '';
-        $response_content = '';
-
-        if (is_wp_error($ai_response)) {
-            $status = 'error';
-            $error_message = $ai_response->get_error_message();
-        } else {
-            $response_content = $ai_response;
-
-            // TRIGGER PDF GENERATION ACTION - This is the key addition for PDF support
-            if (isset(sfaic_main()->pdf_generator)) {
-                do_action('sfaic_after_ai_response_processed', $response_content, $prompt_id, $entry_id, $form_data, $form);
-            }
-        }
-
-        // Save the response if logging is enabled
-        $log_responses = get_post_meta($prompt_id, '_sfaic_log_responses', true);
-        if ($log_responses == '1' || $status === 'error') {
-            // Use the enhanced response logger with proper provider, model information, and token usage
-            if (isset(sfaic_main()->response_logger)) {
-                $result = sfaic_main()->response_logger->log_response(
-                        $prompt_id,
-                        $entry_id,
-                        $form->id,
-                        $complete_prompt, // Save the actual prompt sent
-                        $response_content,
-                        $provider, // Pass the correct provider
-                        $model, // Pass the correct model
-                        $execution_time,
-                        $status,
-                        $error_message,
-                        $token_usage // Pass the token usage
-                );
-            }
-        }
-
-        // Don't proceed with email if there was an error
-        if ($status === 'error') {
-            return;
-        }
-
-        // Handle the response according to settings
-        $response_action = get_post_meta($prompt_id, '_sfaic_response_action', true);
-
-        // Send email if configured
-        if ($response_action === 'email') {
-            $email_sent = $this->send_email_response($prompt_id, $entry_id, $form_data, $response_content, $provider);
-        }
     }
 }

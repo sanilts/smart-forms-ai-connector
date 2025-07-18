@@ -3,7 +3,7 @@
  * Plugin Name: AromaPro Smart Forms AI Connector
  * Plugin URI: https://aromapro.com/
  * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing
- * Version: 2.0.8
+ * Version: 2.0.9
  * Author: Sanil T S
  * Author URI: https://www.fb.com/sanilts
  * License: GPL-2.0+
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('SFAIC_DIR', plugin_dir_path(__FILE__));
 define('SFAIC_URL', plugin_dir_url(__FILE__));
-define('SFAIC_VERSION', '2.0.0');
+define('SFAIC_VERSION', '2.0.9');
 
 /**
  * Main plugin class
@@ -117,7 +117,7 @@ class SFAIC_Main {
             'includes/class-response-logger.php',
             'includes/class-template-manager.php',
             'includes/class-pdf-generator.php',
-            'includes/class-background-job-manager.php'  // New background job manager
+            'includes/class-background-job-manager.php'  // Background job manager
         );
 
         foreach ($files_to_include as $file) {
@@ -161,7 +161,7 @@ class SFAIC_Main {
             'SFAIC_Response_Logger',
             'SFAIC_Template_Manager',
             'SFAIC_PDF_Generator',
-            'SFAIC_Background_Job_Manager'  // New background job manager
+            'SFAIC_Background_Job_Manager'
         );
 
         foreach ($required_classes as $class_name) {
@@ -235,7 +235,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Plugin activation
+     * Plugin activation - UPDATED: Removed global background/chunking settings
      */
     public function plugin_activation() {
         // Make sure the classes are loaded
@@ -287,22 +287,8 @@ class SFAIC_Main {
             update_option('sfaic_api_provider', 'openai');
         }
 
-        // Set default background processing options
-        if (!get_option('sfaic_enable_background_processing')) {
-            update_option('sfaic_enable_background_processing', true);
-        }
-
-        if (!get_option('sfaic_background_processing_delay')) {
-            update_option('sfaic_background_processing_delay', 5);
-        }
-
-        if (!get_option('sfaic_max_concurrent_jobs')) {
-            update_option('sfaic_max_concurrent_jobs', 3);
-        }
-
-        if (!get_option('sfaic_job_timeout')) {
-            update_option('sfaic_job_timeout', 300);
-        }
+        // REMOVED: Global background processing and chunking settings
+        // These are now configured per-prompt in the prompt edit interface
 
         // Create uploads directory for PDFs
         $upload_dir = wp_upload_dir();
@@ -360,15 +346,35 @@ class SFAIC_Main {
         }
 
         $stats = $this->background_job_manager->get_job_statistics();
-        $background_enabled = $this->background_job_manager->is_background_processing_enabled();
+        
+        // NEW: Check if ANY prompt has background processing enabled
+        $prompts_with_bg = get_posts(array(
+            'post_type' => 'sfaic_prompt',
+            'meta_query' => array(
+                array(
+                    'key' => '_sfaic_enable_background_processing',
+                    'value' => '1',
+                    'compare' => '='
+                )
+            ),
+            'posts_per_page' => 1,
+            'fields' => 'ids'
+        ));
+        
+        $background_enabled = !empty($prompts_with_bg);
         $jobs_url = admin_url('edit.php?post_type=sfaic_prompt&page=sfaic-background-jobs');
         ?>
         <div class="sfaic-dashboard-widget">
             <div class="sfaic-widget-status">
                 <p>
                     <span class="status-indicator <?php echo $background_enabled ? 'enabled' : 'disabled'; ?>"></span>
-                    <?php echo $background_enabled ? __('Background Processing: Enabled', 'chatgpt-fluent-connector') : __('Background Processing: Disabled', 'chatgpt-fluent-connector'); ?>
+                    <?php echo $background_enabled ? __('Background Processing: Active', 'chatgpt-fluent-connector') : __('Background Processing: No Active Prompts', 'chatgpt-fluent-connector'); ?>
                 </p>
+                <?php if (!$background_enabled): ?>
+                <p style="font-size: 12px; color: #666;">
+                    <?php _e('Enable background processing in individual prompt settings.', 'chatgpt-fluent-connector'); ?>
+                </p>
+                <?php endif; ?>
             </div>
             
             <div class="sfaic-widget-stats">
@@ -448,7 +454,7 @@ class SFAIC_Main {
     }
 
     /**
-     * Display admin notice for first-time setup
+     * UPDATED: Display admin notice for first-time setup
      */
     public function admin_setup_notice() {
         $screen = get_current_screen();
@@ -499,15 +505,32 @@ class SFAIC_Main {
             <?php
         }
 
-        // Check if background processing is disabled
-        $background_enabled = get_option('sfaic_enable_background_processing', true);
-        if (!$background_enabled) {
+        // UPDATED: Check for prompts without background processing
+        $prompts_without_bg = get_posts(array(
+            'post_type' => 'sfaic_prompt',
+            'meta_query' => array(
+                'relation' => 'OR',
+                array(
+                    'key' => '_sfaic_enable_background_processing',
+                    'value' => '0',
+                    'compare' => '='
+                ),
+                array(
+                    'key' => '_sfaic_enable_background_processing',
+                    'compare' => 'NOT EXISTS'
+                )
+            ),
+            'posts_per_page' => 1,
+            'fields' => 'ids'
+        ));
+        
+        if (!empty($prompts_without_bg)) {
             ?>
             <div class="notice notice-info is-dismissible">
                 <p>
-                    <?php _e('<strong>AI API Connector:</strong> Background processing is disabled. Users may experience delays when submitting forms.', 'chatgpt-fluent-connector'); ?>
-                    <a href="<?php echo admin_url('options-general.php?page=sfaic-settings'); ?>" class="button button-secondary" style="margin-left: 10px;">
-                        <?php _e('Enable Background Processing', 'chatgpt-fluent-connector'); ?>
+                    <?php _e('<strong>AI API Connector:</strong> Some prompts have background processing disabled. Users may experience delays when submitting forms.', 'chatgpt-fluent-connector'); ?>
+                    <a href="<?php echo admin_url('edit.php?post_type=sfaic_prompt'); ?>" class="button button-secondary" style="margin-left: 10px;">
+                        <?php _e('Review Prompt Settings', 'chatgpt-fluent-connector'); ?>
                     </a>
                 </p>
             </div>
