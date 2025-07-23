@@ -1,0 +1,468 @@
+/**
+ * API Testing Styles for ChatGPT Fluent Connector Settings
+ * Save this as: assets/css/api-testing.css
+ */
+
+/* Settings Page Layout */
+.sfaic-settings-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.sfaic-provider-settings {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Provider Badges */
+.sfaic-api-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+    margin-left: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sfaic-api-badge.openai {
+    background-color: #10a37f;
+    color: white;
+}
+
+.sfaic-api-badge.gemini {
+    background-color: #4285f4;
+    color: white;
+}
+
+.sfaic-api-badge.claude {
+    background-color: #8B5CF6;
+    color: white;
+}
+
+.sfaic-pdf-badge {
+    background-color: #28a745;
+    color: white;
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+    margin-left: 8px;
+}
+
+/* Test Buttons */
+.api-test-button {
+    background: linear-gradient(45deg, #007cba, #0096dc);
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 124, 186, 0.2);
+}
+
+.api-test-button:hover {
+    background: linear-gradient(45deg, #005a87, #007bb5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 124, 186, 0.3);
+    color: white;
+}
+
+.api-test-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 124, 186, 0.2);
+}
+
+.api-test-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.api-test-button .dashicons {
+    vertical-align: middle;
+    margin-right: 5px;
+    transition: transform 0.3s ease;
+}
+
+/* PDF Test Button */
+#test-pdf-btn {
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(231, 76, 60, 0.2);
+}
+
+#test-pdf-btn:hover {
+    background: linear-gradient(45deg, #c0392b, #a93226);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+    color: white;
+}
+
+/* Test Results */
+.api-test-result {
+    margin-top: 15px;
+    max-width: 700px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.api-test-result .notice {
+    margin: 0;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.api-test-result .notice-success {
+    border-left-color: #28a745;
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.api-test-result .notice-error {
+    border-left-color: #dc3545;
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.api-test-result .notice-info {
+    border-left-color: #17a2b8;
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Test Result Details */
+.test-result-details {
+    margin-top: 15px;
+}
+
+.test-result-stat {
+    display: inline-block;
+    background: rgba(255,255,255,0.8);
+    padding: 5px 10px;
+    margin: 2px 5px 2px 0;
+    border-radius: 4px;
+    font-size: 13px;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.test-result-stat strong {
+    color: #333;
+}
+
+/* Response Preview */
+.response-preview {
+    margin-top: 15px;
+}
+
+.response-preview summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 8px 0;
+    color: #0073aa;
+    outline: none;
+    transition: color 0.2s ease;
+}
+
+.response-preview summary:hover {
+    color: #005a87;
+}
+
+.response-preview[open] summary {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.response-content {
+    background: #f9f9f9;
+    padding: 15px;
+    margin-top: 10px;
+    border-radius: 6px;
+    border-left: 4px solid #28a745;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.response-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+}
+
+/* Loading Animation */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.dashicons.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Token Usage Display */
+.token-usage {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.token-usage strong {
+    color: #fff;
+}
+
+/* Success/Error Icons */
+.result-icon {
+    font-size: 18px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.result-icon.success {
+    color: #28a745;
+}
+
+.result-icon.error {
+    color: #dc3545;
+}
+
+.result-icon.info {
+    color: #17a2b8;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 782px) {
+    .api-test-result {
+        max-width: 100%;
+    }
+    
+    .api-test-button,
+    #test-pdf-btn {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 12px 16px;
+    }
+    
+    .test-result-stat {
+        display: block;
+        margin: 5px 0;
+    }
+    
+    .response-content {
+        padding: 10px;
+    }
+    
+    .response-content pre {
+        font-size: 13px;
+    }
+}
+
+/* Enhanced Button Transitions */
+.button {
+    transition: all 0.2s ease;
+}
+
+.button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.button:active {
+    transform: translateY(0);
+}
+
+/* Form Field Enhancements */
+.form-table input[type="password"],
+.form-table input[type="text"],
+.form-table select {
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-table input[type="password"]:focus,
+.form-table input[type="text"]:focus,
+.form-table select:focus {
+    border-color: #007cba;
+    box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.1);
+    outline: none;
+}
+
+/* Status Indicators */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.status-indicator.online {
+    background-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+}
+
+.status-indicator.offline {
+    background-color: #dc3545;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+}
+
+.status-indicator.testing {
+    background-color: #ffc107;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Tooltip Styles */
+.tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 1000;
+}
+
+.tooltip:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Progress Bar for Testing */
+.test-progress {
+    width: 100%;
+    height: 4px;
+    background: #e1e1e1;
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.test-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #007cba, #0096dc);
+    width: 0%;
+    transition: width 0.3s ease;
+    animation: progressIndeterminate 1.5s infinite;
+}
+
+@keyframes progressIndeterminate {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Settings Section Headers */
+.sfaic-settings-section h2,
+.sfaic-provider-settings h2 {
+    border-bottom: 2px solid #f1f1f1;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+/* Notice Enhancements */
+.notice.inline {
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.notice.inline p {
+    margin: 12px 0;
+}
+
+/* Copy to Clipboard Button */
+.copy-response-btn {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    cursor: pointer;
+    float: right;
+    margin-top: -5px;
+    transition: background 0.2s ease;
+}
+
+.copy-response-btn:hover {
+    background: #5a6268;
+    color: white;
+}
+
+.copy-response-btn.copied {
+    background: #28a745;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .response-content {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .response-content pre {
+        color: #e2e8f0;
+    }
+    
+    .test-result-stat {
+        background: rgba(45, 55, 72, 0.8);
+        color: #e2e8f0;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+}

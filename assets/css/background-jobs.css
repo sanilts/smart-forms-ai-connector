@@ -1,0 +1,510 @@
+/**
+ * WordPress-Style Background Jobs Admin Interface CSS
+ * Following WordPress admin design conventions
+ */
+
+/* Remove any conflicting margins from WordPress admin */
+.wrap {
+    max-width: 100%;
+}
+
+.wrap > h1 {
+    margin-bottom: 20px;
+}
+
+/* Overview Statistics - WordPress card style */
+.sfaic-jobs-overview {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.sfaic-jobs-overview h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+/* Statistics grid */
+.sfaic-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.sfaic-stat-card {
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    transition: all 0.15s ease-in-out;
+}
+
+.sfaic-stat-card:hover {
+    box-shadow: 0 2px 5px rgba(0,0,0,.07);
+}
+
+.sfaic-stat-card .stat-number {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.sfaic-stat-card .stat-label {
+    font-size: 13px;
+    color: #646970;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Color coding for stat cards */
+.sfaic-stat-card.total { border-left: 4px solid #72aee6; }
+.sfaic-stat-card.pending { border-left: 4px solid #dba617; }
+.sfaic-stat-card.processing { border-left: 4px solid #00a0d2; }
+.sfaic-stat-card.completed { border-left: 4px solid #00a32a; }
+.sfaic-stat-card.failed { border-left: 4px solid #d63638; }
+.sfaic-stat-card.retry { border-left: 4px solid #ff922b; }
+
+.sfaic-stat-card.total .stat-number { color: #72aee6; }
+.sfaic-stat-card.pending .stat-number { color: #dba617; }
+.sfaic-stat-card.processing .stat-number { color: #00a0d2; }
+.sfaic-stat-card.completed .stat-number { color: #00a32a; }
+.sfaic-stat-card.failed .stat-number { color: #d63638; }
+.sfaic-stat-card.retry .stat-number { color: #ff922b; }
+
+/* WordPress-style action buttons */
+.sfaic-job-actions {
+    margin-bottom: 20px;
+    padding: 0;
+}
+
+.sfaic-job-actions .button {
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
+
+/* WordPress admin table styling */
+.sfaic-jobs-table-wrapper {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.sfaic-jobs-table-wrapper .tablenav {
+    padding: 12px 0;
+    margin: 0;
+    background: #f6f7f7;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.sfaic-jobs-table-wrapper .tablenav h3 {
+    margin: 0;
+    padding: 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+/* Main jobs table */
+.sfaic-jobs-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    background: #fff;
+    clear: both;
+}
+
+.sfaic-jobs-table th {
+    background: #f6f7f7;
+    border-bottom: 1px solid #c3c4c7;
+    color: #1d2327;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 10px;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+
+.sfaic-jobs-table th:first-child {
+    padding-left: 20px;
+}
+
+.sfaic-jobs-table th.sortable,
+.sfaic-jobs-table th.sorted {
+    cursor: pointer;
+}
+
+.sfaic-jobs-table td {
+    border-bottom: 1px solid #c3c4c7;
+    padding: 12px 10px;
+    color: #1d2327;
+    font-size: 13px;
+    line-height: 1.5;
+    vertical-align: top;
+}
+
+.sfaic-jobs-table td:first-child {
+    padding-left: 20px;
+}
+
+.sfaic-jobs-table tbody tr {
+    background: #fff;
+    transition: background-color 0.1s ease-in-out;
+}
+
+.sfaic-jobs-table tbody tr:hover {
+    background-color: #f6f7f7;
+}
+
+.sfaic-jobs-table tbody tr.alternate {
+    background: #f9f9f9;
+}
+
+.sfaic-jobs-table tbody tr.alternate:hover {
+    background-color: #f0f0f1;
+}
+
+/* Job row click indicator */
+.sfaic-jobs-table tbody tr {
+    cursor: pointer;
+}
+
+/* Status badges - WordPress style */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.status-badge.status-pending {
+    background-color: #fff8e1;
+    color: #8a6914;
+    border: 1px solid #dba617;
+}
+
+.status-badge.status-processing {
+    background-color: #e1f5fe;
+    color: #0073aa;
+    border: 1px solid #00a0d2;
+}
+
+.status-badge.status-completed {
+    background-color: #e8f5e8;
+    color: #0a7e07;
+    border: 1px solid #00a32a;
+}
+
+.status-badge.status-failed {
+    background-color: #fbeaea;
+    color: #a00;
+    border: 1px solid #d63638;
+}
+
+.status-badge.status-retry {
+    background-color: #fff4e6;
+    color: #b45309;
+    border: 1px solid #ff922b;
+}
+
+/* Action buttons in table */
+.sfaic-jobs-table .button-small {
+    font-size: 11px;
+    height: auto;
+    line-height: 1.4;
+    padding: 3px 8px;
+    margin-right: 5px;
+}
+
+/* Error message rows */
+.job-error-row {
+    background-color: #fcf2f2 !important;
+}
+
+.job-error-row:hover {
+    background-color: #fae6e6 !important;
+}
+
+.job-error-row td {
+    padding: 16px 20px;
+}
+
+.error-message {
+    background: #fff;
+    border: 1px solid #d63638;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #1d2327;
+    word-break: break-all;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.error-message strong {
+    color: #d63638;
+    font-weight: 600;
+}
+
+/* Empty state */
+.sfaic-no-jobs {
+    text-align: center;
+    padding: 60px 20px;
+    color: #646970;
+}
+
+.sfaic-no-jobs .dashicons {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: #c3c4c7;
+    margin-bottom: 16px;
+}
+
+.sfaic-no-jobs h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: #1d2327;
+}
+
+.sfaic-no-jobs p {
+    font-size: 14px;
+    margin-bottom: 0;
+}
+
+/* Auto-refresh indicator */
+#sfaic-auto-refresh-indicator {
+    background: #f0f6fc;
+    border: 1px solid #c3c4c7;
+    border-left: 4px solid #72aee6;
+    padding: 12px 16px;
+    margin: 20px 0;
+    font-size: 13px;
+}
+
+#sfaic-auto-refresh-indicator .dashicons {
+    color: #72aee6;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+
+/* System status notice */
+.sfaic-system-status {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+}
+
+.sfaic-system-status strong {
+    color: #1d2327;
+}
+
+.sfaic-system-status .status-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.sfaic-system-status .status-indicator.enabled {
+    background-color: #00a32a;
+}
+
+.sfaic-system-status .status-indicator.disabled {
+    background-color: #d63638;
+}
+
+/* Loading states */
+.button .dashicons.spin {
+    animation: rotation 1s infinite linear;
+}
+
+@keyframes rotation {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Pulse animation for problems */
+.sfaic-pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.4); }
+    100% { opacity: 1; }
+}
+
+/* Responsive design */
+@media screen and (max-width: 782px) {
+    .sfaic-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .sfaic-stat-card {
+        padding: 12px;
+    }
+    
+    .sfaic-stat-card .stat-number {
+        font-size: 24px;
+    }
+    
+    .sfaic-jobs-table th,
+    .sfaic-jobs-table td {
+        padding: 8px 6px;
+        font-size: 12px;
+    }
+    
+    .sfaic-jobs-table th:first-child,
+    .sfaic-jobs-table td:first-child {
+        padding-left: 12px;
+    }
+    
+    .sfaic-job-actions .button {
+        margin-bottom: 8px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .sfaic-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Stack table for mobile */
+    .sfaic-jobs-table,
+    .sfaic-jobs-table thead,
+    .sfaic-jobs-table tbody,
+    .sfaic-jobs-table th,
+    .sfaic-jobs-table td,
+    .sfaic-jobs-table tr {
+        display: block;
+    }
+    
+    .sfaic-jobs-table thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+    
+    .sfaic-jobs-table tr {
+        border: 1px solid #c3c4c7;
+        margin-bottom: 10px;
+        padding: 0;
+        background: #fff;
+    }
+    
+    .sfaic-jobs-table td {
+        border: none;
+        position: relative;
+        padding: 12px 12px 12px 120px !important;
+        text-align: left;
+        white-space: normal;
+        word-wrap: break-word;
+    }
+    
+    .sfaic-jobs-table td:before {
+        content: attr(data-label) ": ";
+        position: absolute;
+        left: 12px;
+        width: 100px;
+        padding-right: 10px;
+        white-space: nowrap;
+        font-weight: 600;
+        color: #646970;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .sfaic-jobs-table td:nth-child(1):before { content: "ID: "; }
+    .sfaic-jobs-table td:nth-child(2):before { content: "Type: "; }
+    .sfaic-jobs-table td:nth-child(3):before { content: "Name: "; }
+    .sfaic-jobs-table td:nth-child(4):before { content: "Email: "; }
+    .sfaic-jobs-table td:nth-child(5):before { content: "Status: "; }
+    .sfaic-jobs-table td:nth-child(6):before { content: "Created: "; }
+    .sfaic-jobs-table td:nth-child(7):before { content: "Actions: "; }
+}
+
+/* WordPress notices */
+.notice.sfaic-temp-notice {
+    margin: 15px 0;
+    position: relative;
+}
+
+/* Print styles */
+@media print {
+    .sfaic-job-actions,
+    .button,
+    .notice,
+    .dashicons {
+        display: none !important;
+    }
+    
+    .sfaic-jobs-table {
+        border-collapse: collapse;
+    }
+    
+    .sfaic-jobs-table th,
+    .sfaic-jobs-table td {
+        border: 1px solid #000 !important;
+        padding: 8px !important;
+    }
+    
+    .status-badge {
+        border: 1px solid #000 !important;
+        background: transparent !important;
+        color: #000 !important;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .sfaic-jobs-table th {
+        background: #000;
+        color: #fff;
+    }
+    
+    .status-badge {
+        border-width: 2px;
+        font-weight: 700;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .sfaic-stat-card,
+    .sfaic-jobs-table tr,
+    .button {
+        transition: none;
+    }
+    
+    .sfaic-pulse-animation,
+    .spin {
+        animation: none;
+    }
+}
