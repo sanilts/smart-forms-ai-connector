@@ -724,3 +724,469 @@ tr.error:hover {
     background-color: #138496 !important;
     border-color: #117a8b !important;
 }
+
+/**
+ * Enhanced CSS for Chunking Information in Response Logger
+ * Add this to your assets/css/response-logs.css file
+ */
+
+/* Chunking Statistics Dashboard */
+.chunking-stats {
+    border-left: 4px solid #ff922b !important;
+}
+
+.chunking-stats .stat-number {
+    color: #ff922b !important;
+}
+
+/* Table Column for Chunks */
+.column-chunks {
+    text-align: center;
+    font-size: 12px;
+}
+
+/* Chunk Badges in Table */
+.chunk-badge {
+    display: inline-block;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.chunk-badge.single {
+    background-color: #e8f5e8;
+    color: #0a7e07;
+    border: 1px solid #00a32a;
+}
+
+.chunk-badge.chunked {
+    background-color: #fff4e6;
+    color: #b45309;
+    border: 1px solid #ff922b;
+}
+
+.chunk-badge.large {
+    background-color: #fbeaea;
+    color: #a00;
+    border: 1px solid #d63638;
+    animation: pulse-warning 2s infinite;
+}
+
+.chunk-info {
+    font-size: 10px;
+    color: #666;
+    display: block;
+    margin-top: 2px;
+    font-weight: normal;
+}
+
+/* Chunking Details in Log View */
+.chunking-details {
+    border-left: 4px solid #ff922b !important;
+}
+
+.chunking-details .hndle {
+    background: linear-gradient(135deg, #fff4e6 0%, #ffffff 100%);
+    border-bottom: 1px solid #ff922b;
+}
+
+.chunking-optimization-badge {
+    background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+    color: #155724;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 10px;
+    border: 1px solid #c3e6cb;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Chunking Statistics Grid */
+.chunking-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.chunking-stat-card {
+    background: linear-gradient(135deg, #fff8f0 0%, #ffffff 100%);
+    border: 1px solid #ffeaa7;
+    border-left: 4px solid #ff922b;
+    padding: 18px;
+    text-align: center;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(255, 146, 43, 0.1);
+    transition: all 0.3s ease;
+}
+
+.chunking-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 146, 43, 0.2);
+}
+
+.chunking-stat-card .stat-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ff922b;
+    line-height: 1;
+    margin-bottom: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.chunking-stat-card .stat-label {
+    font-size: 12px;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 500;
+}
+
+/* Performance Analysis Section */
+.chunking-performance-analysis {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.chunking-performance-analysis h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #495057;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 2px solid #ff922b;
+    padding-bottom: 5px;
+    display: inline-block;
+}
+
+.performance-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s ease;
+}
+
+.performance-metric:hover {
+    background-color: #f8f9fa;
+    margin: 0 -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.performance-metric:last-child {
+    border-bottom: none;
+}
+
+.performance-metric .metric-label {
+    font-weight: 500;
+    color: #495057;
+    flex: 1;
+}
+
+.performance-metric .metric-value {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: #fff;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 80px;
+    text-align: center;
+}
+
+.performance-metric .metric-value.good {
+    color: #28a745;
+    border-color: #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #ffffff 100%);
+}
+
+.performance-metric .metric-value.warning {
+    color: #ffc107;
+    border-color: #ffc107;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
+}
+
+.performance-metric .metric-value.poor {
+    color: #dc3545;
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #ffffff 100%);
+}
+
+/* Completion Reason Badges */
+.completion-reason-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.completion-reason-badge.fully_optimized_chunking {
+    background: linear-gradient(135deg, #d4edda 0%, #ffffff 100%);
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.completion-reason-badge.token_limit_reached {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffffff 100%);
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.completion-reason-badge.completion_marker_found {
+    background: linear-gradient(135deg, #e8f5e8 0%, #ffffff 100%);
+    color: #0a7e07;
+    border: 1px solid #00a32a;
+}
+
+.completion-reason-badge.smart_completion_detected {
+    background: linear-gradient(135deg, #e1f5fe 0%, #ffffff 100%);
+    color: #0073aa;
+    border: 1px solid #00a0d2;
+}
+
+.completion-reason-badge.max_chunks_reached {
+    background: linear-gradient(135deg, #f8d7da 0%, #ffffff 100%);
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Keyword Tags */
+.keyword-tag {
+    display: inline-block;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    color: #495057;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    margin: 2px;
+    border: 1px solid #dee2e6;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.keyword-tag:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+    border-color: #adb5bd;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Chunked Response Indicator */
+.chunked-response-indicator {
+    color: #ff922b;
+    font-size: 14px;
+    font-weight: 600;
+    margin-left: 10px;
+    background: rgba(255, 146, 43, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 146, 43, 0.3);
+}
+
+/* Single Response Info */
+.single-response-info {
+    border-left: 4px solid #00a32a !important;
+}
+
+.single-response-info .hndle {
+    background: linear-gradient(135deg, #e8f5e8 0%, #ffffff 100%);
+    border-bottom: 1px solid #00a32a;
+}
+
+.single-response-info .inside p {
+    margin: 0;
+    padding: 15px 0;
+}
+
+/* Animations */
+@keyframes pulse-warning {
+    0% { 
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
+    }
+    50% { 
+        opacity: 0.8;
+        box-shadow: 0 0 0 6px rgba(220, 53, 69, 0.1);
+    }
+    100% { 
+        opacity: 1;
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
+    }
+}
+
+@keyframes chunk-badge-glow {
+    0% { box-shadow: 0 0 0 0 rgba(255, 146, 43, 0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(255, 146, 43, 0.1); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 146, 43, 0.4); }
+}
+
+.chunk-badge.large {
+    animation: chunk-badge-glow 2s infinite;
+}
+
+/* Responsive Design for Chunking Elements */
+@media screen and (max-width: 782px) {
+    .chunking-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .chunking-stat-card {
+        padding: 12px;
+    }
+    
+    .chunking-stat-card .stat-number {
+        font-size: 22px;
+    }
+    
+    .performance-metric {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .performance-metric .metric-value {
+        min-width: auto;
+        width: 100%;
+    }
+    
+    .chunking-optimization-badge {
+        display: block;
+        margin: 10px 0 0 0;
+        text-align: center;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .chunking-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .chunk-badge {
+        font-size: 10px;
+        padding: 2px 5px;
+    }
+    
+    .chunk-info {
+        font-size: 9px;
+    }
+}
+
+/* Filter Enhancement for Chunking */
+select[name="chunked"] {
+    background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ff922b' viewBox='0 0 16 16'><path d='M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1H7zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 32px;
+}
+
+/* Enhanced Token Usage Bar for Chunked Responses */
+.token-usage-bar {
+    position: relative;
+}
+
+.token-usage-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 146, 43, 0.1) 70%, rgba(255, 146, 43, 0.2) 100%);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* Chunked responses get special token bar styling */
+.postbox.chunking-details .token-usage-bar .token-usage-fill {
+    background: linear-gradient(90deg, #0073aa 0%, #ff922b 100%);
+}
+
+/* Loading state for chunking analysis */
+.chunking-analysis-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #6c757d;
+}
+
+.chunking-analysis-loading::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ff922b;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Dark mode compatibility */
+@media (prefers-color-scheme: dark) {
+    .chunking-stat-card {
+        background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    
+    .chunking-stat-card .stat-number {
+        color: #ffb84d;
+    }
+    
+    .performance-metric .metric-value {
+        background: #2c2c2c;
+        color: #e0e0e0;
+        border-color: #444;
+    }
+    
+    .chunking-performance-analysis {
+        background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+        border-color: #444;
+    }
+}
+
+/* Print styles for chunking information */
+@media print {
+    .chunking-stats-grid,
+    .chunking-stat-card,
+    .performance-metric {
+        break-inside: avoid;
+    }
+    
+    .chunk-badge {
+        border: 1px solid #000 !important;
+        background: transparent !important;
+        color: #000 !important;
+    }
+    
+    .chunking-optimization-badge,
+    .completion-reason-badge {
+        border: 1px solid #000 !important;
+        background: transparent !important;
+        color: #000 !important;
+    }
+}

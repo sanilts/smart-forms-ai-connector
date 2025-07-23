@@ -377,6 +377,14 @@ class SFAIC_Response_Logger {
     /**
      * Render logs page with user name and email display
      */
+    /**
+     * Enhanced Response Logger Methods for Chunking Information
+     * Add these methods to your SFAIC_Response_Logger class
+     */
+
+    /**
+     * Enhanced render logs page with chunking indicators
+     */
     public function render_logs_page() {
         // Check user capability
         if (!current_user_can('manage_options')) {
@@ -394,31 +402,30 @@ class SFAIC_Response_Logger {
             return;
         }
 
-        // Get filters
+        // Get filters (existing filter code...)
         $filters = array();
-
         if (isset($_GET['prompt_id']) && !empty($_GET['prompt_id'])) {
             $filters['prompt_id'] = (int) $_GET['prompt_id'];
         }
-
         if (isset($_GET['form_id']) && !empty($_GET['form_id'])) {
             $filters['form_id'] = (int) $_GET['form_id'];
         }
-
         if (isset($_GET['status']) && in_array($_GET['status'], array('success', 'error'))) {
             $filters['status'] = sanitize_text_field($_GET['status']);
         }
-
         if (isset($_GET['provider']) && in_array($_GET['provider'], array('openai', 'gemini', 'claude'))) {
             $filters['provider'] = sanitize_text_field($_GET['provider']);
         }
-
         if (isset($_GET['date_from']) && !empty($_GET['date_from'])) {
             $filters['date_from'] = sanitize_text_field($_GET['date_from']);
         }
-
         if (isset($_GET['date_to']) && !empty($_GET['date_to'])) {
             $filters['date_to'] = sanitize_text_field($_GET['date_to']);
+        }
+
+        // NEW: Add chunking filter
+        if (isset($_GET['chunked']) && in_array($_GET['chunked'], array('yes', 'no'))) {
+            $filters['chunked'] = sanitize_text_field($_GET['chunked']);
         }
 
         // Get current page and items per page
@@ -426,12 +433,12 @@ class SFAIC_Response_Logger {
         $per_page = 20;
         $offset = ($page - 1) * $per_page;
 
-        // Get logs with filters
+        // Get logs with filters including chunking info
         $logs = array();
         $total_logs = 0;
 
         if ($table_exists) {
-            $logs = $this->get_all_logs($filters, $per_page, $offset);
+            $logs = $this->get_all_logs_with_chunking($filters, $per_page, $offset);
             $total_logs = $this->count_all_logs($filters);
         }
 
@@ -450,15 +457,18 @@ class SFAIC_Response_Logger {
         $openai_stats = $this->get_token_usage_stats(30, 'openai');
         $gemini_stats = $this->get_token_usage_stats(30, 'gemini');
         $claude_stats = $this->get_token_usage_stats(30, 'claude');
+
+        // Get chunking statistics
+        $chunking_stats = $this->get_chunking_statistics();
         ?>
         <div class="wrap">
             <h1><?php _e('AI Response Logs', 'chatgpt-fluent-connector'); ?></h1>
 
-            <!-- Token Usage Statistics -->
+            <!-- Enhanced Token Usage Statistics with Chunking -->
             <div class="sfaic-token-stats">
-                <h2><?php _e('Token Usage Statistics (Last 30 Days)', 'chatgpt-fluent-connector'); ?></h2>
+                <h2><?php _e('Usage Statistics (Last 30 Days)', 'chatgpt-fluent-connector'); ?></h2>
                 <div class="stats-grid">
-
+                    <!-- Existing token stats boxes... -->
                     <div class="stat-box">
                         <h3>
                             <span class="sfaic-api-badge openai">ChatGPT</span>
@@ -497,6 +507,17 @@ class SFAIC_Response_Logger {
                             <p style="color: #666;"><?php _e('No data available', 'chatgpt-fluent-connector'); ?></p>
                         <?php endif; ?>
                     </div>
+
+                    <!-- NEW: Chunking Statistics Box -->
+                    <div class="stat-box chunking-stats">
+                        <h3>
+                            📊 <?php _e('Chunking Stats', 'chatgpt-fluent-connector'); ?>
+                        </h3>
+                        <p><strong><?php _e('Chunked Responses:', 'chatgpt-fluent-connector'); ?></strong> <span><?php echo number_format_i18n($chunking_stats->chunked_count ?? 0); ?></span></p>
+                        <p><strong><?php _e('Avg Chunks:', 'chatgpt-fluent-connector'); ?></strong> <span><?php echo number_format_i18n($chunking_stats->avg_chunks ?? 0, 1); ?></span></p>
+                        <p><strong><?php _e('Max Chunks:', 'chatgpt-fluent-connector'); ?></strong> <span><?php echo number_format_i18n($chunking_stats->max_chunks ?? 0); ?></span></p>
+                        <p><strong><?php _e('Chunking Rate:', 'chatgpt-fluent-connector'); ?></strong> <span><?php echo number_format_i18n($chunking_stats->chunking_percentage ?? 0, 1); ?>%</span></p>
+                    </div>
                 </div>
             </div>
 
@@ -511,14 +532,14 @@ class SFAIC_Response_Logger {
                 </div>
             <?php endif; ?>
 
-            <!-- Filters -->
+            <!-- Enhanced Filters with Chunking Filter -->
             <div class="tablenav top">
                 <form method="get" class="alignleft actions" id="sfaic-filters-form">
                     <input type="hidden" name="post_type" value="sfaic_prompt">
                     <input type="hidden" name="page" value="sfaic-response-logs">
 
                     <div class="alignleft actions" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
-                        <!-- Prompt filter -->
+                        <!-- Existing filters... -->
                         <select name="prompt_id">
                             <option value=""><?php _e('All Prompts', 'chatgpt-fluent-connector'); ?></option>
                             <?php foreach ($prompts as $prompt) : ?>
@@ -528,7 +549,6 @@ class SFAIC_Response_Logger {
                             <?php endforeach; ?>
                         </select>
 
-                        <!-- Provider filter -->
                         <select name="provider">
                             <option value=""><?php _e('All Providers', 'chatgpt-fluent-connector'); ?></option>
                             <option value="openai" <?php selected(isset($filters['provider']) ? $filters['provider'] : '', 'openai'); ?>><?php _e('OpenAI (ChatGPT)', 'chatgpt-fluent-connector'); ?></option>
@@ -536,14 +556,19 @@ class SFAIC_Response_Logger {
                             <option value="claude" <?php selected(isset($filters['provider']) ? $filters['provider'] : '', 'claude'); ?>><?php _e('Anthropic Claude', 'chatgpt-fluent-connector'); ?></option>
                         </select>
 
-                        <!-- Status filter -->
                         <select name="status">
                             <option value=""><?php _e('All Statuses', 'chatgpt-fluent-connector'); ?></option>
                             <option value="success" <?php selected(isset($filters['status']) ? $filters['status'] : '', 'success'); ?>><?php _e('Success', 'chatgpt-fluent-connector'); ?></option>
                             <option value="error" <?php selected(isset($filters['status']) ? $filters['status'] : '', 'error'); ?>><?php _e('Error', 'chatgpt-fluent-connector'); ?></option>
                         </select>
 
-                        <!-- Date filters -->
+                        <!-- NEW: Chunking Filter -->
+                        <select name="chunked">
+                            <option value=""><?php _e('All Responses', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="yes" <?php selected(isset($filters['chunked']) ? $filters['chunked'] : '', 'yes'); ?>><?php _e('Chunked Only', 'chatgpt-fluent-connector'); ?></option>
+                            <option value="no" <?php selected(isset($filters['chunked']) ? $filters['chunked'] : '', 'no'); ?>><?php _e('Single Response', 'chatgpt-fluent-connector'); ?></option>
+                        </select>
+
                         <span>
                             <input type="date" name="date_from" placeholder="<?php _e('From date', 'chatgpt-fluent-connector'); ?>" 
                                    value="<?php echo isset($filters['date_from']) ? esc_attr($filters['date_from']) : ''; ?>">
@@ -589,7 +614,7 @@ class SFAIC_Response_Logger {
                 </div>
             </div>
 
-            <!-- Logs Table with Name and Email -->
+            <!-- Enhanced Logs Table with Chunking Information -->
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
@@ -603,6 +628,8 @@ class SFAIC_Response_Logger {
                         <th style="width: 70px;"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 80px;"><?php _e('Provider', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 90px;"><?php _e('Model', 'chatgpt-fluent-connector'); ?></th>
+                        <!-- NEW: Chunking Column -->
+                        <th style="width: 80px;" title="<?php _e('Chunking Information', 'chatgpt-fluent-connector'); ?>"><?php _e('Chunks', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 100px;" title="<?php _e('Prompt / Completion / Total', 'chatgpt-fluent-connector'); ?>"><?php _e('Tokens', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Time', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 140px;"><?php _e('Actions', 'chatgpt-fluent-connector'); ?></th>
@@ -648,6 +675,10 @@ class SFAIC_Response_Logger {
                                 }
                             }
 
+                            // NEW: Get chunking information
+                            $chunking_info = $this->get_log_chunking_info($log->id, $log->entry_id);
+                            $chunking_display = $this->format_chunking_display($chunking_info);
+
                             // Format user name and email with proper display
                             $user_name_display = !empty($log->user_name) ? esc_html($log->user_name) : '-';
                             $user_email_display = '-';
@@ -679,6 +710,8 @@ class SFAIC_Response_Logger {
                                 <td><?php echo $status_badge; ?></td>
                                 <td><?php echo $provider_badge; ?></td>
                                 <td style="font-size: 11px;"><?php echo esc_html($log->model); ?></td>
+                                <!-- NEW: Chunking Display -->
+                                <td class="column-chunks"><?php echo $chunking_display; ?></td>
                                 <td class="column-tokens"><?php echo $token_display; ?></td>
                                 <td><?php echo esc_html($execution_time); ?></td>
                                 <td>
@@ -707,7 +740,7 @@ class SFAIC_Response_Logger {
                         <?php endforeach; ?>
                     <?php else : ?>
                         <tr>
-                            <td colspan="13"><?php _e('No logs found matching your criteria.', 'chatgpt-fluent-connector'); ?></td>
+                            <td colspan="14"><?php _e('No logs found matching your criteria.', 'chatgpt-fluent-connector'); ?></td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -730,16 +763,271 @@ class SFAIC_Response_Logger {
                     ?>
                 </div>
             </div>
+
+            <!-- NEW: Enhanced CSS for Chunking Display -->
+            <style>
+                .chunking-stats {
+                    border-left: 4px solid #ff922b !important;
+                }
+                .chunking-stats .stat-number {
+                    color: #ff922b !important;
+                }
+                .column-chunks {
+                    text-align: center;
+                    font-size: 12px;
+                }
+                .chunk-badge {
+                    display: inline-block;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-size: 10px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    white-space: nowrap;
+                }
+                .chunk-badge.single {
+                    background-color: #e8f5e8;
+                    color: #0a7e07;
+                    border: 1px solid #00a32a;
+                }
+                .chunk-badge.chunked {
+                    background-color: #fff4e6;
+                    color: #b45309;
+                    border: 1px solid #ff922b;
+                }
+                .chunk-badge.large {
+                    background-color: #fbeaea;
+                    color: #a00;
+                    border: 1px solid #d63638;
+                }
+                .chunk-info {
+                    font-size: 10px;
+                    color: #666;
+                    display: block;
+                    margin-top: 2px;
+                }
+            </style>
         </div>
         <?php
     }
 
     /**
+     * NEW: Get logs with chunking information
+     */
+    public function get_all_logs_with_chunking($filters = array(), $limit = 20, $offset = 0) {
+        global $wpdb;
+
+        $where_clauses = array();
+        $query_params = array();
+        $joins = array();
+
+        // Process existing filters
+        if (!empty($filters['prompt_id'])) {
+            $where_clauses[] = 'l.prompt_id = %d';
+            $query_params[] = $filters['prompt_id'];
+        }
+
+        if (!empty($filters['form_id'])) {
+            $where_clauses[] = 'l.form_id = %d';
+            $query_params[] = $filters['form_id'];
+        }
+
+        if (!empty($filters['entry_id'])) {
+            $where_clauses[] = 'l.entry_id = %d';
+            $query_params[] = $filters['entry_id'];
+        }
+
+        if (!empty($filters['status'])) {
+            $where_clauses[] = 'l.status = %s';
+            $query_params[] = $filters['status'];
+        }
+
+        if (!empty($filters['provider'])) {
+            $where_clauses[] = 'l.provider = %s';
+            $query_params[] = $filters['provider'];
+        }
+
+        if (!empty($filters['date_from'])) {
+            $where_clauses[] = 'l.created_at >= %s';
+            $query_params[] = $filters['date_from'] . ' 00:00:00';
+        }
+
+        if (!empty($filters['date_to'])) {
+            $where_clauses[] = 'l.created_at <= %s';
+            $query_params[] = $filters['date_to'] . ' 23:59:59';
+        }
+
+        // NEW: Handle chunking filter
+        if (!empty($filters['chunked'])) {
+            $joins[] = "LEFT JOIN {$wpdb->postmeta} pm_chunked ON l.entry_id = pm_chunked.post_id AND pm_chunked.meta_key = '_gemini_chunked_response'";
+
+            if ($filters['chunked'] === 'yes') {
+                $where_clauses[] = "pm_chunked.meta_value = '1'";
+            } elseif ($filters['chunked'] === 'no') {
+                $where_clauses[] = "(pm_chunked.meta_value IS NULL OR pm_chunked.meta_value != '1')";
+            }
+        }
+
+        // Build joins
+        $join_sql = '';
+        if (!empty($joins)) {
+            $join_sql = implode(' ', array_unique($joins));
+        }
+
+        // Build the WHERE clause
+        $where_sql = '';
+        if (!empty($where_clauses)) {
+            $where_sql = 'WHERE ' . implode(' AND ', $where_clauses);
+        }
+
+        // Add limit and offset
+        $query_params[] = $limit;
+        $query_params[] = $offset;
+
+        $sql = "SELECT l.*, p.post_title as prompt_title 
+            FROM {$this->table_name} l
+            LEFT JOIN {$wpdb->posts} p ON l.prompt_id = p.ID
+            $join_sql
+            $where_sql
+            ORDER BY l.created_at DESC 
+            LIMIT %d OFFSET %d";
+
+        $prepared_sql = $wpdb->prepare($sql, $query_params);
+
+        return $wpdb->get_results($prepared_sql);
+    }
+
+    /**
+     * NEW: Get chunking statistics
+     */
+    public function get_chunking_statistics($days = 30) {
+        global $wpdb;
+
+        $date_limit = date('Y-m-d H:i:s', strtotime("-$days days"));
+
+        $sql = $wpdb->prepare(
+                "SELECT 
+            COUNT(DISTINCT l.id) as total_responses,
+            COUNT(DISTINCT CASE WHEN pm_chunked.meta_value = '1' THEN l.id END) as chunked_count,
+            AVG(CASE WHEN pm_chunks.meta_value IS NOT NULL THEN CAST(pm_chunks.meta_value AS UNSIGNED) END) as avg_chunks,
+            MAX(CASE WHEN pm_chunks.meta_value IS NOT NULL THEN CAST(pm_chunks.meta_value AS UNSIGNED) END) as max_chunks,
+            (COUNT(DISTINCT CASE WHEN pm_chunked.meta_value = '1' THEN l.id END) * 100.0 / COUNT(DISTINCT l.id)) as chunking_percentage
+        FROM {$this->table_name} l
+        LEFT JOIN {$wpdb->postmeta} pm_chunked ON l.entry_id = pm_chunked.post_id AND pm_chunked.meta_key = '_gemini_chunked_response'
+        LEFT JOIN {$wpdb->postmeta} pm_chunks ON l.entry_id = pm_chunks.post_id AND pm_chunks.meta_key = '_gemini_chunks_count'
+        WHERE l.created_at >= %s",
+                $date_limit
+        );
+
+        return $wpdb->get_row($sql);
+    }
+
+    /**
+     * NEW: Get chunking information for a specific log
+     */
+    public function get_log_chunking_info($log_id, $entry_id) {
+        global $wpdb;
+
+        // Get chunking metadata from postmeta
+        $chunking_meta = $wpdb->get_results($wpdb->prepare(
+                        "SELECT meta_key, meta_value 
+         FROM {$wpdb->postmeta} 
+         WHERE post_id = %d 
+         AND meta_key IN (
+             '_gemini_chunked_response',
+             '_gemini_chunks_count', 
+             '_gemini_total_tokens_generated',
+             '_gemini_response_length',
+             '_gemini_completion_reason',
+             '_gemini_model_optimized'
+         )",
+                        $entry_id
+                ), ARRAY_A);
+
+        $chunking_info = array(
+            'is_chunked' => false,
+            'chunks_count' => 0,
+            'total_tokens_generated' => 0,
+            'response_length' => 0,
+            'completion_reason' => '',
+            'model_optimized' => ''
+        );
+
+        foreach ($chunking_meta as $meta) {
+            switch ($meta['meta_key']) {
+                case '_gemini_chunked_response':
+                    $chunking_info['is_chunked'] = ($meta['meta_value'] === '1');
+                    break;
+                case '_gemini_chunks_count':
+                    $chunking_info['chunks_count'] = intval($meta['meta_value']);
+                    break;
+                case '_gemini_total_tokens_generated':
+                    $chunking_info['total_tokens_generated'] = intval($meta['meta_value']);
+                    break;
+                case '_gemini_response_length':
+                    $chunking_info['response_length'] = intval($meta['meta_value']);
+                    break;
+                case '_gemini_completion_reason':
+                    $chunking_info['completion_reason'] = $meta['meta_value'];
+                    break;
+                case '_gemini_model_optimized':
+                    $chunking_info['model_optimized'] = $meta['meta_value'];
+                    break;
+            }
+        }
+
+        return $chunking_info;
+    }
+
+    /**
+     * NEW: Format chunking display for table
+     */
+    public function format_chunking_display($chunking_info) {
+        if (!$chunking_info['is_chunked']) {
+            return '<span class="chunk-badge single" title="' . __('Single response', 'chatgpt-fluent-connector') . '">1</span>';
+        }
+
+        $chunks_count = $chunking_info['chunks_count'];
+        $response_length = $chunking_info['response_length'];
+
+        // Determine badge class based on chunk count
+        $badge_class = 'chunked';
+        if ($chunks_count >= 10) {
+            $badge_class = 'large';
+        }
+
+        $title = sprintf(
+                __('Chunked response: %d chunks, %s characters', 'chatgpt-fluent-connector'),
+                $chunks_count,
+                number_format_i18n($response_length)
+        );
+
+        if (!empty($chunking_info['model_optimized'])) {
+            $title .= sprintf(
+                    __(' (Optimized for %s)', 'chatgpt-fluent-connector'),
+                    $chunking_info['model_optimized']
+            );
+        }
+
+        $display = '<span class="chunk-badge ' . $badge_class . '" title="' . esc_attr($title) . '">' . $chunks_count . '</span>';
+
+        if ($response_length > 0) {
+            $display .= '<span class="chunk-info">' . size_format($response_length, 0) . '</span>';
+        }
+
+        return $display;
+    }
+
+    /**
      * Render log details view with enhanced user information
+     */
+    /**
+     * FIXED: Render log details view with enhanced user information and HTML safety
      */
 
     /**
-     * FIXED: Render log details view with enhanced user information and HTML safety
+     * Enhanced render_log_details method with comprehensive chunking information
+     * Replace or enhance the existing render_log_details method in SFAIC_Response_Logger class
      */
     private function render_log_details($log_id) {
         global $wpdb;
@@ -753,6 +1041,9 @@ class SFAIC_Response_Logger {
         if (!$log) {
             wp_die(__('Log entry not found.', 'chatgpt-fluent-connector'));
         }
+
+        // Get comprehensive chunking information
+        $chunking_info = $this->get_comprehensive_chunking_info($log->entry_id);
 
         // FIXED: Safely process AI response to prevent HTML crashes
         $ai_response_safe = $this->safe_process_ai_response($log->ai_response);
@@ -921,7 +1212,137 @@ class SFAIC_Response_Logger {
                     </div>
                 </div>
 
-                <!-- Token Usage -->
+                <!-- NEW: Comprehensive Chunking Information -->
+                <?php if ($chunking_info['is_chunked']) : ?>
+                    <div class="postbox chunking-details">
+                        <h2 class="hndle">
+                            <span>🧩 <?php _e('Chunking Details', 'chatgpt-fluent-connector'); ?></span>
+                            <?php if ($chunking_info['model_optimized']) : ?>
+                                <span class="chunking-optimization-badge"><?php echo esc_html($chunking_info['model_optimized']); ?></span>
+                            <?php endif; ?>
+                        </h2>
+                        <div class="inside">
+                            <div class="chunking-overview">
+                                <div class="chunking-stats-grid">
+                                    <div class="chunking-stat-card">
+                                        <div class="stat-number"><?php echo esc_html($chunking_info['chunks_count']); ?></div>
+                                        <div class="stat-label"><?php _e('Total Chunks', 'chatgpt-fluent-connector'); ?></div>
+                                    </div>
+                                    <div class="chunking-stat-card">
+                                        <div class="stat-number"><?php echo esc_html(size_format($chunking_info['response_length'], 0)); ?></div>
+                                        <div class="stat-label"><?php _e('Response Size', 'chatgpt-fluent-connector'); ?></div>
+                                    </div>
+                                    <div class="chunking-stat-card">
+                                        <div class="stat-number"><?php echo esc_html(number_format_i18n($chunking_info['total_tokens_generated'])); ?></div>
+                                        <div class="stat-label"><?php _e('Total Tokens', 'chatgpt-fluent-connector'); ?></div>
+                                    </div>
+                                    <div class="chunking-stat-card">
+                                        <div class="stat-number"><?php echo esc_html(round($chunking_info['response_length'] / $chunking_info['chunks_count'])); ?></div>
+                                        <div class="stat-label"><?php _e('Avg Chunk Size', 'chatgpt-fluent-connector'); ?></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <table class="form-table" style="margin-top: 20px;">
+                                <tr>
+                                    <th><?php _e('Chunking Strategy:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td>
+                                        <?php echo esc_html($chunking_info['chunking_strategy'] ?: 'Not specified'); ?>
+                                        <?php if ($chunking_info['chunking_strategy']) : ?>
+                                            <span class="description">
+                                                <?php echo $this->get_chunking_strategy_description($chunking_info['chunking_strategy']); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><?php _e('Completion Reason:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td>
+                                        <span class="completion-reason-badge <?php echo esc_attr($chunking_info['completion_reason']); ?>">
+                                            <?php echo esc_html($this->format_completion_reason($chunking_info['completion_reason'])); ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th><?php _e('Smart Completion:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td>
+                                        <?php if ($chunking_info['enable_smart_completion']) : ?>
+                                            <span class="dashicons dashicons-yes-alt" style="color: #00a32a;"></span>
+                                            <?php _e('Enabled', 'chatgpt-fluent-connector'); ?>
+                                        <?php else : ?>
+                                            <span class="dashicons dashicons-marker" style="color: #d63638;"></span>
+                                            <?php _e('Disabled', 'chatgpt-fluent-connector'); ?>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php if (!empty($chunking_info['completion_marker'])) : ?>
+                                    <tr>
+                                        <th><?php _e('Completion Marker:', 'chatgpt-fluent-connector'); ?></th>
+                                        <td><code><?php echo esc_html($chunking_info['completion_marker']); ?></code></td>
+                                    </tr>
+                                <?php endif; ?>
+                                <?php if ($chunking_info['use_token_percentage']) : ?>
+                                    <tr>
+                                        <th><?php _e('Token Threshold:', 'chatgpt-fluent-connector'); ?></th>
+                                        <td>
+                                            <?php echo esc_html($chunking_info['token_completion_threshold']); ?>%
+                                            <span class="description"><?php _e('(Token-based completion enabled)', 'chatgpt-fluent-connector'); ?></span>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                                <tr>
+                                    <th><?php _e('Min Content Length:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td><?php echo esc_html(number_format_i18n($chunking_info['min_content_length'])); ?> characters</td>
+                                </tr>
+                                <tr>
+                                    <th><?php _e('Target Word Count:', 'chatgpt-fluent-connector'); ?></th>
+                                    <td><?php echo esc_html(number_format_i18n($chunking_info['completion_word_count'])); ?> words</td>
+                                </tr>
+                                <?php if (!empty($chunking_info['completion_keywords'])) : ?>
+                                    <tr>
+                                        <th><?php _e('Completion Keywords:', 'chatgpt-fluent-connector'); ?></th>
+                                        <td>
+                                            <?php
+                                            $keywords = explode(',', $chunking_info['completion_keywords']);
+                                            foreach ($keywords as $keyword) {
+                                                echo '<span class="keyword-tag">' . esc_html(trim($keyword)) . '</span> ';
+                                            }
+                                            ?>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </table>
+
+                            <!-- Chunking Performance Analysis -->
+                            <div class="chunking-performance-analysis" style="margin-top: 20px;">
+                                <h4><?php _e('Performance Analysis', 'chatgpt-fluent-connector'); ?></h4>
+                                <?php $this->render_chunking_performance_analysis($chunking_info, $log); ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php else : ?>
+                    <!-- Single Response Info -->
+                    <div class="postbox single-response-info">
+                        <h2 class="hndle"><span>📄 <?php _e('Response Method', 'chatgpt-fluent-connector'); ?></span></h2>
+                        <div class="inside">
+                            <p>
+                                <span class="dashicons dashicons-yes-alt" style="color: #00a32a; vertical-align: middle;"></span>
+                                <strong><?php _e('Single Response', 'chatgpt-fluent-connector'); ?></strong> - 
+                                <?php _e('This response was generated in a single API call without chunking.', 'chatgpt-fluent-connector'); ?>
+                            </p>
+                            <?php if ($ai_response_length > 10000) : ?>
+                                <div class="notice notice-info inline" style="margin: 15px 0;">
+                                    <p>
+                                        <strong><?php _e('Note:', 'chatgpt-fluent-connector'); ?></strong>
+                                        <?php _e('This is a large single response. Consider enabling chunking for better performance and reliability.', 'chatgpt-fluent-connector'); ?>
+                                    </p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Enhanced Token Usage with Chunking Context -->
                 <?php if (!empty($log->total_tokens)) : ?>
                     <div class="postbox token-usage">
                         <h2 class="hndle"><span><?php _e('Token Usage', 'chatgpt-fluent-connector'); ?></span></h2>
@@ -948,6 +1369,17 @@ class SFAIC_Response_Logger {
                                         </span>
                                     </td>
                                 </tr>
+                                <?php if ($chunking_info['is_chunked'] && $chunking_info['total_tokens_generated'] > 0) : ?>
+                                    <tr>
+                                        <th><?php _e('Chunked Generation Tokens:', 'chatgpt-fluent-connector'); ?></th>
+                                        <td>
+                                            <?php echo number_format_i18n($chunking_info['total_tokens_generated']); ?>
+                                            <span class="description">
+                                                (<?php echo round(($chunking_info['total_tokens_generated'] / $log->total_tokens) * 100, 1); ?>% of total)
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                                 <tr>
                                     <th><?php _e('Model Token Limit:', 'chatgpt-fluent-connector'); ?></th>
                                     <td><?php echo number_format_i18n($model_limits['max_tokens']); ?></td>
@@ -970,10 +1402,20 @@ class SFAIC_Response_Logger {
                                     <p><?php _e('⚠️ This request used more than 80% of the model\'s token limit. Consider optimizing your prompts or using a model with a higher token limit.', 'chatgpt-fluent-connector'); ?></p>
                                 </div>
                             <?php endif; ?>
+
+                            <?php if (!$chunking_info['is_chunked'] && $usage_percentage > 60) : ?>
+                                <div class="notice notice-info inline" style="margin-top: 15px;">
+                                    <p>
+                                        <strong><?php _e('Chunking Recommendation:', 'chatgpt-fluent-connector'); ?></strong>
+                                        <?php _e('This response used a significant portion of the token limit. Consider enabling chunking for more reliable long-form responses.', 'chatgpt-fluent-connector'); ?>
+                                    </p>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>
 
+                <!-- Rest of the existing metaboxes (Form Data, AI Response, etc.) -->
                 <!-- Form Data -->
                 <?php if (!empty($entry_data)) : ?>
                     <div class="postbox">
@@ -1012,10 +1454,17 @@ class SFAIC_Response_Logger {
                     </div>
                 <?php endif; ?>
 
-                <!-- FIXED: AI Response with Enhanced Safety -->
+                <!-- AI Response (existing code with chunking context) -->
                 <div class="postbox">
                     <h2 class="hndle">
-                        <span><?php _e('AI Response', 'chatgpt-fluent-connector'); ?></span>
+                        <span>
+                            <?php _e('AI Response', 'chatgpt-fluent-connector'); ?>
+                            <?php if ($chunking_info['is_chunked']) : ?>
+                                <span class="chunked-response-indicator">
+                                    🧩 <?php printf(__('(%d chunks)', 'chatgpt-fluent-connector'), $chunking_info['chunks_count']); ?>
+                                </span>
+                            <?php endif; ?>
+                        </span>
                         <?php if (!empty($log->response_json)) : ?>
                             <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-ajax.php?action=sfaic_download_response_json&log_id=' . $log->id), 'sfaic_download_json', 'nonce')); ?>" 
                                class="button button-secondary sfaic-download-json" 
@@ -1033,6 +1482,9 @@ class SFAIC_Response_Logger {
                                 <p>
                                     <strong><?php _e('Large Response Detected:', 'chatgpt-fluent-connector'); ?></strong>
                                     <?php _e('This response is very large. Use the tabs below to view different formats, or download the JSON for external viewing.', 'chatgpt-fluent-connector'); ?>
+                                    <?php if ($chunking_info['is_chunked']) : ?>
+                                        <?php printf(__('Generated using %d chunks for optimal performance.', 'chatgpt-fluent-connector'), $chunking_info['chunks_count']); ?>
+                                    <?php endif; ?>
                                 </p>
                             </div>
                         <?php endif; ?>
@@ -1047,14 +1499,14 @@ class SFAIC_Response_Logger {
                             </button>
                         </div>
 
-                        <!-- FIXED: Safe Rendered View -->
+                        <!-- Safe Rendered View -->
                         <div class="sfaic-response-view" id="sfaic-rendered-response">
                             <div class="sfaic-rendered-response sfaic-safe-content">
                                 <?php echo $ai_response_safe['rendered']; ?>
                             </div>
                         </div>
 
-                        <!-- FIXED: Formatted View for better readability -->
+                        <!-- Formatted View for better readability -->
                         <div class="sfaic-response-view" id="sfaic-formatted-response" style="display: none;">
                             <div class="sfaic-content-box">
                                 <div class="sfaic-formatted-content">
@@ -1063,7 +1515,7 @@ class SFAIC_Response_Logger {
                             </div>
                         </div>
 
-                        <!-- FIXED: Raw View with length protection -->
+                        <!-- Raw View with length protection -->
                         <div class="sfaic-response-view" id="sfaic-raw-response" style="display: none;">
                             <div class="sfaic-content-box">
                                 <?php if ($is_long_response) : ?>
@@ -1079,7 +1531,7 @@ class SFAIC_Response_Logger {
                     </div>
                 </div>
 
-                <!-- Request Data -->
+                <!-- Request Data (existing) -->
                 <?php if (!empty($log->request_json)) : ?>
                     <div class="postbox">
                         <h2 class="hndle">
@@ -1102,73 +1554,310 @@ class SFAIC_Response_Logger {
                 <?php endif; ?>
             </div>
 
-            <!-- FIXED: Enhanced CSS for safe content display -->
+            <!-- Enhanced CSS for Chunking Display -->
             <style>
-                .sfaic-safe-content {
-                    max-height: 600px;
-                    overflow-y: auto;
-                    border: 1px solid #ddd;
-                    padding: 15px;
-                    background: #fafafa;
+                /* Chunking-specific styles */
+                .chunking-details {
+                    border-left: 4px solid #ff922b !important;
                 }
 
-                .sfaic-formatted-content {
-                    max-height: 500px;
-                    overflow-y: auto;
-                    white-space: pre-wrap;
-                    word-wrap: break-word;
-                    font-family: 'Courier New', monospace;
-                    font-size: 13px;
-                    line-height: 1.4;
-                    padding: 15px;
-                    background: #f8f8f8;
-                    border: 1px solid #ddd;
+                .chunking-optimization-badge {
+                    background: #e8f5e8;
+                    color: #155724;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-left: 10px;
                 }
 
-                .sfaic-raw-content {
-                    max-height: 400px;
-                    overflow-y: auto;
-                    white-space: pre-wrap;
-                    word-wrap: break-word;
+                .chunking-stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                    gap: 15px;
+                    margin: 15px 0;
+                }
+
+                .chunking-stat-card {
+                    background: #f8f9fa;
+                    border: 1px solid #dee2e6;
+                    padding: 15px;
+                    text-align: center;
+                    border-radius: 5px;
+                    border-left: 4px solid #ff922b;
+                }
+
+                .chunking-stat-card .stat-number {
+                    font-size: 24px;
+                    font-weight: 600;
+                    color: #ff922b;
+                    line-height: 1;
+                    margin-bottom: 5px;
+                }
+
+                .chunking-stat-card .stat-label {
                     font-size: 12px;
-                    line-height: 1.3;
+                    color: #6c757d;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
                 }
 
-                /* Prevent HTML content from breaking layout */
-                .sfaic-safe-content * {
-                    max-width: 100% !important;
-                    word-wrap: break-word !important;
-                }
-
-                .sfaic-safe-content img {
-                    max-width: 300px !important;
-                    height: auto !important;
-                }
-
-                .sfaic-safe-content table {
-                    width: auto !important;
-                    max-width: 100% !important;
-                    overflow-x: auto !important;
-                    display: block !important;
-                    white-space: nowrap !important;
-                }
-
-                /* Long content handling */
-                .sfaic-response-view {
-                    position: relative;
-                }
-
-                .response-length-warning {
-                    background: #fff3cd;
-                    border: 1px solid #ffeaa7;
-                    padding: 10px;
-                    margin-bottom: 15px;
+                .completion-reason-badge {
+                    display: inline-block;
+                    padding: 4px 8px;
                     border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                }
+
+                .completion-reason-badge.fully_optimized_chunking {
+                    background: #d4edda;
+                    color: #155724;
+                    border: 1px solid #c3e6cb;
+                }
+
+                .completion-reason-badge.token_limit_reached {
+                    background: #fff3cd;
                     color: #856404;
+                    border: 1px solid #ffeaa7;
+                }
+
+                .completion-reason-badge.completion_marker_found {
+                    background: #e8f5e8;
+                    color: #0a7e07;
+                    border: 1px solid #00a32a;
+                }
+
+                .keyword-tag {
+                    display: inline-block;
+                    background: #f8f9fa;
+                    color: #495057;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-size: 11px;
+                    margin: 1px;
+                    border: 1px solid #dee2e6;
+                }
+
+                .chunked-response-indicator {
+                    color: #ff922b;
+                    font-size: 14px;
+                    font-weight: 500;
+                }
+
+                .single-response-info {
+                    border-left: 4px solid #00a32a !important;
+                }
+
+                .chunking-performance-analysis {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 5px;
+                    border: 1px solid #dee2e6;
+                }
+
+                .performance-metric {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+
+                .performance-metric:last-child {
+                    border-bottom: none;
+                }
+
+                .performance-metric .metric-label {
+                    font-weight: 500;
+                }
+
+                .performance-metric .metric-value {
+                    font-family: monospace;
+                    background: #fff;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    border: 1px solid #ccc;
+                }
+
+                .performance-metric .metric-value.good {
+                    color: #28a745;
+                    border-color: #28a745;
+                }
+
+                .performance-metric .metric-value.warning {
+                    color: #ffc107;
+                    border-color: #ffc107;
+                }
+
+                .performance-metric .metric-value.poor {
+                    color: #dc3545;
+                    border-color: #dc3545;
                 }
             </style>
         </div>
         <?php
+    }
+
+    /**
+     * NEW: Get comprehensive chunking information including settings
+     */
+    private function get_comprehensive_chunking_info($entry_id) {
+        global $wpdb;
+
+        // Get all chunking-related metadata
+        $chunking_meta = $wpdb->get_results($wpdb->prepare(
+                        "SELECT meta_key, meta_value 
+         FROM {$wpdb->postmeta} 
+         WHERE post_id = %d 
+         AND meta_key LIKE '_gemini_%'",
+                        $entry_id
+                ), ARRAY_A);
+
+        $chunking_info = array(
+            'is_chunked' => false,
+            'chunks_count' => 0,
+            'total_tokens_generated' => 0,
+            'response_length' => 0,
+            'completion_reason' => '',
+            'model_optimized' => '',
+            'chunking_strategy' => '',
+            'enable_smart_completion' => false,
+            'completion_marker' => '',
+            'min_content_length' => 0,
+            'completion_word_count' => 0,
+            'completion_keywords' => '',
+            'use_token_percentage' => false,
+            'token_completion_threshold' => 0,
+            'chunking_settings_used' => array()
+        );
+
+        foreach ($chunking_meta as $meta) {
+            switch ($meta['meta_key']) {
+                case '_gemini_chunked_response':
+                    $chunking_info['is_chunked'] = ($meta['meta_value'] === '1');
+                    break;
+                case '_gemini_chunks_count':
+                    $chunking_info['chunks_count'] = intval($meta['meta_value']);
+                    break;
+                case '_gemini_total_tokens_generated':
+                    $chunking_info['total_tokens_generated'] = intval($meta['meta_value']);
+                    break;
+                case '_gemini_response_length':
+                    $chunking_info['response_length'] = intval($meta['meta_value']);
+                    break;
+                case '_gemini_completion_reason':
+                    $chunking_info['completion_reason'] = $meta['meta_value'];
+                    break;
+                case '_gemini_model_optimized':
+                    $chunking_info['model_optimized'] = $meta['meta_value'];
+                    break;
+                case '_gemini_chunking_settings_used':
+                    $settings = maybe_unserialize($meta['meta_value']);
+                    if (is_array($settings)) {
+                        $chunking_info = array_merge($chunking_info, $settings);
+                        $chunking_info['chunking_settings_used'] = $settings;
+                    }
+                    break;
+            }
+        }
+
+        return $chunking_info;
+    }
+
+    /**
+     * NEW: Get chunking strategy description
+     */
+    private function get_chunking_strategy_description($strategy) {
+        $descriptions = array(
+            'balanced' => __('Balanced approach optimizing for both quality and performance', 'chatgpt-fluent-connector'),
+            'aggressive' => __('Maximum length generation with higher token usage', 'chatgpt-fluent-connector'),
+            'conservative' => __('Safe and fast processing with shorter chunks', 'chatgpt-fluent-connector')
+        );
+
+        return isset($descriptions[$strategy]) ? $descriptions[$strategy] : '';
+    }
+
+    /**
+     * NEW: Format completion reason for display
+     */
+    private function format_completion_reason($reason) {
+        $reasons = array(
+            'fully_optimized_chunking' => __('Optimized Chunking Complete', 'chatgpt-fluent-connector'),
+            'token_limit_reached' => __('Token Limit Reached', 'chatgpt-fluent-connector'),
+            'completion_marker_found' => __('Completion Marker Found', 'chatgpt-fluent-connector'),
+            'smart_completion_detected' => __('Smart Completion Detected', 'chatgpt-fluent-connector'),
+            'max_chunks_reached' => __('Maximum Chunks Reached', 'chatgpt-fluent-connector')
+        );
+
+        return isset($reasons[$reason]) ? $reasons[$reason] : ucfirst(str_replace('_', ' ', $reason));
+    }
+
+    /**
+     * NEW: Render chunking performance analysis
+     */
+    private function render_chunking_performance_analysis($chunking_info, $log) {
+        $metrics = array();
+
+        // Calculate efficiency metrics
+        if ($chunking_info['chunks_count'] > 0 && $chunking_info['response_length'] > 0) {
+            $avg_chunk_size = $chunking_info['response_length'] / $chunking_info['chunks_count'];
+            $tokens_per_chunk = $chunking_info['total_tokens_generated'] / $chunking_info['chunks_count'];
+
+            $metrics[] = array(
+                'label' => __('Average Chunk Size', 'chatgpt-fluent-connector'),
+                'value' => size_format($avg_chunk_size, 0),
+                'class' => ($avg_chunk_size > 5000) ? 'good' : (($avg_chunk_size > 2000) ? 'warning' : 'poor')
+            );
+
+            $metrics[] = array(
+                'label' => __('Tokens per Chunk', 'chatgpt-fluent-connector'),
+                'value' => number_format_i18n($tokens_per_chunk),
+                'class' => ($tokens_per_chunk > 1000) ? 'good' : (($tokens_per_chunk > 500) ? 'warning' : 'poor')
+            );
+
+            // Efficiency ratio
+            $efficiency = ($chunking_info['response_length'] / $chunking_info['total_tokens_generated']) * 100;
+            $metrics[] = array(
+                'label' => __('Character/Token Ratio', 'chatgpt-fluent-connector'),
+                'value' => number_format($efficiency, 1) . '%',
+                'class' => ($efficiency > 70) ? 'good' : (($efficiency > 50) ? 'warning' : 'poor')
+            );
+        }
+
+        // Chunking strategy effectiveness
+        if ($chunking_info['completion_reason']) {
+            $strategy_effectiveness = array(
+                'fully_optimized_chunking' => 'good',
+                'completion_marker_found' => 'good',
+                'smart_completion_detected' => 'good',
+                'token_limit_reached' => 'warning',
+                'max_chunks_reached' => 'poor'
+            );
+
+            $effectiveness_class = isset($strategy_effectiveness[$chunking_info['completion_reason']]) ? $strategy_effectiveness[$chunking_info['completion_reason']] : 'warning';
+
+            $metrics[] = array(
+                'label' => __('Completion Strategy', 'chatgpt-fluent-connector'),
+                'value' => $this->format_completion_reason($chunking_info['completion_reason']),
+                'class' => $effectiveness_class
+            );
+        }
+
+        // Render metrics
+        if (!empty($metrics)) {
+            foreach ($metrics as $metric) {
+                echo '<div class="performance-metric">';
+                echo '<span class="metric-label">' . esc_html($metric['label']) . ':</span>';
+                echo '<span class="metric-value ' . esc_attr($metric['class']) . '">' . esc_html($metric['value']) . '</span>';
+                echo '</div>';
+            }
+        } else {
+            echo '<p class="description">' . __('Performance analysis not available for this response.', 'chatgpt-fluent-connector') . '</p>';
+        }
     }
 
     /**
