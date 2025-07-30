@@ -964,3 +964,292 @@ function sfaic_process_jobs_immediately() {
         sfaic_main()->background_job_manager->process_background_job();
     }
 }
+
+
+/**
+ * Temporary debugging function for field mapping issues
+ * Add this to your smart-forms-ai-connector.php file temporarily
+ */
+function sfaic_debug_field_mapping($prompt_id, $form_data) {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    error_log('SFAIC DEBUG - Field Mapping Check:');
+    error_log('Prompt ID: ' . $prompt_id);
+    
+    // Check custom field mappings
+    $first_name_field = get_post_meta($prompt_id, '_sfaic_first_name_field', true);
+    $last_name_field = get_post_meta($prompt_id, '_sfaic_last_name_field', true);
+    $email_field = get_post_meta($prompt_id, '_sfaic_email_field_mapping', true);
+    
+    error_log('Custom First Name Field: ' . ($first_name_field ?: 'Not set'));
+    error_log('Custom Last Name Field: ' . ($last_name_field ?: 'Not set'));
+    error_log('Custom Email Field: ' . ($email_field ?: 'Not set'));
+    
+    // Log available form data fields
+    error_log('Available form data fields:');
+    if (is_array($form_data)) {
+        foreach ($form_data as $key => $value) {
+            if (!is_scalar($key)) continue;
+            $value_preview = is_array($value) ? '[array]' : substr((string)$value, 0, 50);
+            error_log("  - {$key}: {$value_preview}");
+        }
+    } else {
+        error_log('Form data is not an array: ' . gettype($form_data));
+    }
+    
+    // Test extraction with current logic
+    if (!empty($first_name_field) && isset($form_data[$first_name_field])) {
+        error_log('Found first name from custom mapping: ' . $form_data[$first_name_field]);
+    }
+    if (!empty($last_name_field) && isset($form_data[$last_name_field])) {
+        error_log('Found last name from custom mapping: ' . $form_data[$last_name_field]);
+    }
+    if (!empty($email_field) && isset($form_data[$email_field])) {
+        error_log('Found email from custom mapping: ' . $form_data[$email_field]);
+    }
+}
+
+// Add this hook temporarily to debug form submissions
+add_action('fluentform/submission_inserted', function($entryId, $formData, $form) {
+    // Get the prompt ID associated with this form
+    $prompts = get_posts(array(
+        'post_type' => 'sfaic_prompt',
+        'meta_query' => array(
+            array(
+                'key' => '_sfaic_fluent_form_id',
+                'value' => $form->id,
+                'compare' => '='
+            )
+        ),
+        'posts_per_page' => 1
+    ));
+    
+    if (!empty($prompts)) {
+        $prompt_id = $prompts[0]->ID;
+        sfaic_debug_field_mapping($prompt_id, $formData);
+    }
+}, 5, 3); // Run before the main processing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * Add this to your WordPress admin menu for testing field mapping
+ * Add this function to smart-forms-ai-connector.php
+ */
+function sfaic_add_field_mapping_test_page() {
+    add_submenu_page(
+        'tools.php',
+        'Test Field Mapping',
+        'Test Field Mapping',
+        'manage_options',
+        'test-field-mapping',
+        'sfaic_render_field_mapping_test_page'
+    );
+}
+add_action('admin_menu', 'sfaic_add_field_mapping_test_page');
+
+function sfaic_render_field_mapping_test_page() {
+    if (!current_user_can('manage_options')) {
+        wp_die('Unauthorized');
+    }
+    
+    // Get all prompts
+    $prompts = get_posts(array(
+        'post_type' => 'sfaic_prompt',
+        'posts_per_page' => -1,
+        'post_status' => 'publish'
+    ));
+    
+    ?>
+    <div class="wrap">
+        <h1>Field Mapping Test</h1>
+        
+        <?php foreach ($prompts as $prompt): ?>
+            <?php
+            $form_id = get_post_meta($prompt->ID, '_sfaic_fluent_form_id', true);
+            $first_name_field = get_post_meta($prompt->ID, '_sfaic_first_name_field', true);
+            $last_name_field = get_post_meta($prompt->ID, '_sfaic_last_name_field', true);
+            $email_field = get_post_meta($prompt->ID, '_sfaic_email_field_mapping', true);
+            ?>
+            <div class="postbox" style="margin-bottom: 20px;">
+                <div class="postbox-header">
+                    <h2><?php echo esc_html($prompt->post_title); ?> (ID: <?php echo $prompt->ID; ?>)</h2>
+                </div>
+                <div class="inside">
+                    <p><strong>Associated Form ID:</strong> <?php echo $form_id ?: 'Not set'; ?></p>
+                    <p><strong>First Name Field Mapping:</strong> <?php echo $first_name_field ?: 'Auto-detect'; ?></p>
+                    <p><strong>Last Name Field Mapping:</strong> <?php echo $last_name_field ?: 'Auto-detect'; ?></p>
+                    <p><strong>Email Field Mapping:</strong> <?php echo $email_field ?: 'Auto-detect'; ?></p>
+                    
+                    <?php if (!empty($form_id) && function_exists('wpFluent')): ?>
+                        <?php
+                        // Get recent submission for this form
+                        $recent_submission = wpFluent()->table('fluentform_submissions')
+                                ->where('form_id', $form_id)
+                                ->orderBy('id', 'DESC')
+                                ->first();
+                        ?>
+                        
+                        <?php if ($recent_submission): ?>
+                            <?php
+                            $submission_data = json_decode($recent_submission->response, true);
+                            ?>
+                            <h4>Available Form Fields (from recent submission):</h4>
+                            <ul>
+                                <?php foreach ($submission_data as $field_key => $field_value): ?>
+                                    <?php if (strpos($field_key, '_') !== 0): // Skip internal fields ?>
+                                        <li>
+                                            <code><?php echo esc_html($field_key); ?></code>: 
+                                            <?php echo esc_html(is_array($field_value) ? implode(', ', $field_value) : $field_value); ?>
+                                        </li>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
+                            
+                            <h4>Field Mapping Test Results:</h4>
+                            <?php
+                            // Test the extraction logic
+                            $extracted_name = '';
+                            $extracted_email = '';
+                            
+                            // Test name extraction
+                            if (!empty($first_name_field) && isset($submission_data[$first_name_field])) {
+                                $first_name = sanitize_text_field($submission_data[$first_name_field]);
+                            } else {
+                                $first_name = '';
+                            }
+                            
+                            if (!empty($last_name_field) && isset($submission_data[$last_name_field])) {
+                                $last_name = sanitize_text_field($submission_data[$last_name_field]);
+                            } else {
+                                $last_name = '';
+                            }
+                            
+                            if (!empty($first_name) || !empty($last_name)) {
+                                $extracted_name = trim($first_name . ' ' . $last_name);
+                            }
+                            
+                            // Test email extraction
+                            if (!empty($email_field) && isset($submission_data[$email_field])) {
+                                $email = sanitize_email($submission_data[$email_field]);
+                                if (is_email($email)) {
+                                    $extracted_email = $email;
+                                }
+                            }
+                            ?>
+                            
+                            <p><strong>Extracted Name:</strong> 
+                                <?php if (!empty($extracted_name)): ?>
+                                    <span style="color: green;"><?php echo esc_html($extracted_name); ?></span>
+                                <?php else: ?>
+                                    <span style="color: red;">Not found with current mapping</span>
+                                <?php endif; ?>
+                            </p>
+                            
+                            <p><strong>Extracted Email:</strong> 
+                                <?php if (!empty($extracted_email)): ?>
+                                    <span style="color: green;"><?php echo esc_html($extracted_email); ?></span>
+                                <?php else: ?>
+                                    <span style="color: red;">Not found with current mapping</span>
+                                <?php endif; ?>
+                            </p>
+                            
+                        <?php else: ?>
+                            <p><em>No recent submissions found for this form. Field mapping test requires at least one submission.</em></p>
+                        <?php endif; ?>
+                        
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
+        
+        <?php if (empty($prompts)): ?>
+            <p>No prompts found. Create a prompt first.</p>
+        <?php endif; ?>
+    </div>
+    <?php
+}

@@ -3,7 +3,6 @@
  * WordPress-Style Background Job Manager Class
  * Following WordPress admin design conventions
  */
-
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
@@ -13,7 +12,7 @@ class SFAIC_Background_Job_Manager {
 
     private $jobs_table;
     private $table_version = '1.3';
-    
+
     const CRON_HOOK = 'sfaic_process_background_job';
     const STATUS_PENDING = 'pending';
     const STATUS_PROCESSING = 'processing';
@@ -29,10 +28,10 @@ class SFAIC_Background_Job_Manager {
 
         $this->init_hooks();
         $this->ensure_table_exists();
-        
+
         // Force cron processing every 30 seconds
         add_action('init', array($this, 'ensure_cron_scheduled'));
-        
+
         // Add immediate processing trigger
         add_action('wp_loaded', array($this, 'maybe_process_immediately'));
     }
@@ -58,19 +57,19 @@ class SFAIC_Background_Job_Manager {
 
         // Check if there are pending jobs and if cron hasn't run recently
         global $wpdb;
-        
+
         $pending_jobs = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->jobs_table} 
+                        "SELECT COUNT(*) FROM {$this->jobs_table} 
              WHERE status = %s 
              AND scheduled_at <= %s",
-            self::STATUS_PENDING,
-            current_time('mysql')
+                        self::STATUS_PENDING,
+                        current_time('mysql')
         ));
 
         if ($pending_jobs > 0) {
             $last_cron_run = get_option('sfaic_last_cron_run', 0);
             $time_since_last_run = time() - $last_cron_run;
-            
+
             // If no cron run in 2 minutes, process immediately
             if ($time_since_last_run > 120) {
                 error_log('SFAIC: Cron not running, processing immediately');
@@ -148,30 +147,32 @@ class SFAIC_Background_Job_Manager {
         $created_time = current_time('mysql');
 
         // Extract user name and email from job data
-        $user_name = $this->extract_user_name($job_data['form_data'] ?? array());
-        $user_email = $this->extract_user_email($job_data['form_data'] ?? array());
+        //$user_name = $this->extract_user_name($job_data['form_data'] ?? array());
+        //$user_email = $this->extract_user_email($job_data['form_data'] ?? array());
+        $user_name = $this->extract_user_name($job_data['form_data'] ?? array(), $prompt_id);
+        $user_email = $this->extract_user_email($job_data['form_data'] ?? array(), $prompt_id);
 
         $job_data_json = wp_json_encode($job_data);
 
         error_log('SFAIC: Scheduling job - User: ' . $user_name . ' (' . $user_email . '), Scheduled: ' . $scheduled_time);
 
         $result = $wpdb->insert(
-            $this->jobs_table,
-            array(
-                'job_type' => $job_type,
-                'prompt_id' => $prompt_id,
-                'form_id' => $form_id,
-                'entry_id' => $entry_id,
-                'user_name' => $user_name,
-                'user_email' => $user_email,
-                'job_data' => $job_data_json,
-                'status' => self::STATUS_PENDING,
-                'priority' => $priority,
-                'scheduled_at' => $scheduled_time,
-                'created_at' => $created_time,
-                'updated_at' => $created_time
-            ),
-            array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s')
+                $this->jobs_table,
+                array(
+                    'job_type' => $job_type,
+                    'prompt_id' => $prompt_id,
+                    'form_id' => $form_id,
+                    'entry_id' => $entry_id,
+                    'user_name' => $user_name,
+                    'user_email' => $user_email,
+                    'job_data' => $job_data_json,
+                    'status' => self::STATUS_PENDING,
+                    'priority' => $priority,
+                    'scheduled_at' => $scheduled_time,
+                    'created_at' => $created_time,
+                    'updated_at' => $created_time
+                ),
+                array('%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s')
         );
 
         if ($result === false) {
@@ -193,7 +194,6 @@ class SFAIC_Background_Job_Manager {
      */
     private function schedule_cron_event_reliable($delay = 0) {
         $timestamp = time() + max($delay, 5); // Minimum 5 second delay
-
         // Always schedule a new event - WordPress will handle duplicates
         $result = wp_schedule_single_event($timestamp, self::CRON_HOOK);
 
@@ -220,7 +220,7 @@ class SFAIC_Background_Job_Manager {
         }
 
         error_log('SFAIC: Emergency processing triggered');
-        
+
         // Process in background using wp_remote_post
         wp_remote_post(admin_url('admin-ajax.php'), array(
             'timeout' => 0.01,
@@ -237,7 +237,7 @@ class SFAIC_Background_Job_Manager {
      */
     public function process_background_job() {
         update_option('sfaic_last_cron_run', time());
-        
+
         error_log('SFAIC: Background job processor triggered at ' . date('Y-m-d H:i:s'));
 
         // Reset stuck jobs first
@@ -253,13 +253,13 @@ class SFAIC_Background_Job_Manager {
 
         // Get the next job to process (simplified query)
         $job = $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->jobs_table} 
+                        "SELECT * FROM {$this->jobs_table} 
              WHERE status = %s 
              AND scheduled_at <= %s 
              ORDER BY priority DESC, created_at ASC 
              LIMIT 1",
-            self::STATUS_PENDING,
-            current_time('mysql')
+                        self::STATUS_PENDING,
+                        current_time('mysql')
         ));
 
         if (!$job) {
@@ -272,15 +272,15 @@ class SFAIC_Background_Job_Manager {
 
         // Update job status to processing
         $update_result = $wpdb->update(
-            $this->jobs_table,
-            array(
-                'status' => self::STATUS_PROCESSING,
-                'started_at' => current_time('mysql'),
-                'updated_at' => current_time('mysql')
-            ),
-            array('id' => $job->id),
-            array('%s', '%s', '%s'),
-            array('%d')
+                $this->jobs_table,
+                array(
+                    'status' => self::STATUS_PROCESSING,
+                    'started_at' => current_time('mysql'),
+                    'updated_at' => current_time('mysql')
+                ),
+                array('id' => $job->id),
+                array('%s', '%s', '%s'),
+                array('%d')
         );
 
         if ($update_result === false) {
@@ -319,11 +319,11 @@ class SFAIC_Background_Job_Manager {
         }
 
         global $wpdb;
-        
+
         // Check for too many concurrent jobs
         $processing_count = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
-            self::STATUS_PROCESSING
+                        "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
+                        self::STATUS_PROCESSING
         ));
 
         return $processing_count < 3; // Allow up to 3 concurrent jobs
@@ -336,18 +336,18 @@ class SFAIC_Background_Job_Manager {
         global $wpdb;
 
         $timeout_minutes = self::MAX_PROCESSING_TIME;
-        
+
         $stuck_jobs = $wpdb->query($wpdb->prepare(
-            "UPDATE {$this->jobs_table} 
+                        "UPDATE {$this->jobs_table} 
              SET status = %s, 
                  error_message = CONCAT(COALESCE(error_message, ''), ' [Reset: was stuck in processing]'),
                  updated_at = %s
              WHERE status = %s 
              AND (started_at IS NULL OR started_at < DATE_SUB(NOW(), INTERVAL %d MINUTE))",
-            self::STATUS_PENDING,
-            current_time('mysql'),
-            self::STATUS_PROCESSING,
-            $timeout_minutes
+                        self::STATUS_PENDING,
+                        current_time('mysql'),
+                        self::STATUS_PROCESSING,
+                        $timeout_minutes
         ));
 
         if ($wpdb->rows_affected > 0) {
@@ -356,15 +356,15 @@ class SFAIC_Background_Job_Manager {
 
         // Also reset very old pending jobs (older than 1 hour)
         $very_old_jobs = $wpdb->query($wpdb->prepare(
-            "UPDATE {$this->jobs_table} 
+                        "UPDATE {$this->jobs_table} 
              SET error_message = CONCAT(COALESCE(error_message, ''), ' [Reset: was pending too long]'),
                  updated_at = %s,
                  scheduled_at = %s
              WHERE status = %s 
              AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)",
-            current_time('mysql'),
-            current_time('mysql'), // Reschedule for immediate processing
-            self::STATUS_PENDING
+                        current_time('mysql'),
+                        current_time('mysql'), // Reschedule for immediate processing
+                        self::STATUS_PENDING
         ));
 
         if ($wpdb->rows_affected > 0) {
@@ -380,10 +380,10 @@ class SFAIC_Background_Job_Manager {
 
         // Check for more pending jobs
         $pending_count = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->jobs_table} 
+                        "SELECT COUNT(*) FROM {$this->jobs_table} 
              WHERE status = %s AND scheduled_at <= %s",
-            self::STATUS_PENDING,
-            current_time('mysql')
+                        self::STATUS_PENDING,
+                        current_time('mysql')
         ));
 
         if ($pending_count > 0) {
@@ -394,17 +394,17 @@ class SFAIC_Background_Job_Manager {
 
     private function mark_job_completed($job_id) {
         global $wpdb;
-        
+
         $wpdb->update(
-            $this->jobs_table,
-            array(
-                'status' => self::STATUS_COMPLETED,
-                'completed_at' => current_time('mysql'),
-                'updated_at' => current_time('mysql')
-            ),
-            array('id' => $job_id),
-            array('%s', '%s', '%s'),
-            array('%d')
+                $this->jobs_table,
+                array(
+                    'status' => self::STATUS_COMPLETED,
+                    'completed_at' => current_time('mysql'),
+                    'updated_at' => current_time('mysql')
+                ),
+                array('id' => $job_id),
+                array('%s', '%s', '%s'),
+                array('%d')
         );
     }
 
@@ -439,8 +439,8 @@ class SFAIC_Background_Job_Manager {
         }
 
         $form = wpFluent()->table('fluentform_forms')
-            ->where('id', $job->form_id)
-            ->first();
+                ->where('id', $job->form_id)
+                ->first();
 
         if (!$form) {
             throw new Exception('Form not found: ' . $job->form_id);
@@ -448,10 +448,10 @@ class SFAIC_Background_Job_Manager {
 
         // Call the process_prompt method directly
         $result = sfaic_main()->fluent_integration->process_prompt(
-            $job->prompt_id,
-            $job_data['form_data'],
-            $job->entry_id,
-            $form
+                $job->prompt_id,
+                $job_data['form_data'],
+                $job->entry_id,
+                $form
         );
 
         return $result;
@@ -472,17 +472,17 @@ class SFAIC_Background_Job_Manager {
             $retry_time = date('Y-m-d H:i:s', current_time('timestamp') + $delay);
 
             $wpdb->update(
-                $this->jobs_table,
-                array(
-                    'status' => self::STATUS_RETRY,
-                    'retry_count' => $retry_count,
-                    'scheduled_at' => $retry_time,
-                    'error_message' => $error_message,
-                    'updated_at' => current_time('mysql')
-                ),
-                array('id' => $job->id),
-                array('%s', '%d', '%s', '%s', '%s'),
-                array('%d')
+                    $this->jobs_table,
+                    array(
+                        'status' => self::STATUS_RETRY,
+                        'retry_count' => $retry_count,
+                        'scheduled_at' => $retry_time,
+                        'error_message' => $error_message,
+                        'updated_at' => current_time('mysql')
+                    ),
+                    array('id' => $job->id),
+                    array('%s', '%d', '%s', '%s', '%s'),
+                    array('%d')
             );
 
             // Schedule retry processing
@@ -492,16 +492,16 @@ class SFAIC_Background_Job_Manager {
         } else {
             // Mark as failed permanently
             $wpdb->update(
-                $this->jobs_table,
-                array(
-                    'status' => self::STATUS_FAILED,
-                    'completed_at' => current_time('mysql'),
-                    'error_message' => $error_message,
-                    'updated_at' => current_time('mysql')
-                ),
-                array('id' => $job->id),
-                array('%s', '%s', '%s', '%s'),
-                array('%d')
+                    $this->jobs_table,
+                    array(
+                        'status' => self::STATUS_FAILED,
+                        'completed_at' => current_time('mysql'),
+                        'error_message' => $error_message,
+                        'updated_at' => current_time('mysql')
+                    ),
+                    array('id' => $job->id),
+                    array('%s', '%s', '%s', '%s'),
+                    array('%d')
             );
 
             error_log("SFAIC: Job {$job->id} failed permanently after {$max_retries} retries");
@@ -516,14 +516,14 @@ class SFAIC_Background_Job_Manager {
 
         try {
             $job = (object) array(
-                'id' => 0,
-                'job_type' => $job_type,
-                'prompt_id' => $prompt_id,
-                'form_id' => $form_id,
-                'entry_id' => $entry_id,
-                'job_data' => wp_json_encode($job_data),
-                'user_name' => $this->extract_user_name($job_data['form_data'] ?? array()),
-                'user_email' => $this->extract_user_email($job_data['form_data'] ?? array()),
+                        'id' => 0,
+                        'job_type' => $job_type,
+                        'prompt_id' => $prompt_id,
+                        'form_id' => $form_id,
+                        'entry_id' => $entry_id,
+                        'job_data' => wp_json_encode($job_data),
+                        'user_name' => $this->extract_user_name($job_data['form_data'] ?? array()),
+                        'user_email' => $this->extract_user_email($job_data['form_data'] ?? array()),
             );
 
             return $this->execute_job($job);
@@ -538,12 +538,12 @@ class SFAIC_Background_Job_Manager {
      */
     public function cleanup_stuck_jobs_periodic() {
         $this->reset_stuck_processing_jobs();
-        
+
         // Check if we need to schedule more processing
         global $wpdb;
         $pending_count = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
-            self::STATUS_PENDING
+                        "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
+                        self::STATUS_PENDING
         ));
 
         if ($pending_count > 0) {
@@ -554,24 +554,61 @@ class SFAIC_Background_Job_Manager {
     /**
      * Extract user name from form data
      */
-    private function extract_user_name($form_data) {
+    private function extract_user_name($form_data, $prompt_id = null) {
         if (!is_array($form_data)) {
             return '';
         }
+        // First, try to use custom field mappings from prompt settings
+        if (!empty($prompt_id)) {
+            $first_name_field = get_post_meta($prompt_id, '_sfaic_first_name_field', true);
+            $last_name_field = get_post_meta($prompt_id, '_sfaic_last_name_field', true);
 
+            $first_name = '';
+            $last_name = '';
+                       
+            // Get first name from custom mapping
+            if (!empty($first_name_field) && isset($form_data[$first_name_field])) {   
+                 $fname=$form_data[$first_name_field];
+                if(is_array($fname)){
+                    $first_name = sanitize_text_field($fname['first_name']);
+                }else{
+                    $first_name = sanitize_text_field($form_data[$first_name_field]);
+                }
+            }
+            
+            
+            // Get last name from custom mapping
+            if (!empty($last_name_field) && isset($form_data[$last_name_field])) {     
+                $lname=$form_data[$last_name_field];
+                error_log('SFAIC:$last_name_field: ' . print_r($lname)); 
+                if(is_array($lname)){
+                    $last_name = sanitize_text_field($lname['last_name']);
+                    error_log('SFAIC: $last_name: ' . $last_name); 
+                }else{
+                     $last_name = sanitize_text_field($form_data[$last_name_field]);
+                }               
+            }
+
+            // If we got names from custom mappings, return them
+            if (!empty($first_name) || !empty($last_name)) {
+                return trim($first_name . ' ' . $last_name);
+            }
+        }
+
+        // Fall back to auto-detection with common field names
         $name_fields = array(
             'name', 'full_name', 'fullname', 'user_name', 'username',
             'first_name', 'last_name', 'contact_name', 'customer_name',
-            'client_name', 'your_name', 'applicant_name', 'student_name'
+            'client_name', 'your_name', 'applicant_name', 'student_name', 'Voornaam', 'Achternaam'
         );
 
         foreach ($name_fields as $field) {
-            if (isset($form_data[$field]) && !empty($form_data[$field])) {
+            if (isset($form_data[$field]) && !empty($form_data[$field])) { 
                 return sanitize_text_field($form_data[$field]);
             }
         }
 
-        // Try to combine first and last name
+        // Try to combine first and last name from auto-detection
         $first_name = isset($form_data['first_name']) ? sanitize_text_field($form_data['first_name']) : '';
         $last_name = isset($form_data['last_name']) ? sanitize_text_field($form_data['last_name']) : '';
 
@@ -585,11 +622,24 @@ class SFAIC_Background_Job_Manager {
     /**
      * Extract user email from form data
      */
-    private function extract_user_email($form_data) {
+    private function extract_user_email($form_data, $prompt_id = null) {
         if (!is_array($form_data)) {
             return '';
         }
 
+        // First, try to use custom field mapping from prompt settings
+        if (!empty($prompt_id)) {
+            $email_field = get_post_meta($prompt_id, '_sfaic_email_field_mapping', true);
+
+            if (!empty($email_field) && isset($form_data[$email_field])) {
+                $email = sanitize_email($form_data[$email_field]);
+                if (is_email($email)) {
+                    return $email;
+                }
+            }
+        }
+
+        // Fall back to auto-detection with common field names
         $email_fields = array(
             'email', 'email_address', 'user_email', 'contact_email',
             'customer_email', 'client_email', 'your_email', 'applicant_email',
@@ -701,7 +751,7 @@ class SFAIC_Background_Job_Manager {
      */
     public function get_job_statistics() {
         global $wpdb;
-        
+
         $stats = $wpdb->get_row("
             SELECT 
                 COUNT(*) as total_jobs,
@@ -713,7 +763,7 @@ class SFAIC_Background_Job_Manager {
             FROM {$this->jobs_table}
             WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         ");
-        
+
         // Ensure all values are integers
         if ($stats) {
             $stats->total_jobs = intval($stats->total_jobs);
@@ -725,15 +775,15 @@ class SFAIC_Background_Job_Manager {
         } else {
             // Return default stats if no data
             $stats = (object) array(
-                'total_jobs' => 0,
-                'pending_jobs' => 0,
-                'processing_jobs' => 0,
-                'completed_jobs' => 0,
-                'failed_jobs' => 0,
-                'retry_jobs' => 0
+                        'total_jobs' => 0,
+                        'pending_jobs' => 0,
+                        'processing_jobs' => 0,
+                        'completed_jobs' => 0,
+                        'failed_jobs' => 0,
+                        'retry_jobs' => 0
             );
         }
-        
+
         return $stats;
     }
 
@@ -742,19 +792,19 @@ class SFAIC_Background_Job_Manager {
      */
     public function get_recent_jobs_enhanced($limit = 50) {
         global $wpdb;
-        
+
         $jobs = $wpdb->get_results($wpdb->prepare(
-            "SELECT j.*, p.post_title as prompt_title 
+                        "SELECT j.*, p.post_title as prompt_title 
              FROM {$this->jobs_table} j
              LEFT JOIN {$wpdb->posts} p ON j.prompt_id = p.ID
              ORDER BY j.created_at DESC 
              LIMIT %d",
-            $limit
+                        $limit
         ));
-        
+
         // Process and format each job
         $formatted_jobs = array();
-        
+
         foreach ($jobs as $job) {
             $formatted_job = array(
                 'id' => intval($job->id),
@@ -776,10 +826,10 @@ class SFAIC_Background_Job_Manager {
                 'updated_at' => $job->updated_at,
                 'prompt_title' => sanitize_text_field($job->prompt_title ?: '')
             );
-            
+
             $formatted_jobs[] = $formatted_job;
         }
-        
+
         return $formatted_jobs;
     }
 
@@ -790,27 +840,27 @@ class SFAIC_Background_Job_Manager {
     public function cleanup_old_jobs() {
         global $wpdb;
         $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->jobs_table} 
+                        "DELETE FROM {$this->jobs_table} 
              WHERE status = %s 
              AND completed_at < DATE_SUB(NOW(), INTERVAL 7 DAY)",
-            self::STATUS_COMPLETED
+                        self::STATUS_COMPLETED
         ));
         $wpdb->query($wpdb->prepare(
-            "DELETE FROM {$this->jobs_table} 
+                        "DELETE FROM {$this->jobs_table} 
              WHERE status = %s 
              AND completed_at < DATE_SUB(NOW(), INTERVAL 30 DAY)",
-            self::STATUS_FAILED
+                        self::STATUS_FAILED
         ));
     }
 
     public function add_jobs_menu() {
         add_submenu_page(
-            'edit.php?post_type=sfaic_prompt',
-            __('Background Jobs', 'chatgpt-fluent-connector'),
-            __('Background Jobs', 'chatgpt-fluent-connector'),
-            'manage_options',
-            'sfaic-background-jobs',
-            array($this, 'render_jobs_page')
+                'edit.php?post_type=sfaic_prompt',
+                __('Background Jobs', 'chatgpt-fluent-connector'),
+                __('Background Jobs', 'chatgpt-fluent-connector'),
+                'manage_options',
+                'sfaic-background-jobs',
+                array($this, 'render_jobs_page')
         );
     }
 
@@ -820,11 +870,11 @@ class SFAIC_Background_Job_Manager {
         }
 
         wp_enqueue_script(
-            'sfaic-background-jobs',
-            SFAIC_URL . 'assets/js/background-jobs.js',
-            array('jquery'),
-            SFAIC_VERSION,
-            true
+                'sfaic-background-jobs',
+                SFAIC_URL . 'assets/js/background-jobs.js',
+                array('jquery'),
+                SFAIC_VERSION,
+                true
         );
 
         wp_localize_script('sfaic-background-jobs', 'sfaic_jobs_ajax', array(
@@ -838,10 +888,10 @@ class SFAIC_Background_Job_Manager {
         ));
 
         wp_enqueue_style(
-            'sfaic-background-jobs',
-            SFAIC_URL . 'assets/css/background-jobs.css',
-            array(),
-            SFAIC_VERSION
+                'sfaic-background-jobs',
+                SFAIC_URL . 'assets/css/background-jobs.css',
+                array(),
+                SFAIC_VERSION
         );
     }
 
@@ -852,12 +902,12 @@ class SFAIC_Background_Job_Manager {
         if (!current_user_can('manage_options')) {
             wp_die(__('You do not have sufficient permissions to access this page.'));
         }
-        
+
         try {
             $stats = $this->get_job_statistics();
             $recent_jobs = $this->get_recent_jobs_enhanced();
             $background_enabled = $this->is_background_processing_enabled();
-            
+
             // Check for any prompts with background processing enabled
             $prompts_with_bg = get_posts(array(
                 'post_type' => 'sfaic_prompt',
@@ -871,14 +921,13 @@ class SFAIC_Background_Job_Manager {
                 'posts_per_page' => 1,
                 'fields' => 'ids'
             ));
-            
+
             $has_bg_prompts = !empty($prompts_with_bg);
-            
             ?>
             <div class="wrap">
                 <h1 class="wp-heading-inline"><?php _e('Background Jobs', 'chatgpt-fluent-connector'); ?></h1>
                 <hr class="wp-header-end">
-                
+
                 <!-- System Status -->
                 <div class="sfaic-system-status">
                     <p>
@@ -889,24 +938,24 @@ class SFAIC_Background_Job_Manager {
                         <?php else: ?>
                             <span class="status-indicator enabled"></span><span style="color: #00a32a;"><?php _e('Enabled', 'chatgpt-fluent-connector'); ?></span>
                         <?php endif; ?> | 
-                        
+
                         <?php _e('Next Scheduled:', 'chatgpt-fluent-connector'); ?> 
-                        <?php 
-                            $next = wp_next_scheduled(self::CRON_HOOK);
-                            if ($next) {
-                                echo '<span style="color: #00a32a;">' . date('H:i:s', $next) . '</span>';
-                            } else {
-                                echo '<span style="color: #d63638;">' . __('None', 'chatgpt-fluent-connector') . '</span>';
-                            }
+                        <?php
+                        $next = wp_next_scheduled(self::CRON_HOOK);
+                        if ($next) {
+                            echo '<span style="color: #00a32a;">' . date('H:i:s', $next) . '</span>';
+                        } else {
+                            echo '<span style="color: #d63638;">' . __('None', 'chatgpt-fluent-connector') . '</span>';
+                        }
                         ?> | 
-                        
+
                         <?php _e('Background Processing:', 'chatgpt-fluent-connector'); ?> 
                         <?php if ($background_enabled): ?>
                             <span class="status-indicator enabled"></span><span style="color: #00a32a;"><?php _e('Available', 'chatgpt-fluent-connector'); ?></span>
                         <?php else: ?>
                             <span class="status-indicator disabled"></span><span style="color: #dba617;"><?php _e('Disabled', 'chatgpt-fluent-connector'); ?></span>
                         <?php endif; ?> | 
-                        
+
                         <?php _e('Active Prompts:', 'chatgpt-fluent-connector'); ?> 
                         <?php if ($has_bg_prompts): ?>
                             <span class="status-indicator enabled"></span><span style="color: #00a32a;"><?php echo count($prompts_with_bg); ?></span>
@@ -972,7 +1021,7 @@ class SFAIC_Background_Job_Manager {
                     <div class="tablenav top">
                         <h3><?php _e('Recent Jobs', 'chatgpt-fluent-connector'); ?></h3>
                     </div>
-                    
+
                     <?php if (!empty($recent_jobs)): ?>
                         <table class="wp-list-table widefat fixed striped sfaic-jobs-table">
                             <thead>
@@ -980,7 +1029,7 @@ class SFAIC_Background_Job_Manager {
                                     <th scope="col" class="manage-column column-id"><?php _e('ID', 'chatgpt-fluent-connector'); ?></th>
                                     <th scope="col" class="manage-column column-type"><?php _e('Type', 'chatgpt-fluent-connector'); ?></th>
                                     <th scope="col" class="manage-column column-name"><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
-                                    <th scope="col" class="manage-column column-email"><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
+                                    <th scope="col" class="manage-column column-email"><?php _e('Email 1', 'chatgpt-fluent-connector'); ?></th>
                                     <th scope="col" class="manage-column column-status"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
                                     <th scope="col" class="manage-column column-date"><?php _e('Created', 'chatgpt-fluent-connector'); ?></th>
                                     <th scope="col" class="manage-column column-actions"><?php _e('Actions', 'chatgpt-fluent-connector'); ?></th>
@@ -1013,7 +1062,7 @@ class SFAIC_Background_Job_Manager {
                                                 <?php
                                                 $age_minutes = (time() - strtotime($job['created_at'])) / 60;
                                                 if ($age_minutes > 5):
-                                                ?>
+                                                    ?>
                                                     <br><small style="color: #d63638;">⚠️ <?php echo round($age_minutes); ?>min old</small>
                                                 <?php endif; ?>
                                             <?php endif; ?>
@@ -1057,13 +1106,12 @@ class SFAIC_Background_Job_Manager {
                 </div>
             </div>
             <?php
-            
         } catch (Exception $e) {
             echo '<div class="wrap">';
             echo '<h1>' . __('Background Jobs', 'chatgpt-fluent-connector') . '</h1>';
             echo '<div class="notice notice-error"><p>' . sprintf(__('Error loading jobs page: %s', 'chatgpt-fluent-connector'), esc_html($e->getMessage())) . '</p></div>';
             echo '</div>';
-            
+
             error_log('SFAIC: Error in render_jobs_page: ' . $e->getMessage());
         }
     }
@@ -1074,25 +1122,24 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         try {
             $stats = $this->get_job_statistics();
             $recent_jobs = $this->get_recent_jobs_enhanced(50);
-            
+
             $response_data = array(
                 'stats' => $stats,
                 'jobs' => $recent_jobs,
                 'timestamp' => current_time('timestamp'),
                 'server_time' => current_time('mysql')
             );
-            
+
             wp_send_json_success($response_data);
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_get_job_status: ' . $e->getMessage());
             wp_send_json_error('Failed to get job status: ' . $e->getMessage());
@@ -1104,50 +1151,50 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         if (!isset($_POST['job_id']) || !is_numeric($_POST['job_id'])) {
             wp_send_json_error('Invalid job ID');
             return;
         }
-        
+
         $job_id = intval($_POST['job_id']);
-        
+
         try {
             global $wpdb;
-            
+
             $job = $wpdb->get_row($wpdb->prepare(
-                "SELECT * FROM {$this->jobs_table} WHERE id = %d",
-                $job_id
+                            "SELECT * FROM {$this->jobs_table} WHERE id = %d",
+                            $job_id
             ));
-            
+
             if (!$job) {
                 wp_send_json_error('Job not found');
                 return;
             }
-            
+
             if (!in_array($job->status, array('failed', 'retry'))) {
                 wp_send_json_error('Job cannot be retried in current status: ' . $job->status);
                 return;
             }
-            
+
             $result = $wpdb->update(
-                $this->jobs_table,
-                array(
-                    'status' => self::STATUS_PENDING,
-                    'retry_count' => 0,
-                    'scheduled_at' => current_time('mysql'),
-                    'started_at' => null,
-                    'error_message' => '',
-                    'updated_at' => current_time('mysql')
-                ),
-                array('id' => $job_id),
-                array('%s', '%d', '%s', '%s', '%s', '%s'),
-                array('%d')
+                    $this->jobs_table,
+                    array(
+                        'status' => self::STATUS_PENDING,
+                        'retry_count' => 0,
+                        'scheduled_at' => current_time('mysql'),
+                        'started_at' => null,
+                        'error_message' => '',
+                        'updated_at' => current_time('mysql')
+                    ),
+                    array('id' => $job_id),
+                    array('%s', '%d', '%s', '%s', '%s', '%s'),
+                    array('%d')
             );
 
             if ($result !== false) {
@@ -1156,7 +1203,6 @@ class SFAIC_Background_Job_Manager {
             } else {
                 wp_send_json_error('Failed to update job in database');
             }
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_retry_job: ' . $e->getMessage());
             wp_send_json_error('Database error occurred');
@@ -1168,48 +1214,48 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         if (!isset($_POST['job_id']) || !is_numeric($_POST['job_id'])) {
             wp_send_json_error('Invalid job ID');
             return;
         }
-        
+
         $job_id = intval($_POST['job_id']);
-        
+
         try {
             global $wpdb;
-            
+
             $job = $wpdb->get_row($wpdb->prepare(
-                "SELECT * FROM {$this->jobs_table} WHERE id = %d",
-                $job_id
+                            "SELECT * FROM {$this->jobs_table} WHERE id = %d",
+                            $job_id
             ));
-            
+
             if (!$job) {
                 wp_send_json_error('Job not found');
                 return;
             }
-            
+
             if (!in_array($job->status, array('pending', 'retry'))) {
                 wp_send_json_error('Job cannot be cancelled in current status: ' . $job->status);
                 return;
             }
-            
+
             $result = $wpdb->update(
-                $this->jobs_table,
-                array(
-                    'status' => self::STATUS_FAILED,
-                    'error_message' => 'Cancelled by administrator',
-                    'completed_at' => current_time('mysql'),
-                    'updated_at' => current_time('mysql')
-                ),
-                array('id' => $job_id),
-                array('%s', '%s', '%s', '%s'),
-                array('%d')
+                    $this->jobs_table,
+                    array(
+                        'status' => self::STATUS_FAILED,
+                        'error_message' => 'Cancelled by administrator',
+                        'completed_at' => current_time('mysql'),
+                        'updated_at' => current_time('mysql')
+                    ),
+                    array('id' => $job_id),
+                    array('%s', '%s', '%s', '%s'),
+                    array('%d')
             );
 
             if ($result !== false) {
@@ -1217,7 +1263,6 @@ class SFAIC_Background_Job_Manager {
             } else {
                 wp_send_json_error('Failed to cancel job in database');
             }
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_cancel_job: ' . $e->getMessage());
             wp_send_json_error('Database error occurred');
@@ -1229,35 +1274,34 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         try {
             global $wpdb;
-            
+
             $completed_count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} 
+                            "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE status = %s 
                  AND completed_at < DATE_SUB(NOW(), INTERVAL 7 DAY)",
-                self::STATUS_COMPLETED
+                            self::STATUS_COMPLETED
             ));
-            
+
             $failed_count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} 
+                            "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE status = %s 
                  AND completed_at < DATE_SUB(NOW(), INTERVAL 30 DAY)",
-                self::STATUS_FAILED
+                            self::STATUS_FAILED
             ));
-            
+
             $this->cleanup_old_jobs();
-            
+
             $total_cleaned = intval($completed_count) + intval($failed_count);
-            
+
             wp_send_json_success("Cleaned up {$total_cleaned} old jobs");
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_cleanup_jobs: ' . $e->getMessage());
             wp_send_json_error('Failed to cleanup jobs');
@@ -1269,53 +1313,52 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         try {
             global $wpdb;
-            
+
             $cron_info = array();
             $cron_info['wp_cron_disabled'] = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
-            
+
             $next_scheduled = wp_next_scheduled(self::CRON_HOOK);
             $cron_info['next_scheduled'] = $next_scheduled ? date('Y-m-d H:i:s', $next_scheduled) : 'None';
-            
+
             $cron_info['pending_jobs'] = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
-                self::STATUS_PENDING
-            )) ?: 0;
-            
+                                    "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
+                                    self::STATUS_PENDING
+                            )) ?: 0;
+
             $cron_info['processing_jobs'] = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
-                self::STATUS_PROCESSING
-            )) ?: 0;
-            
+                                    "SELECT COUNT(*) FROM {$this->jobs_table} WHERE status = %s",
+                                    self::STATUS_PROCESSING
+                            )) ?: 0;
+
             $cron_info['stuck_jobs'] = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} 
+                                    "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE (status = %s AND started_at < DATE_SUB(NOW(), INTERVAL %d MINUTE))
                  OR (status = %s AND created_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE))",
-                self::STATUS_PROCESSING,
-                self::MAX_PROCESSING_TIME,
-                self::STATUS_PENDING
-            )) ?: 0;
-            
+                                    self::STATUS_PROCESSING,
+                                    self::MAX_PROCESSING_TIME,
+                                    self::STATUS_PENDING
+                            )) ?: 0;
+
             $cron_info['server_time'] = current_time('mysql');
             $cron_info['wp_timezone'] = wp_timezone_string();
             $cron_info['last_cron_run'] = get_option('sfaic_last_cron_run', 0);
-            
+
             if ($cron_info['last_cron_run'] > 0) {
                 $cron_info['last_cron_run_formatted'] = date('Y-m-d H:i:s', $cron_info['last_cron_run']);
                 $cron_info['minutes_since_last_run'] = round((time() - $cron_info['last_cron_run']) / 60, 1);
             }
-            
+
             $cron_info['available_schedules'] = wp_get_schedules();
-            
+
             wp_send_json_success($cron_info);
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_debug_cron: ' . $e->getMessage());
             wp_send_json_error('Failed to get debug information');
@@ -1327,20 +1370,19 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         try {
             $this->reset_stuck_processing_jobs();
             wp_clear_scheduled_hook(self::CRON_HOOK);
             $result = $this->process_background_job();
             $this->schedule_cron_event_reliable(5);
-            
+
             wp_send_json_success('Background job processing triggered');
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_force_process_jobs: ' . $e->getMessage());
             wp_send_json_error('Failed to force process jobs: ' . $e->getMessage());
@@ -1352,37 +1394,36 @@ class SFAIC_Background_Job_Manager {
             wp_send_json_error('Invalid nonce');
             return;
         }
-        
+
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Unauthorized');
             return;
         }
-        
+
         try {
             global $wpdb;
-            
+
             $stuck_processing = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} 
+                            "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE status = %s 
                  AND started_at < DATE_SUB(NOW(), INTERVAL %d MINUTE)",
-                self::STATUS_PROCESSING,
-                self::MAX_PROCESSING_TIME
+                            self::STATUS_PROCESSING,
+                            self::MAX_PROCESSING_TIME
             ));
-            
+
             $old_pending = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->jobs_table} 
+                            "SELECT COUNT(*) FROM {$this->jobs_table} 
                  WHERE status = %s 
                  AND created_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE)",
-                self::STATUS_PENDING
+                            self::STATUS_PENDING
             ));
-            
+
             $this->reset_stuck_processing_jobs();
             $this->schedule_cron_event_reliable(0);
-            
+
             $total_reset = intval($stuck_processing) + intval($old_pending);
-            
+
             wp_send_json_success("Reset {$total_reset} stuck jobs ({$stuck_processing} processing, {$old_pending} old pending)");
-            
         } catch (Exception $e) {
             error_log('SFAIC: Error in ajax_cleanup_stuck_jobs: ' . $e->getMessage());
             wp_send_json_error('Failed to cleanup stuck jobs: ' . $e->getMessage());

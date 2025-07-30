@@ -5,7 +5,6 @@
  * Handles registration and management of the ChatGPT Prompt custom post type
  * with improved chunking settings and per-prompt background processing
  */
-
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
@@ -69,59 +68,59 @@ class SFAIC_Prompt_Manager {
      */
     public function add_meta_boxes() {
         add_meta_box(
-            'sfaic_prompt_settings',
-            __('Prompt Settings', 'chatgpt-fluent-connector'),
-            array($this, 'render_prompt_settings_meta_box'),
-            'sfaic_prompt',
-            'normal',
-            'high'
+                'sfaic_prompt_settings',
+                __('Prompt Settings', 'chatgpt-fluent-connector'),
+                array($this, 'render_prompt_settings_meta_box'),
+                'sfaic_prompt',
+                'normal',
+                'high'
         );
 
         add_meta_box(
-            'sfaic_form_selection',
-            __('Fluent Form Selection', 'chatgpt-fluent-connector'),
-            array($this, 'render_form_selection_meta_box'),
-            'sfaic_prompt',
-            'side',
-            'default'
+                'sfaic_form_selection',
+                __('Fluent Form Selection', 'chatgpt-fluent-connector'),
+                array($this, 'render_form_selection_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
         );
 
         add_meta_box(
-            'sfaic_response_handling',
-            __('Response Handling', 'chatgpt-fluent-connector'),
-            array($this, 'render_response_handling_meta_box'),
-            'sfaic_prompt',
-            'normal',
-            'default'
+                'sfaic_response_handling',
+                __('Response Handling', 'chatgpt-fluent-connector'),
+                array($this, 'render_response_handling_meta_box'),
+                'sfaic_prompt',
+                'normal',
+                'default'
         );
 
         // Enhanced comprehensive chunking settings
         add_meta_box(
-            'sfaic_chunking_settings',
-            __('Response Length & Chunking', 'chatgpt-fluent-connector'),
-            array($this, 'render_chunking_settings_meta_box'),
-            'sfaic_prompt',
-            'side',
-            'default'
+                'sfaic_chunking_settings',
+                __('Response Length & Chunking', 'chatgpt-fluent-connector'),
+                array($this, 'render_chunking_settings_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
         );
 
         // NEW: Background Processing Settings
         add_meta_box(
-            'sfaic_background_processing',
-            __('Background Processing Settings', 'chatgpt-fluent-connector'),
-            array($this, 'render_background_processing_meta_box'),
-            'sfaic_prompt',
-            'side',
-            'default'
+                'sfaic_background_processing',
+                __('Background Processing Settings', 'chatgpt-fluent-connector'),
+                array($this, 'render_background_processing_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
         );
 
         add_meta_box(
-            'sfaic_field_mapping',
-            __('User Field Mapping', 'chatgpt-fluent-connector'),
-            array($this, 'render_field_mapping_meta_box'),
-            'sfaic_prompt',
-            'side',
-            'default'
+                'sfaic_field_mapping',
+                __('User Field Mapping', 'chatgpt-fluent-connector'),
+                array($this, 'render_field_mapping_meta_box'),
+                'sfaic_prompt',
+                'side',
+                'default'
         );
     }
 
@@ -154,7 +153,7 @@ class SFAIC_Prompt_Manager {
         ?>
         <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
             <h4 style="margin-top: 0; color: #0073aa;">⚙️ Processing Method</h4>
-            
+
             <?php if (!$background_available): ?>
                 <div class="notice notice-warning inline" style="margin: 0 0 15px 0;">
                     <p style="margin: 5px 0; font-size: 12px;">
@@ -168,13 +167,13 @@ class SFAIC_Prompt_Manager {
                     <th style="width: 120px;"><label for="sfaic_enable_background_processing"><?php _e('Processing Mode:', 'chatgpt-fluent-connector'); ?></label></th>
                     <td>
                         <label style="display: block; margin-bottom: 8px;">
-                            <input type="radio" name="sfaic_enable_background_processing" value="1" <?php checked($enable_background_processing, '1'); ?> <?php echo !$background_available ? 'disabled' : ''; ?>>
+                            <input type="radio" name="sfaic_enable_background_processing" value="1" <?php checked($enable_background_processing, '1'); ?> <?php echo!$background_available ? 'disabled' : ''; ?>>
                             <strong><?php _e('Background Processing (Recommended)', 'chatgpt-fluent-connector'); ?></strong>
                         </label>
                         <p class="description" style="margin: 0 0 10px 20px; font-size: 11px;">
                             <?php _e('AI requests are processed in the background. Users get immediate form confirmation and receive responses via email.', 'chatgpt-fluent-connector'); ?>
                         </p>
-                        
+
                         <label style="display: block;">
                             <input type="radio" name="sfaic_enable_background_processing" value="0" <?php checked($enable_background_processing, '0'); ?>>
                             <strong><?php _e('Immediate Processing', 'chatgpt-fluent-connector'); ?></strong>
@@ -190,7 +189,7 @@ class SFAIC_Prompt_Manager {
             <div id="background-processing-options" <?php echo ($enable_background_processing != '1' || !$background_available) ? 'style="display:none;"' : ''; ?>>
                 <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
                 <h4 style="margin: 10px 0; color: #0073aa;">⏱️ Background Processing Options</h4>
-                
+
                 <table class="form-table" style="margin: 0;">
                     <tr>
                         <th><label for="sfaic_background_processing_delay"><?php _e('Processing Delay:', 'chatgpt-fluent-connector'); ?></label></th>
@@ -207,7 +206,7 @@ class SFAIC_Prompt_Manager {
                             </p>
                         </td>
                     </tr>
-                    
+
                     <tr>
                         <th><label for="sfaic_job_priority"><?php _e('Job Priority:', 'chatgpt-fluent-connector'); ?></label></th>
                         <td>
@@ -222,7 +221,7 @@ class SFAIC_Prompt_Manager {
                             </p>
                         </td>
                     </tr>
-                    
+
                     <tr>
                         <th><label for="sfaic_job_timeout"><?php _e('Timeout:', 'chatgpt-fluent-connector'); ?></label></th>
                         <td>
@@ -274,7 +273,7 @@ class SFAIC_Prompt_Manager {
                 $('input[name="sfaic_enable_background_processing"]').change(function () {
                     var isEnabled = $('input[name="sfaic_enable_background_processing"]:checked').val() === '1';
                     var isAvailable = <?php echo $background_available ? 'true' : 'false'; ?>;
-                    
+
                     if (isEnabled && isAvailable) {
                         $('#background-processing-options').show();
                         $('#processing-impact-text').text('Users will receive immediate form confirmation and get AI responses via email within minutes.');
@@ -414,7 +413,7 @@ class SFAIC_Prompt_Manager {
         ?>
         <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
             <h4 style="margin-top: 0; color: #0073aa;">📏 Response Length Settings</h4>
-            
+
             <table class="form-table" style="margin: 0;">
                 <tr>
                     <th style="width: 120px;"><label for="sfaic_max_tokens"><?php _e('Max Tokens:', 'chatgpt-fluent-connector'); ?></label></th>
@@ -432,7 +431,7 @@ class SFAIC_Prompt_Manager {
                         </p>
                     </td>
                 </tr>
-                
+
                 <tr>
                     <th><label for="sfaic_enable_chunking"><?php _e('Long Responses:', 'chatgpt-fluent-connector'); ?></label></th>
                     <td>
@@ -451,7 +450,7 @@ class SFAIC_Prompt_Manager {
             <div id="advanced-chunking-settings" <?php echo ($enable_chunking != '1') ? 'style="display:none;"' : ''; ?>>
                 <hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
                 <h4 style="margin: 10px 0; color: #0073aa;">⚙️ Advanced Chunking Settings</h4>
-                
+
                 <table class="form-table" style="margin: 0;">
                     <tr>
                         <th><label for="sfaic_chunking_strategy"><?php _e('Strategy:', 'chatgpt-fluent-connector'); ?></label></th>
@@ -463,7 +462,7 @@ class SFAIC_Prompt_Manager {
                             </select>
                         </td>
                     </tr>
-                    
+
                     <tr>
                         <th><label for="sfaic_completion_marker"><?php _e('Stop Marker:', 'chatgpt-fluent-connector'); ?></label></th>
                         <td>
@@ -477,7 +476,7 @@ class SFAIC_Prompt_Manager {
                             </p>
                         </td>
                     </tr>
-                    
+
                     <tr>
                         <th><label for="sfaic_enable_smart_completion"><?php _e('Smart Detection:', 'chatgpt-fluent-connector'); ?></label></th>
                         <td>
@@ -487,12 +486,12 @@ class SFAIC_Prompt_Manager {
                                        id="sfaic_enable_smart_completion" 
                                        value="1" 
                                        <?php checked($enable_smart_completion, '1'); ?>>
-                                <?php _e('Auto-detect when response is complete', 'chatgpt-fluent-connector'); ?>
+                                       <?php _e('Auto-detect when response is complete', 'chatgpt-fluent-connector'); ?>
                             </label>
                         </td>
                     </tr>
                 </table>
-                
+
                 <!-- Smart completion settings -->
                 <div id="smart-completion-settings" <?php echo ($enable_smart_completion != '1') ? 'style="display:none;"' : ''; ?>>
                     <table class="form-table" style="margin: 10px 0 0 0;">
@@ -543,7 +542,7 @@ class SFAIC_Prompt_Manager {
                                            id="sfaic_use_token_percentage" 
                                            value="1" 
                                            <?php checked($use_token_percentage, '1'); ?>>
-                                    <?php _e('Use token percentage for completion timing', 'chatgpt-fluent-connector'); ?>
+                                           <?php _e('Use token percentage for completion timing', 'chatgpt-fluent-connector'); ?>
                                 </label>
                             </td>
                         </tr>
@@ -612,7 +611,7 @@ class SFAIC_Prompt_Manager {
         $first_name_field = get_post_meta($post->ID, '_sfaic_first_name_field', true);
         $last_name_field = get_post_meta($post->ID, '_sfaic_last_name_field', true);
         $email_field = get_post_meta($post->ID, '_sfaic_email_field_mapping', true);
-        
+
         // Get form ID to fetch available fields
         $form_id = get_post_meta($post->ID, '_sfaic_fluent_form_id', true);
 
@@ -732,7 +731,7 @@ class SFAIC_Prompt_Manager {
         $selected_form_id = get_post_meta($post->ID, '_sfaic_fluent_form_id', true);
         ?>
         <p>
-        <?php if (empty($fluent_forms)) : ?>
+            <?php if (empty($fluent_forms)) : ?>
             <div class="notice notice-warning inline">
                 <p><?php _e('No Fluent Forms found. Please create at least one form first.', 'chatgpt-fluent-connector'); ?></p>
             </div>
@@ -752,7 +751,7 @@ class SFAIC_Prompt_Manager {
         <?php if (!empty($selected_form_id)) : ?>
             <p>
                 <strong><?php _e('Available Form Fields:', 'chatgpt-fluent-connector'); ?></strong><br>
-                <div style="max-height: 200px; overflow-y: auto; margin-top: 5px; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+            <div style="max-height: 200px; overflow-y: auto; margin-top: 5px; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
                 <?php
                 $all_fields = $this->get_form_fields($selected_form_id);
                 if (!empty($all_fields)) {
@@ -764,12 +763,12 @@ class SFAIC_Prompt_Manager {
                 } else {
                     echo '<div class="notice notice-info inline"><p>' . esc_html__('To see available form fields, please edit and save the selected form in Fluent Forms first.', 'chatgpt-fluent-connector') . '</p>';
                     echo '<p>' . esc_html__('Alternatively, you can manually determine field keys by checking the form structure in Fluent Forms.', 'chatgpt-fluent-connector') . '</p></div>';
-                    
+
                     $edit_link = admin_url('admin.php?page=fluent_forms&route=editor&form_id=' . $selected_form_id);
                     echo '<p><a href="' . esc_url($edit_link) . '" class="button" target="_blank">' . esc_html__('Edit Form in Fluent Forms', 'chatgpt-fluent-connector') . '</a></p>';
                 }
                 ?>
-                </div>
+            </div>
             </p>
         <?php endif; ?>
         <?php
@@ -1020,10 +1019,10 @@ class SFAIC_Prompt_Manager {
      */
     public function save_post_meta($post_id) {
         // Check nonce and permissions
-        if (!isset($_POST['sfaic_prompt_nonce']) || 
-            !wp_verify_nonce($_POST['sfaic_prompt_nonce'], 'sfaic_prompt_meta_save') ||
-            !current_user_can('edit_post', $post_id) ||
-            (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)) {
+        if (!isset($_POST['sfaic_prompt_nonce']) ||
+                !wp_verify_nonce($_POST['sfaic_prompt_nonce'], 'sfaic_prompt_meta_save') ||
+                !current_user_can('edit_post', $post_id) ||
+                (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)) {
             return;
         }
 
@@ -1216,6 +1215,53 @@ class SFAIC_Prompt_Manager {
             return $field_labels;
         }
 
+        // Method 1: Try to get fields from recent submissions first (most reliable)
+        $recent_submission = wpFluent()->table('fluentform_submissions')
+                ->where('form_id', $form_id)
+                ->orderBy('id', 'DESC')
+                ->first();
+
+        if ($recent_submission && !empty($recent_submission->response)) {
+            $submission_data = json_decode($recent_submission->response, true);
+            if (!empty($submission_data)) {
+                // Get field labels from form structure and match with submission data
+                $form_structure_fields = $this->get_form_structure_fields($form_id);
+
+                foreach ($submission_data as $field_key => $field_value) {
+                    // Skip internal fields
+                    if (strpos($field_key, '_') === 0) {
+                        continue;
+                    }
+
+                    // Use form structure label if available, otherwise use field key
+                    $field_label = isset($form_structure_fields[$field_key]) ?
+                            $form_structure_fields[$field_key] :
+                            ucwords(str_replace('_', ' ', $field_key));
+
+                    $field_labels[$field_key] = $field_label;
+                }
+
+                // If we got fields from submissions, return them
+                if (!empty($field_labels)) {
+                    return $field_labels;
+                }
+            }
+        }
+
+        // Method 2: Fall back to form structure parsing
+        return $this->get_form_structure_fields($form_id);
+    }
+
+    /**
+     * Get fields from form structure with multiple fallback methods
+     */
+    private function get_form_structure_fields($form_id) {
+        $field_labels = array();
+
+        if (empty($form_id) || !function_exists('wpFluent')) {
+            return $field_labels;
+        }
+
         // Try multiple methods to get field labels
         // Method 1: Try formDatenation first (older versions)
         $formFields = wpFluent()->table('fluentform_form_meta')
@@ -1233,7 +1279,9 @@ class SFAIC_Prompt_Manager {
                         $field_labels[$field_name] = $field_label;
                     }
                 }
-                return $field_labels;
+                if (!empty($field_labels)) {
+                    return $field_labels;
+                }
             }
         }
 
@@ -1253,7 +1301,9 @@ class SFAIC_Prompt_Manager {
                         $field_labels[$field_name] = $field_label;
                     }
                 }
-                return $field_labels;
+                if (!empty($field_labels)) {
+                    return $field_labels;
+                }
             }
         }
 
@@ -1273,22 +1323,35 @@ class SFAIC_Prompt_Manager {
                         $field_labels[$field_name] = $field_label;
                     }
                 }
-                return $field_labels;
+                if (!empty($field_labels)) {
+                    return $field_labels;
+                }
             }
         }
 
         // Method 4: Use Fluent Forms API if available (most reliable)
         if (class_exists('\FluentForm\App\Api\FormFields')) {
             try {
-                $formFields = (new \FluentForm\App\Api\FormFields())->getFormInputs($form_id);
+                $formFieldsAPI = new \FluentForm\App\Api\FormFields();
+                $formFields = $formFieldsAPI->getFormInputs($form_id);
                 if (!empty($formFields)) {
                     foreach ($formFields as $fieldName => $fieldDetails) {
-                        $field_labels[$fieldName] = $fieldDetails['element'];
+                        // Get a better label if available
+                        $label = $fieldName;
+                        if (isset($fieldDetails['label']) && !empty($fieldDetails['label'])) {
+                            $label = $fieldDetails['label'];
+                        } elseif (isset($fieldDetails['element']) && !empty($fieldDetails['element'])) {
+                            $label = $fieldDetails['element'];
+                        }
+                        $field_labels[$fieldName] = $label;
                     }
-                    return $field_labels;
+                    if (!empty($field_labels)) {
+                        return $field_labels;
+                    }
                 }
             } catch (\Exception $e) {
-                // Silently fail, return empty array
+                // Silently fail and continue to next method
+                error_log('SFAIC: Fluent Forms API error: ' . $e->getMessage());
             }
         }
 
@@ -1361,7 +1424,7 @@ class SFAIC_Prompt_Manager {
      */
     private function format_all_form_data($form_data, $prompt_id) {
         $formatted = "Form Submission Data:\n\n";
-        
+
         foreach ($form_data as $field_key => $field_value) {
             if (!is_scalar($field_key)) {
                 continue;
@@ -1376,7 +1439,7 @@ class SFAIC_Prompt_Manager {
 
             $formatted .= "{$field_key}: {$field_value}\n";
         }
-        
+
         return $formatted;
     }
 

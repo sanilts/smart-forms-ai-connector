@@ -43,38 +43,53 @@ class SFAIC_Response_Logger {
     }
 
     /**
-     * Extract user name from form data
+     * Extract user name from form data using prompt-specific field mappings
      */
-    private function extract_user_name($form_data) {
+    private function extract_user_name($form_data, $prompt_id = null) {
         if (!is_array($form_data)) {
             return '';
         }
 
-        // Common field names for user name
+        // First, try to use custom field mappings from prompt settings
+        if (!empty($prompt_id)) {
+            $first_name_field = get_post_meta($prompt_id, '_sfaic_first_name_field', true);
+            $last_name_field = get_post_meta($prompt_id, '_sfaic_last_name_field', true);
+
+            $first_name = '';
+            $last_name = '';
+
+            // Get first name from custom mapping
+            if (!empty($first_name_field) && isset($form_data[$first_name_field])) {
+                $first_name = sanitize_text_field($form_data[$first_name_field]);
+            }
+
+            // Get last name from custom mapping
+            if (!empty($last_name_field) && isset($form_data[$last_name_field])) {
+                $last_name = sanitize_text_field($form_data[$last_name_field]);
+            }
+
+            // If we got names from custom mappings, return them
+            if (!empty($first_name) || !empty($last_name)) {
+                return trim($first_name . ' ' . $last_name);
+            }
+        }
+
+        // Fall back to auto-detection with common field names
         $name_fields = array(
             'name', 'full_name', 'fullname', 'user_name', 'username',
             'first_name', 'last_name', 'contact_name', 'customer_name',
-            'client_name', 'your_name', 'applicant_name', 'student_name'
+            'client_name', 'your_name', 'applicant_name', 'student_name', 'Voornaam', 'Achternaam'
         );
 
-        // Try to find name field
         foreach ($name_fields as $field) {
             if (isset($form_data[$field]) && !empty($form_data[$field])) {
                 return sanitize_text_field($form_data[$field]);
             }
         }
 
-        // Try to combine first and last name
-        $first_name = '';
-        $last_name = '';
-
-        if (isset($form_data['first_name']) && !empty($form_data['first_name'])) {
-            $first_name = sanitize_text_field($form_data['first_name']);
-        }
-
-        if (isset($form_data['last_name']) && !empty($form_data['last_name'])) {
-            $last_name = sanitize_text_field($form_data['last_name']);
-        }
+        // Try to combine first and last name from auto-detection
+        $first_name = isset($form_data['Voornaam']) ? sanitize_text_field($form_data['Voornaam']) : '';
+        $last_name = isset($form_data['Achternaam']) ? sanitize_text_field($form_data['Achternaam']) : '';
 
         if (!empty($first_name) || !empty($last_name)) {
             return trim($first_name . ' ' . $last_name);
@@ -84,21 +99,32 @@ class SFAIC_Response_Logger {
     }
 
     /**
-     * Extract user email from form data
+     * Extract user email from form data using prompt-specific field mappings
      */
-    private function extract_user_email($form_data) {
+    private function extract_user_email($form_data, $prompt_id = null) {
         if (!is_array($form_data)) {
             return '';
         }
 
-        // Common field names for email
+        // First, try to use custom field mapping from prompt settings
+        if (!empty($prompt_id)) {
+            $email_field = get_post_meta($prompt_id, '_sfaic_email_field_mapping', true);
+
+            if (!empty($email_field) && isset($form_data[$email_field])) {
+                $email = sanitize_email($form_data[$email_field]);
+                if (is_email($email)) {
+                    return $email;
+                }
+            }
+        }
+
+        // Fall back to auto-detection with common field names
         $email_fields = array(
             'email', 'email_address', 'user_email', 'contact_email',
             'customer_email', 'client_email', 'your_email', 'applicant_email',
             'student_email', 'work_email', 'business_email'
         );
 
-        // Try to find email field
         foreach ($email_fields as $field) {
             if (isset($form_data[$field]) && !empty($form_data[$field])) {
                 $email = sanitize_email($form_data[$field]);
@@ -317,9 +343,8 @@ class SFAIC_Response_Logger {
         }
 
         // Extract user name and email from form data
-        $user_name = $this->extract_user_name($form_data);
-        $user_email = $this->extract_user_email($form_data);
-
+        $user_name = $this->extract_user_name($form_data, $prompt_id);
+        $user_email = $this->extract_user_email($form_data, $prompt_id);
         // Debug logging
         error_log('SFAIC Logger: Extracted user info - Name: ' . $user_name . ', Email: ' . $user_email);
 
@@ -1392,7 +1417,7 @@ class SFAIC_Response_Logger {
                                      style="width: <?php echo min($usage_percentage, 100); ?>%;"
                                      data-percentage="<?php echo round($usage_percentage, 1); ?>">
                                          <?php if ($usage_percentage > 20) : ?>
-                                             <?php echo round($usage_percentage, 1); ?>%
+                                        <?php echo round($usage_percentage, 1); ?>%
                                     <?php endif; ?>
                                 </div>
                             </div>
