@@ -49,7 +49,6 @@ class SFAIC_Response_Logger {
         if (!is_array($form_data)) {
             return '';
         }
-
         // First, try to use custom field mappings from prompt settings
         if (!empty($prompt_id)) {
             $first_name_field = get_post_meta($prompt_id, '_sfaic_first_name_field', true);
@@ -57,15 +56,28 @@ class SFAIC_Response_Logger {
 
             $first_name = '';
             $last_name = '';
-
+                       
             // Get first name from custom mapping
-            if (!empty($first_name_field) && isset($form_data[$first_name_field])) {
-                $first_name = sanitize_text_field($form_data[$first_name_field]);
+            if (!empty($first_name_field) && isset($form_data[$first_name_field])) {   
+                 $fname=$form_data[$first_name_field];
+                if(is_array($fname)){
+                    $first_name = sanitize_text_field($fname['first_name']);
+                }else{
+                    $first_name = sanitize_text_field($form_data[$first_name_field]);
+                }
             }
-
+            
+            
             // Get last name from custom mapping
-            if (!empty($last_name_field) && isset($form_data[$last_name_field])) {
-                $last_name = sanitize_text_field($form_data[$last_name_field]);
+            if (!empty($last_name_field) && isset($form_data[$last_name_field])) {     
+                $lname=$form_data[$last_name_field];
+                error_log('SFAIC:$last_name_field: ' . print_r($lname)); 
+                if(is_array($lname)){
+                    $last_name = sanitize_text_field($lname['last_name']);
+                    error_log('SFAIC: $last_name: ' . $last_name); 
+                }else{
+                     $last_name = sanitize_text_field($form_data[$last_name_field]);
+                }               
             }
 
             // If we got names from custom mappings, return them
@@ -82,14 +94,14 @@ class SFAIC_Response_Logger {
         );
 
         foreach ($name_fields as $field) {
-            if (isset($form_data[$field]) && !empty($form_data[$field])) {
+            if (isset($form_data[$field]) && !empty($form_data[$field])) { 
                 return sanitize_text_field($form_data[$field]);
             }
         }
 
         // Try to combine first and last name from auto-detection
-        $first_name = isset($form_data['Voornaam']) ? sanitize_text_field($form_data['Voornaam']) : '';
-        $last_name = isset($form_data['Achternaam']) ? sanitize_text_field($form_data['Achternaam']) : '';
+        $first_name = isset($form_data['first_name']) ? sanitize_text_field($form_data['first_name']) : '';
+        $last_name = isset($form_data['last_name']) ? sanitize_text_field($form_data['last_name']) : '';
 
         if (!empty($first_name) || !empty($last_name)) {
             return trim($first_name . ' ' . $last_name);
