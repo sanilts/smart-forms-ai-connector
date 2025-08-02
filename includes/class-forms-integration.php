@@ -22,7 +22,7 @@ class SFAIC_Forms_Integration {
         
         if (!$hooks_registered) {
             // Hook into Fluent Forms submission with LOWER priority to avoid blocking redirects
-            add_action('fluentform/submission_inserted', array($this, 'handle_form_submission'), 30, 3);
+            add_action('fluentform/submission_inserted', array($this, 'handle_form_submission'), 5, 3);
             
             // Use WordPress shutdown hook for completely non-blocking processing
             add_action('shutdown', array($this, 'process_queued_submissions'));
@@ -1079,47 +1079,3 @@ class SFAIC_Forms_Integration {
 // IMPORTANT: Register the AJAX handler for immediate async processing
 //add_action('wp_ajax_nopriv_sfaic_process_immediate_async', array('SFAIC_Forms_Integration', 'handle_immediate_async_processing'));
 //add_action('wp_ajax_sfaic_process_immediate_async', array('SFAIC_Forms_Integration', 'handle_immediate_async_processing'));
-
-// Create a static method to handle the AJAX call
-class SFAIC_Forms_Integration_Static {
-    public static function handle_immediate_async_processing() {
-        // Verify nonce
-        $prompt_id = intval($_POST['prompt_id'] ?? 0);
-        $nonce = $_POST['nonce'] ?? '';
-        
-        if (!wp_verify_nonce($nonce, 'sfaic_immediate_async_' . $prompt_id)) {
-            wp_die('Invalid nonce');
-        }
-        
-        $entry_id = intval($_POST['entry_id'] ?? 0);
-        $form_data = unserialize(base64_decode($_POST['form_data'] ?? ''));
-        $form_id = intval($_POST['form_id'] ?? 0);
-        
-        if (!$prompt_id || !$entry_id || !is_array($form_data)) {
-            wp_die('Invalid data');
-        }
-        
-        // Get form object
-        if (!function_exists('wpFluent')) {
-            wp_die('Fluent Forms not available');
-        }
-        
-        $form = wpFluent()->table('fluentform_forms')->where('id', $form_id)->first();
-        if (!$form) {
-            wp_die('Form not found');
-        }
-        
-        error_log('SFAIC: Processing immediate async job for prompt: ' . $prompt_id);
-        
-        // Create an instance and process the prompt
-        if (isset(sfaic_main()->fluent_integration)) {
-            sfaic_main()->fluent_integration->process_prompt($prompt_id, $form_data, $entry_id, $form);
-        }
-        
-        wp_die('OK');
-    }
-}
-
-// Update the AJAX handlers to use the static method
-add_action('wp_ajax_nopriv_sfaic_process_immediate_async', array('SFAIC_Forms_Integration_Static', 'handle_immediate_async_processing'));
-add_action('wp_ajax_sfaic_process_immediate_async', array('SFAIC_Forms_Integration_Static', 'handle_immediate_async_processing'));
