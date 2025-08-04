@@ -3,7 +3,7 @@
  * Plugin Name: AromaPro Smart Forms AI Connector
  * Plugin URI: https://aromapro.com/
  * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing
- * Version: 2.0.10
+ * Version: 2.0.11
  * Author: Sanil T S
  * Author URI: https://www.fb.com/sanilts
  * License: GPL-2.0+
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 // Define plugin constants
 define('SFAIC_DIR', plugin_dir_path(__FILE__));
 define('SFAIC_URL', plugin_dir_url(__FILE__));
-define('SFAIC_VERSION', '2.0.9');
+define('SFAIC_VERSION', '2.0.11');
 
 /**
  * Main plugin class
@@ -118,7 +118,7 @@ class SFAIC_Main {
             'includes/class-response-logger.php',
             'includes/class-template-manager.php',
             'includes/class-pdf-generator.php',
-            'includes/class-background-job-manager.php'  // Background job manager
+            'includes/class-background-job-manager.php'
         );
 
         foreach ($files_to_include as $file) {
@@ -128,7 +128,7 @@ class SFAIC_Main {
                 require_once $file_path;
             } else {
                 // Log missing file error
-                error_log('CGPTFC: Missing required file: ' . $file_path);
+                error_log('SFAIC: Missing required file: ' . $file_path);
 
                 // Show admin notice for missing file
                 add_action('admin_notices', function () use ($file) {
@@ -167,7 +167,7 @@ class SFAIC_Main {
 
         foreach ($required_classes as $class_name) {
             if (!class_exists($class_name)) {
-                error_log('CGPTFC: Missing required class: ' . $class_name);
+                error_log('SFAIC: Missing required class: ' . $class_name);
 
                 add_action('admin_notices', function () use ($class_name) {
                     echo '<div class="notice notice-error"><p>';
@@ -197,6 +197,9 @@ class SFAIC_Main {
 
             // Register hooks only after successful initialization
             $this->register_hooks();
+            
+            // Log successful initialization
+            error_log('SFAIC: Plugin initialized successfully with enhanced background processing');
         } catch (Exception $e) {
             add_action('admin_notices', function () use ($e) {
                 echo '<div class="notice notice-error"><p>';
@@ -213,8 +216,7 @@ class SFAIC_Main {
      * Register plugin hooks
      */
     private function register_hooks() {
-        // Register hooks
-        add_action('fluentform/submission_inserted', array($this->fluent_integration, 'handle_form_submission'), 20, 3);
+        // NOTE: Forms integration hooks are now registered in the SFAIC_Forms_Integration class itself
 
         // Register activation hook
         register_activation_hook(__FILE__, array($this, 'plugin_activation'));
@@ -236,6 +238,9 @@ class SFAIC_Main {
 
         // Add admin footer text
         add_filter('admin_footer_text', array($this, 'admin_footer_text'), 1);
+        
+        // Add debug information hook
+        add_action('admin_init', array($this, 'maybe_show_debug_info'));
     }
 
     /**
@@ -310,6 +315,9 @@ class SFAIC_Main {
 
         // Flush rewrite rules after creating custom post type
         flush_rewrite_rules();
+        
+        // Log activation
+        error_log('SFAIC: Plugin activated with enhanced background processing');
     }
 
     /**
@@ -320,6 +328,9 @@ class SFAIC_Main {
         wp_clear_scheduled_hook('sfaic_process_background_job');
         wp_clear_scheduled_hook('sfaic_cleanup_old_jobs');
         wp_clear_scheduled_hook('sfaic_cleanup_stuck_jobs_periodic');
+        
+        // Log deactivation
+        error_log('SFAIC: Plugin deactivated - background processing stopped');
         
         // Note: We don't delete the database tables on deactivation
         // as users might want to keep their data when temporarily deactivating
@@ -462,36 +473,50 @@ class SFAIC_Main {
             <?php
         }
 
-        // Check for prompts without background processing
-        $prompts_without_bg = get_posts(array(
+        // Show success notice if background processing is working well
+        $prompts_with_bg = get_posts(array(
             'post_type' => 'sfaic_prompt',
             'meta_query' => array(
-                'relation' => 'OR',
                 array(
                     'key' => '_sfaic_enable_background_processing',
-                    'value' => '0',
+                    'value' => '1',
                     'compare' => '='
-                ),
-                array(
-                    'key' => '_sfaic_enable_background_processing',
-                    'compare' => 'NOT EXISTS'
                 )
             ),
             'posts_per_page' => 1,
             'fields' => 'ids'
         ));
         
-        if (!empty($prompts_without_bg) && $screen->id !== 'sfaic_prompt_page_sfaic-background-jobs') {
+        if (!empty($prompts_with_bg) && $screen->id === 'sfaic_prompt_page_sfaic-background-jobs') {
             ?>
-            <div class="notice notice-info is-dismissible">
+            <div class="notice notice-success is-dismissible">
                 <p>
-                    <?php _e('<strong>AI API Connector:</strong> Some prompts have background processing disabled. Users may experience delays when submitting forms.', 'chatgpt-fluent-connector'); ?>
-                    <a href="<?php echo admin_url('edit.php?post_type=sfaic_prompt'); ?>" class="button button-secondary" style="margin-left: 10px;">
-                        <?php _e('Review Prompt Settings', 'chatgpt-fluent-connector'); ?>
-                    </a>
+                    <?php _e('<strong>✅ Enhanced Background Processing Active:</strong> Forms will be processed after submission is complete. Users will see immediate success messages and receive AI responses via email.', 'chatgpt-fluent-connector'); ?>
                 </p>
             </div>
             <?php
+        }
+    }
+
+    /**
+     * Maybe show debug information for troubleshooting
+     */
+    public function maybe_show_debug_info() {
+        if (isset($_GET['sfaic_debug']) && current_user_can('manage_options')) {
+            add_action('admin_notices', function() {
+                $cron_enabled = !defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON;
+                $next_cron = wp_next_scheduled('sfaic_process_background_job');
+                
+                echo '<div class="notice notice-info">';
+                echo '<p><strong>SFAIC Debug Information:</strong></p>';
+                echo '<ul style="margin-left: 20px;">';
+                echo '<li>WP Cron: ' . ($cron_enabled ? '✅ Enabled' : '❌ Disabled') . '</li>';
+                echo '<li>Next Background Job: ' . ($next_cron ? date('Y-m-d H:i:s', $next_cron) : '❌ Not scheduled') . '</li>';
+                echo '<li>Background Job Manager: ' . (isset($this->background_job_manager) ? '✅ Available' : '❌ Not available') . '</li>';
+                echo '<li>Forms Integration: ' . (isset($this->fluent_integration) ? '✅ Available' : '❌ Not available') . '</li>';
+                echo '</ul>';
+                echo '</div>';
+            });
         }
     }
 
@@ -621,20 +646,3 @@ function sfaic_main() {
 
 // Initialize the plugin
 sfaic_main();
-
-/**
- * Background Jobs Diagnostic Tool
- * Temporary diagnostic functionality
- */
-add_action('admin_menu', function() {
-    if (current_user_can('manage_options')) {
-        add_submenu_page(
-            'tools.php',
-            'AI Jobs Diagnostics',
-            'AI Jobs Diagnostics',
-            'manage_options',
-            'ai-jobs-diagnostics',
-            'sfaic_render_diagnostics_page'
-        );
-    }
-});
