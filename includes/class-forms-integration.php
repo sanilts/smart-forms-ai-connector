@@ -1,10 +1,10 @@
 <?php
 
 /**
- * ChatGPT Fluent Forms Integration Class - Fixed for immediate redirects
+ * ChatGPT Fluent Forms Integration Class - ZERO INTERFERENCE VERSION
  * 
- * Handles integration with Fluent Forms using the new background job system
- * WITHOUT blocking form submission redirects
+ * Uses transient-based queuing system that processes submissions AFTER redirects complete
+ * ZERO hooks during form submission process
  */
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
@@ -17,142 +17,289 @@ class SFAIC_Forms_Integration {
      * Constructor
      */
     public function __construct() {
-        // Prevent duplicate hook registration
-        static $hooks_registered = false;
+        // CRITICAL: NO hooks during form submission!
+        // Instead, we use wp_loaded to check for queued submissions
+        add_action('wp_loaded', array($this, 'process_queued_submissions'), 1);
         
-        if (!$hooks_registered) {
-            // Hook into Fluent Forms submission with LOWER priority to avoid blocking redirects
-            add_action('fluentform/submission_inserted', array($this, 'handle_form_submission'), 5, 3);
-            
-            // Use WordPress shutdown hook for completely non-blocking processing
-            add_action('shutdown', array($this, 'process_queued_submissions'));
-            
-            $hooks_registered = true;
-            error_log('SFAIC: Forms integration hooks registered (priority 30 + shutdown)');
+        // Use a very late hook to queue submissions without interfering
+        add_action('wp_footer', array($this, 'queue_recent_submissions'), 1);
+        add_action('admin_footer', array($this, 'queue_recent_submissions'), 1);
+        
+        // AJAX handler for immediate async processing
+        add_action('wp_ajax_sfaic_process_immediate_async', array($this, 'handle_immediate_async_processing'));
+        add_action('wp_ajax_nopriv_sfaic_process_immediate_async', array($this, 'handle_immediate_async_processing'));
+        
+        // Cron job for processing queued items
+        add_action('sfaic_process_queued_items', array($this, 'process_cron_queue'));
+        
+        // Schedule recurring processing
+        if (!wp_next_scheduled('sfaic_process_queued_items')) {
+            wp_schedule_event(time() + 60, 'every_30_seconds', 'sfaic_process_queued_items');
         }
         
-        // Initialize the queue
-        if (!isset($this->queued_submissions)) {
-            $this->queued_submissions = array();
+        error_log('SFAIC: ZERO-INTERFERENCE forms integration initialized');
+    }
+    
+    /**
+     * Queue recent submissions without any hooks during submission
+     * This runs in footer AFTER redirects have happened
+     */
+    public function queue_recent_submissions() {
+        // Only run once per page load
+        static $processed = false;
+        if ($processed) {
+            return;
+        }
+        $processed = true;
+        
+        // Check if we have any recent submissions to process
+        $recent_submissions = $this->get_recent_unprocessed_submissions();
+        
+        if (empty($recent_submissions)) {
+            return;
+        }
+        
+        error_log('SFAIC: Found ' . count($recent_submissions) . ' recent unprocessed submissions');
+        
+        foreach ($recent_submissions as $submission) {
+            $this->queue_submission_for_processing($submission);
         }
     }
     
-    private $queued_submissions = array();
+    /**
+     * Get recent submissions that haven't been processed yet
+     */
+    private function get_recent_unprocessed_submissions() {
+        if (!function_exists('wpFluent')) {
+            return array();
+        }
+        
+        // Get submissions from the last 5 minutes that haven't been processed
+        $recent_submissions = wpFluent()->table('fluentform_submissions')
+            ->where('created_at', '>', date('Y-m-d H:i:s', strtotime('-5 minutes')))
+            ->orderBy('id', 'DESC')
+            ->get();
+            
+        if (empty($recent_submissions)) {
+            return array();
+        }
+        
+        $unprocessed = array();
+        
+        foreach ($recent_submissions as $submission) {
+            // Check if this submission has already been processed
+            $processed_flag = get_transient('sfaic_processed_' . $submission->id);
+            if ($processed_flag) {
+                continue; // Already processed
+            }
+            
+            // Check if we have prompts for this form
+            $prompts = get_posts(array(
+                'post_type' => 'sfaic_prompt',
+                'meta_query' => array(
+                    array(
+                        'key' => '_sfaic_fluent_form_id',
+                        'value' => $submission->form_id,
+                        'compare' => '='
+                    )
+                ),
+                'posts_per_page' => -1,
+                'fields' => 'ids'
+            ));
+            
+            if (!empty($prompts)) {
+                $unprocessed[] = $submission;
+            }
+        }
+        
+        return $unprocessed;
+    }
     
     /**
-     * Handle form submission - ONLY QUEUE, DO NOT PROCESS
-     * 
-     * @param int $entry_id The submission entry ID
-     * @param array $form_data The submitted form data
-     * @param object $form The form object
+     * Queue a submission for processing using transients
      */
-    public function handle_form_submission($insertId, $formData, $form) {
-        error_log('SFAIC: Form submission received - Entry ID: ' . $insertId . ', Form ID: ' . $form->id);
-
-        // Find all prompts associated with this form
+    private function queue_submission_for_processing($submission) {
+        // Get form object
+        $form = wpFluent()->table('fluentform_forms')
+            ->where('id', $submission->form_id)
+            ->first();
+            
+        if (!$form) {
+            return;
+        }
+        
+        // Decode form data
+        $form_data = json_decode($submission->response, true);
+        if (!is_array($form_data)) {
+            return;
+        }
+        
+        // Get prompts for this form
         $prompts = get_posts(array(
             'post_type' => 'sfaic_prompt',
             'meta_query' => array(
                 array(
                     'key' => '_sfaic_fluent_form_id',
-                    'value' => $form->id,
+                    'value' => $submission->form_id,
                     'compare' => '='
                 )
             ),
             'posts_per_page' => -1
         ));
-
-        if (empty($prompts)) {
-            error_log('SFAIC: No prompts found for form ID: ' . $form->id);
-            return;
-        }
-
-        error_log('SFAIC: Found ' . count($prompts) . ' prompt(s) for form ID: ' . $form->id . ' - QUEUING ONLY');
-
-        // ONLY queue for later processing - DO NOT process here
+        
         foreach ($prompts as $prompt) {
-            $enable_background_processing = get_post_meta($prompt->ID, '_sfaic_enable_background_processing', true);
-            
-            // Default to enabled if not set (backwards compatibility)
-            if ($enable_background_processing === '') {
-                $enable_background_processing = '1';
-            }
-
-            // Add to queue - processing happens later during shutdown
-            $this->queued_submissions[] = array(
+            $queue_item = array(
                 'prompt_id' => $prompt->ID,
-                'entry_id' => $insertId,
-                'form_data' => $formData,
-                'form' => $form,
-                'background_enabled' => ($enable_background_processing === '1')
+                'entry_id' => $submission->id,
+                'form_id' => $submission->form_id,
+                'form_data' => $form_data,
+                'form_title' => $form->title,
+                'timestamp' => current_time('mysql'),
+                'background_enabled' => get_post_meta($prompt->ID, '_sfaic_enable_background_processing', true)
             );
             
-            error_log('SFAIC: Queued prompt ID: ' . $prompt->ID . ' (background: ' . ($enable_background_processing === '1' ? 'yes' : 'no') . ')');
+            // Store in transient queue
+            $queue_key = 'sfaic_queue_' . $submission->id . '_' . $prompt->ID . '_' . time();
+            set_transient($queue_key, $queue_item, 300); // 5 minutes expiry
+            
+            error_log('SFAIC: Queued submission ' . $submission->id . ' for prompt ' . $prompt->ID);
         }
         
-        // CRITICAL: Return immediately - NO processing here
-        // All processing happens during shutdown hook to avoid blocking redirects
+        // Mark submission as processed to avoid duplicate processing
+        set_transient('sfaic_processed_' . $submission->id, true, 600); // 10 minutes
     }
     
     /**
-     * Process queued submissions during shutdown (non-blocking)
-     * ONLY METHOD THAT ACTUALLY PROCESSES SUBMISSIONS
+     * Process queued submissions from transients
      */
     public function process_queued_submissions() {
-        if (empty($this->queued_submissions)) {
+        global $wpdb;
+        
+        // Get all queued items from transients
+        $queue_transients = $wpdb->get_col(
+            "SELECT option_name FROM {$wpdb->options} 
+             WHERE option_name LIKE '_transient_sfaic_queue_%' 
+             ORDER BY option_id ASC 
+             LIMIT 10"
+        );
+        
+        if (empty($queue_transients)) {
             return;
         }
         
-        // Prevent multiple processing by clearing queue immediately
-        $submissions_to_process = $this->queued_submissions;
-        $this->queued_submissions = array(); // Clear queue immediately
+        error_log('SFAIC: Processing ' . count($queue_transients) . ' queued items');
         
-        error_log('SFAIC: Processing ' . count($submissions_to_process) . ' queued submissions during shutdown');
-        
-        foreach ($submissions_to_process as $submission) {
-            error_log('SFAIC: Processing queued prompt ID: ' . $submission['prompt_id'] . ' (background: ' . ($submission['background_enabled'] ? 'yes' : 'no') . ')');
+        foreach ($queue_transients as $transient_name) {
+            $queue_key = str_replace('_transient_', '', $transient_name);
+            $queue_item = get_transient($queue_key);
             
-            if ($submission['background_enabled']) {
-                // Process in background
-                $this->schedule_background_processing(
-                    $submission['prompt_id'], 
-                    $submission['entry_id'], 
-                    $submission['form_data'], 
-                    $submission['form']
-                );
-            } else {
-                // Process immediately but asynchronously using wp_remote_post
-                $this->schedule_immediate_async_processing(
-                    $submission['prompt_id'], 
-                    $submission['entry_id'], 
-                    $submission['form_data'], 
-                    $submission['form']
-                );
+            if (!$queue_item || !is_array($queue_item)) {
+                delete_transient($queue_key);
+                continue;
             }
+            
+            // Process this item
+            $this->process_queue_item($queue_item);
+            
+            // Remove from queue
+            delete_transient($queue_key);
         }
-        
-        error_log('SFAIC: Completed processing all queued submissions');
     }
     
     /**
-     * NEW: Schedule immediate async processing using wp_remote_post
+     * Process individual queue item
      */
-    private function schedule_immediate_async_processing($prompt_id, $entry_id, $form_data, $form) {
-        error_log('SFAIC: Scheduling immediate async processing for prompt ID: ' . $prompt_id);
+    private function process_queue_item($queue_item) {
+        $prompt_id = $queue_item['prompt_id'];
+        $entry_id = $queue_item['entry_id'];
+        $form_data = $queue_item['form_data'];
+        $background_enabled = $queue_item['background_enabled'];
         
-        // Use wp_remote_post to trigger immediate processing without blocking
-        wp_remote_post(admin_url('admin-ajax.php'), array(
-            'timeout' => 0.01, // Very short timeout
-            'blocking' => false, // Non-blocking
+        error_log('SFAIC: Processing queue item - Entry: ' . $entry_id . ', Prompt: ' . $prompt_id);
+        
+        if ($background_enabled === '1') {
+            // Use background job system
+            $this->schedule_background_processing($queue_item);
+        } else {
+            // Use immediate async processing
+            $this->schedule_immediate_async_processing_from_queue($queue_item);
+        }
+    }
+    
+    /**
+     * Schedule background processing from queue item
+     */
+    private function schedule_background_processing($queue_item) {
+        if (!isset(sfaic_main()->background_job_manager)) {
+            error_log('SFAIC: Background job manager not available, using async processing');
+            $this->schedule_immediate_async_processing_from_queue($queue_item);
+            return;
+        }
+        
+        $prompt_id = $queue_item['prompt_id'];
+        $delay = get_post_meta($prompt_id, '_sfaic_background_processing_delay', true);
+        if (empty($delay)) {
+            $delay = 5;
+        }
+        
+        $priority = get_post_meta($prompt_id, '_sfaic_job_priority', true);
+        if (empty($priority)) {
+            $priority = 0;
+        }
+        
+        // Schedule the background job
+        $job_id = sfaic_main()->background_job_manager->schedule_job(
+            'ai_form_processing',
+            $queue_item['prompt_id'],
+            $queue_item['form_id'],
+            $queue_item['entry_id'],
+            array(
+                'form_data' => $queue_item['form_data'],
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '',
+                'timestamp' => $queue_item['timestamp']
+            ),
+            intval($delay),
+            intval($priority)
+        );
+        
+        if ($job_id) {
+            error_log('SFAIC: Scheduled background job ID: ' . $job_id);
+        } else {
+            error_log('SFAIC: Failed to schedule background job, using async processing');
+            $this->schedule_immediate_async_processing_from_queue($queue_item);
+        }
+    }
+    
+    /**
+     * Schedule immediate async processing from queue item
+     */
+    private function schedule_immediate_async_processing_from_queue($queue_item) {
+        error_log('SFAIC: Scheduling immediate async processing for prompt ID: ' . $queue_item['prompt_id']);
+        
+        $response = wp_remote_post(admin_url('admin-ajax.php'), array(
+            'timeout' => 0.01,
+            'blocking' => false,
             'body' => array(
                 'action' => 'sfaic_process_immediate_async',
-                'prompt_id' => $prompt_id,
-                'entry_id' => $entry_id,
-                'form_data' => base64_encode(serialize($form_data)),
-                'form_id' => $form->id,
-                'nonce' => wp_create_nonce('sfaic_immediate_async_' . $prompt_id)
+                'prompt_id' => $queue_item['prompt_id'],
+                'entry_id' => $queue_item['entry_id'],
+                'form_data' => base64_encode(serialize($queue_item['form_data'])),
+                'form_id' => $queue_item['form_id'],
+                'nonce' => wp_create_nonce('sfaic_immediate_async_' . $queue_item['prompt_id'])
             )
         ));
+        
+        if (is_wp_error($response)) {
+            error_log('SFAIC: Failed to schedule async processing: ' . $response->get_error_message());
+        }
+    }
+    
+    /**
+     * Cron job to process any remaining queued items
+     */
+    public function process_cron_queue() {
+        $this->process_queued_submissions();
     }
     
     /**
@@ -164,6 +311,7 @@ class SFAIC_Forms_Integration {
         $nonce = $_POST['nonce'] ?? '';
         
         if (!wp_verify_nonce($nonce, 'sfaic_immediate_async_' . $prompt_id)) {
+            error_log('SFAIC: Invalid nonce for async processing');
             wp_die('Invalid nonce');
         }
         
@@ -172,71 +320,34 @@ class SFAIC_Forms_Integration {
         $form_id = intval($_POST['form_id'] ?? 0);
         
         if (!$prompt_id || !$entry_id || !is_array($form_data)) {
+            error_log('SFAIC: Invalid data for async processing');
             wp_die('Invalid data');
         }
         
         // Get form object
         if (!function_exists('wpFluent')) {
+            error_log('SFAIC: Fluent Forms not available');
             wp_die('Fluent Forms not available');
         }
         
         $form = wpFluent()->table('fluentform_forms')->where('id', $form_id)->first();
         if (!$form) {
+            error_log('SFAIC: Form not found: ' . $form_id);
             wp_die('Form not found');
         }
         
         error_log('SFAIC: Processing immediate async job for prompt: ' . $prompt_id);
         
         // Process the prompt immediately
-        $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
+        $result = $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
+        
+        if ($result) {
+            error_log('SFAIC: Async processing completed successfully for prompt: ' . $prompt_id);
+        } else {
+            error_log('SFAIC: Async processing failed for prompt: ' . $prompt_id);
+        }
         
         wp_die('OK');
-    }
-    
-    /**
-     * Schedule background processing for a specific prompt
-     */
-    private function schedule_background_processing($prompt_id, $entry_id, $form_data, $form) {
-        // Get prompt-specific background processing settings
-        $delay = get_post_meta($prompt_id, '_sfaic_background_processing_delay', true);
-        if (empty($delay)) {
-            $delay = 5; // Default delay
-        }
-
-        $priority = get_post_meta($prompt_id, '_sfaic_job_priority', true);
-        if (empty($priority)) {
-            $priority = 0; // Default priority
-        }
-
-        // Check if background job manager is available
-        if (!isset(sfaic_main()->background_job_manager)) {
-            error_log('SFAIC: Background job manager not available, scheduling async processing');
-            $this->schedule_immediate_async_processing($prompt_id, $entry_id, $form_data, $form);
-            return;
-        }
-
-        // Schedule the background job
-        $job_id = sfaic_main()->background_job_manager->schedule_job(
-            'ai_form_processing',
-            $prompt_id,
-            $form->id,
-            $entry_id,
-            array(
-                'form_data' => $form_data,
-                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
-                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '',
-                'timestamp' => current_time('mysql')
-            ),
-            intval($delay),
-            intval($priority)
-        );
-
-        if ($job_id) {
-            error_log('SFAIC: Scheduled background job ID: ' . $job_id . ' for prompt: ' . $prompt_id);
-        } else {
-            error_log('SFAIC: Failed to schedule background job, using async processing');
-            $this->schedule_immediate_async_processing($prompt_id, $entry_id, $form_data, $form);
-        }
     }
 
     /**
@@ -1075,7 +1186,3 @@ class SFAIC_Forms_Integration {
         return $response;
     }
 }
-
-// IMPORTANT: Register the AJAX handler for immediate async processing
-//add_action('wp_ajax_nopriv_sfaic_process_immediate_async', array('SFAIC_Forms_Integration', 'handle_immediate_async_processing'));
-//add_action('wp_ajax_sfaic_process_immediate_async', array('SFAIC_Forms_Integration', 'handle_immediate_async_processing'));
