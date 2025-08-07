@@ -1,10 +1,9 @@
 <?php
 
 /**
- * ChatGPT Fluent Forms Integration Class - ZERO INTERFERENCE VERSION
+ * ChatGPT Fluent Forms Integration Class - FIXED VERSION WITH DUPLICATE PREVENTION
  * 
- * Uses transient-based queuing system that processes submissions AFTER redirects complete
- * ZERO hooks during form submission process
+ * Complete replacement for class-forms-integration.php
  */
 // Exit if accessed directly
 if (!defined('ABSPATH')) {
@@ -20,52 +19,94 @@ class SFAIC_Forms_Integration {
         // CRITICAL: NO hooks during form submission!
         // Instead, we use wp_loaded to check for queued submissions
         add_action('wp_loaded', array($this, 'process_queued_submissions'), 1);
-
+        
         // Use a very late hook to queue submissions without interfering
-        add_action('wp_footer', array($this, 'queue_recent_submissions'), 1);
-        add_action('admin_footer', array($this, 'queue_recent_submissions'), 1);
-
+        add_action('wp_footer', array($this, 'queue_recent_submissions'), 999);
+        add_action('admin_footer', array($this, 'queue_recent_submissions'), 999);
+        
         // AJAX handler for immediate async processing
         add_action('wp_ajax_sfaic_process_immediate_async', array($this, 'handle_immediate_async_processing'));
         add_action('wp_ajax_nopriv_sfaic_process_immediate_async', array($this, 'handle_immediate_async_processing'));
-
+        
         // Cron job for processing queued items
         add_action('sfaic_process_queued_items', array($this, 'process_cron_queue'));
-
+        
         // Schedule recurring processing
         if (!wp_next_scheduled('sfaic_process_queued_items')) {
             wp_schedule_event(time() + 60, 'every_30_seconds', 'sfaic_process_queued_items');
         }
-
-        error_log('SFAIC: ZERO-INTERFERENCE forms integration initialized');
+        
+        // Add frontend duplicate prevention
+        add_action('wp_footer', array($this, 'add_duplicate_prevention_js'), 1000);
+        
+        error_log('SFAIC: Forms integration initialized with duplicate prevention');
     }
-
+    
+    /**
+     * Create a fingerprint of form submission for duplicate detection
+     */
+    private function create_submission_fingerprint($form_data, $form_id) {
+        if (!is_array($form_data)) {
+            return '';
+        }
+        
+        // Extract key fields for fingerprinting (excluding timestamps and tokens)
+        $key_data = array();
+        foreach ($form_data as $field => $value) {
+            // Skip internal fields, timestamps, and tokens
+            if (strpos($field, '_') === 0 || 
+                in_array(strtolower($field), array('timestamp', 'token', 'nonce', '_token', '_nonce', 'created_at', 'updated_at'))) {
+                continue;
+            }
+            
+            // Convert arrays to string for consistent hashing
+            if (is_array($value)) {
+                $value = serialize($value);
+            }
+            
+            $key_data[$field] = $value;
+        }
+        
+        // Sort for consistency
+        ksort($key_data);
+        
+        // Create fingerprint with form ID
+        return md5($form_id . '_' . serialize($key_data));
+    }
+    
     /**
      * Queue recent submissions without any hooks during submission
      * This runs in footer AFTER redirects have happened
      */
     public function queue_recent_submissions() {
-        // Only run once per page load
-        static $processed = false;
-        if ($processed) {
+        // Only run once per page load - CRITICAL CHECK
+        static $has_run = false;
+        if ($has_run) {
             return;
         }
-        $processed = true;
-
+        $has_run = true;
+        
+        // Add additional check to prevent multiple executions
+        $execution_key = 'sfaic_queue_execution_' . wp_get_current_user()->ID . '_' . date('YmdHis');
+        if (get_transient($execution_key)) {
+            return;
+        }
+        set_transient($execution_key, true, 5);
+        
         // Check if we have any recent submissions to process
         $recent_submissions = $this->get_recent_unprocessed_submissions();
-
+        
         if (empty($recent_submissions)) {
             return;
         }
-
+        
         error_log('SFAIC: Found ' . count($recent_submissions) . ' recent unprocessed submissions');
-
+        
         foreach ($recent_submissions as $submission) {
             $this->queue_submission_for_processing($submission);
         }
     }
-
+    
     /**
      * Get recent submissions that haven't been processed yet
      */
@@ -73,26 +114,33 @@ class SFAIC_Forms_Integration {
         if (!function_exists('wpFluent')) {
             return array();
         }
-
-        // Get submissions from the last 5 minutes that haven't been processed
+        
+        // Get submissions from the last 2 minutes (reduced from 5)
         $recent_submissions = wpFluent()->table('fluentform_submissions')
-                ->where('created_at', '>', date('Y-m-d H:i:s', strtotime('-5 minutes')))
-                ->orderBy('id', 'DESC')
-                ->get();
-
+            ->where('created_at', '>', date('Y-m-d H:i:s', strtotime('-2 minutes')))
+            ->orderBy('id', 'DESC')
+            ->limit(10) // Limit to prevent overload
+            ->get();
+            
         if (empty($recent_submissions)) {
             return array();
         }
-
+        
         $unprocessed = array();
-
+        
         foreach ($recent_submissions as $submission) {
             // Check if this submission has already been processed
             $processed_flag = get_transient('sfaic_processed_' . $submission->id);
             if ($processed_flag) {
                 continue; // Already processed
             }
-
+            
+            // Check if this is a duplicate
+            $duplicate_of = get_transient('sfaic_duplicate_' . $submission->id);
+            if ($duplicate_of) {
+                continue; // This is a duplicate
+            }
+            
             // Check if we have prompts for this form
             $prompts = get_posts(array(
                 'post_type' => 'sfaic_prompt',
@@ -103,59 +151,62 @@ class SFAIC_Forms_Integration {
                         'compare' => '='
                     )
                 ),
-                'posts_per_page' => -1,
+                'posts_per_page' => 1, // Just check if any exist
                 'fields' => 'ids'
             ));
-
+            
             if (!empty($prompts)) {
                 $unprocessed[] = $submission;
             }
         }
-
+        
         return $unprocessed;
     }
-
+    
     /**
-     * Queue a submission for processing using transients
+     * Queue a submission for processing using transients with duplicate prevention
      */
     private function queue_submission_for_processing($submission) {
         // Get form object
+        if (!function_exists('wpFluent')) {
+            return;
+        }
+        
         $form = wpFluent()->table('fluentform_forms')
-                ->where('id', $submission->form_id)
-                ->first();
-
+            ->where('id', $submission->form_id)
+            ->first();
+            
         if (!$form) {
             return;
         }
-
+        
         // Decode form data
         $form_data = json_decode($submission->response, true);
         if (!is_array($form_data)) {
             return;
         }
-
-        // Create fingerprint for this submission
+        
+        // Create fingerprint for duplicate detection
         $fingerprint = $this->create_submission_fingerprint($form_data, $submission->form_id);
-        $duplicate_check_key = 'sfaic_fingerprint_' . $fingerprint;
-
-        // Check if we've seen this exact submission recently (within 60 seconds)
-        $existing_submission_id = get_transient($duplicate_check_key);
-
-        if ($existing_submission_id && $existing_submission_id != $submission->id) {
-            error_log('SFAIC: Duplicate submission detected! New ID: ' . $submission->id . ' is duplicate of ID: ' . $existing_submission_id);
-
-            // Mark as already processed
+        $fingerprint_key = 'sfaic_fp_' . $fingerprint;
+        
+        // Check if we've seen this exact submission data recently
+        $existing_id = get_transient($fingerprint_key);
+        
+        if ($existing_id && $existing_id != $submission->id) {
+            // This is a duplicate submission
+            error_log('SFAIC: Duplicate detected - Submission ' . $submission->id . ' is duplicate of ' . $existing_id);
+            
+            // Mark as duplicate and processed
+            set_transient('sfaic_duplicate_' . $submission->id, $existing_id, 300);
             set_transient('sfaic_processed_' . $submission->id, true, 600);
-
-            // Store duplicate info for debugging
-            set_transient('sfaic_duplicate_' . $submission->id, $existing_submission_id, 600);
-
-            return; // Skip processing this duplicate
+            
+            return; // Don't process duplicates
         }
-
-        // Store this submission's fingerprint
-        set_transient($duplicate_check_key, $submission->id, 60); // 60 second window
-        // Continue with normal processing...
+        
+        // Not a duplicate, store fingerprint
+        set_transient($fingerprint_key, $submission->id, 60); // 60 second window for duplicates
+        
         // Get prompts for this form
         $prompts = get_posts(array(
             'post_type' => 'sfaic_prompt',
@@ -168,15 +219,18 @@ class SFAIC_Forms_Integration {
             ),
             'posts_per_page' => -1
         ));
-
+        
+        $queued_count = 0;
+        
         foreach ($prompts as $prompt) {
-            // Additional check: prevent queuing the same prompt+entry combination
-            $combo_key = 'sfaic_combo_' . $submission->id . '_' . $prompt->ID;
-            if (get_transient($combo_key)) {
-                error_log('SFAIC: Already queued entry ' . $submission->id . ' for prompt ' . $prompt->ID);
+            // Check if already queued for this prompt
+            $queue_check_key = 'sfaic_queued_' . $submission->id . '_' . $prompt->ID;
+            
+            if (get_transient($queue_check_key)) {
+                error_log('SFAIC: Already queued - Submission ' . $submission->id . ' for prompt ' . $prompt->ID);
                 continue;
             }
-
+            
             $queue_item = array(
                 'prompt_id' => $prompt->ID,
                 'entry_id' => $submission->id,
@@ -186,69 +240,103 @@ class SFAIC_Forms_Integration {
                 'timestamp' => current_time('mysql'),
                 'background_enabled' => get_post_meta($prompt->ID, '_sfaic_enable_background_processing', true)
             );
-
-            // Store in transient queue
-            $queue_key = 'sfaic_queue_' . $submission->id . '_' . $prompt->ID . '_' . time();
+            
+            // Store in transient queue with unique key
+            $queue_key = 'sfaic_queue_' . $submission->id . '_' . $prompt->ID . '_' . uniqid();
             set_transient($queue_key, $queue_item, 300); // 5 minutes expiry
-            // Mark this combination as queued
-            set_transient($combo_key, true, 300);
-
+            
+            // Mark as queued
+            set_transient($queue_check_key, true, 300);
+            
+            $queued_count++;
             error_log('SFAIC: Queued submission ' . $submission->id . ' for prompt ' . $prompt->ID);
         }
-
-        // Mark submission as processed to avoid duplicate processing
-        set_transient('sfaic_processed_' . $submission->id, true, 600); // 10 minutes
+        
+        // Mark submission as processed if we queued any items
+        if ($queued_count > 0) {
+            set_transient('sfaic_processed_' . $submission->id, true, 600); // 10 minutes
+        }
     }
-
+    
     /**
      * Process queued submissions from transients
      */
     public function process_queued_submissions() {
+        // Prevent concurrent processing
+        $lock_key = 'sfaic_processing_lock';
+        if (get_transient($lock_key)) {
+            return; // Another process is already running
+        }
+        
+        // Set processing lock for 30 seconds
+        set_transient($lock_key, true, 30);
+        
         global $wpdb;
-
+        
         // Get all queued items from transients
         $queue_transients = $wpdb->get_col(
-                "SELECT option_name FROM {$wpdb->options} 
+            "SELECT option_name FROM {$wpdb->options} 
              WHERE option_name LIKE '_transient_sfaic_queue_%' 
              ORDER BY option_id ASC 
-             LIMIT 10"
+             LIMIT 5"
         );
-
+        
         if (empty($queue_transients)) {
+            delete_transient($lock_key);
             return;
         }
-
+        
         error_log('SFAIC: Processing ' . count($queue_transients) . ' queued items');
-
+        
         foreach ($queue_transients as $transient_name) {
             $queue_key = str_replace('_transient_', '', $transient_name);
             $queue_item = get_transient($queue_key);
-
+            
             if (!$queue_item || !is_array($queue_item)) {
                 delete_transient($queue_key);
                 continue;
             }
-
+            
             // Process this item
             $this->process_queue_item($queue_item);
-
+            
             // Remove from queue
             delete_transient($queue_key);
         }
+        
+        // Release lock
+        delete_transient($lock_key);
     }
-
+    
     /**
-     * Process individual queue item
+     * Process individual queue item with duplicate check
      */
     private function process_queue_item($queue_item) {
         $prompt_id = $queue_item['prompt_id'];
         $entry_id = $queue_item['entry_id'];
         $form_data = $queue_item['form_data'];
         $background_enabled = $queue_item['background_enabled'];
-
+        
+        // Final processing check to prevent duplicates
+        $processing_key = 'sfaic_processing_' . $entry_id . '_' . $prompt_id;
+        
+        if (get_transient($processing_key)) {
+            error_log('SFAIC: Already processing entry ' . $entry_id . ' for prompt ' . $prompt_id);
+            return;
+        }
+        
+        // Set processing lock
+        set_transient($processing_key, true, 300); // 5 minute lock
+        
         error_log('SFAIC: Processing queue item - Entry: ' . $entry_id . ', Prompt: ' . $prompt_id);
-
+        
         if ($background_enabled === '1') {
+            // Check if background job already exists
+            if ($this->background_job_exists($prompt_id, $entry_id)) {
+                error_log('SFAIC: Background job already exists for entry ' . $entry_id);
+                return;
+            }
+            
             // Use background job system
             $this->schedule_background_processing($queue_item);
         } else {
@@ -256,7 +344,35 @@ class SFAIC_Forms_Integration {
             $this->schedule_immediate_async_processing_from_queue($queue_item);
         }
     }
-
+    
+    /**
+     * Check if background job already exists
+     */
+    private function background_job_exists($prompt_id, $entry_id) {
+        if (!isset(sfaic_main()->background_job_manager)) {
+            return false;
+        }
+        
+        global $wpdb;
+        $jobs_table = $wpdb->prefix . 'sfaic_background_jobs';
+        
+        // Check if table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '{$jobs_table}'") !== $jobs_table) {
+            return false;
+        }
+        
+        $existing_job = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$jobs_table} 
+             WHERE prompt_id = %d 
+             AND entry_id = %d 
+             AND status IN ('pending', 'processing', 'retry')",
+            $prompt_id,
+            $entry_id
+        ));
+        
+        return $existing_job > 0;
+    }
+    
     /**
      * Schedule background processing from queue item
      */
@@ -266,34 +382,34 @@ class SFAIC_Forms_Integration {
             $this->schedule_immediate_async_processing_from_queue($queue_item);
             return;
         }
-
+        
         $prompt_id = $queue_item['prompt_id'];
         $delay = get_post_meta($prompt_id, '_sfaic_background_processing_delay', true);
         if (empty($delay)) {
             $delay = 5;
         }
-
+        
         $priority = get_post_meta($prompt_id, '_sfaic_job_priority', true);
         if (empty($priority)) {
             $priority = 0;
         }
-
+        
         // Schedule the background job
         $job_id = sfaic_main()->background_job_manager->schedule_job(
-                'ai_form_processing',
-                $queue_item['prompt_id'],
-                $queue_item['form_id'],
-                $queue_item['entry_id'],
-                array(
-                    'form_data' => $queue_item['form_data'],
-                    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
-                    'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '',
-                    'timestamp' => $queue_item['timestamp']
-                ),
-                intval($delay),
-                intval($priority)
+            'ai_form_processing',
+            $queue_item['prompt_id'],
+            $queue_item['form_id'],
+            $queue_item['entry_id'],
+            array(
+                'form_data' => $queue_item['form_data'],
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '',
+                'timestamp' => $queue_item['timestamp']
+            ),
+            intval($delay),
+            intval($priority)
         );
-
+        
         if ($job_id) {
             error_log('SFAIC: Scheduled background job ID: ' . $job_id);
         } else {
@@ -301,13 +417,13 @@ class SFAIC_Forms_Integration {
             $this->schedule_immediate_async_processing_from_queue($queue_item);
         }
     }
-
+    
     /**
      * Schedule immediate async processing from queue item
      */
     private function schedule_immediate_async_processing_from_queue($queue_item) {
         error_log('SFAIC: Scheduling immediate async processing for prompt ID: ' . $queue_item['prompt_id']);
-
+        
         $response = wp_remote_post(admin_url('admin-ajax.php'), array(
             'timeout' => 0.01,
             'blocking' => false,
@@ -320,19 +436,19 @@ class SFAIC_Forms_Integration {
                 'nonce' => wp_create_nonce('sfaic_immediate_async_' . $queue_item['prompt_id'])
             )
         ));
-
+        
         if (is_wp_error($response)) {
             error_log('SFAIC: Failed to schedule async processing: ' . $response->get_error_message());
         }
     }
-
+    
     /**
      * Cron job to process any remaining queued items
      */
     public function process_cron_queue() {
         $this->process_queued_submissions();
     }
-
+    
     /**
      * AJAX handler for immediate async processing
      */
@@ -340,55 +456,162 @@ class SFAIC_Forms_Integration {
         // Verify nonce
         $prompt_id = intval($_POST['prompt_id'] ?? 0);
         $nonce = $_POST['nonce'] ?? '';
-
+        
         if (!wp_verify_nonce($nonce, 'sfaic_immediate_async_' . $prompt_id)) {
             error_log('SFAIC: Invalid nonce for async processing');
             wp_die('Invalid nonce');
         }
-
+        
         $entry_id = intval($_POST['entry_id'] ?? 0);
         $form_data = unserialize(base64_decode($_POST['form_data'] ?? ''));
         $form_id = intval($_POST['form_id'] ?? 0);
-
+        
         if (!$prompt_id || !$entry_id || !is_array($form_data)) {
             error_log('SFAIC: Invalid data for async processing');
             wp_die('Invalid data');
         }
-
+        
         // Get form object
         if (!function_exists('wpFluent')) {
             error_log('SFAIC: Fluent Forms not available');
             wp_die('Fluent Forms not available');
         }
-
+        
         $form = wpFluent()->table('fluentform_forms')->where('id', $form_id)->first();
         if (!$form) {
             error_log('SFAIC: Form not found: ' . $form_id);
             wp_die('Form not found');
         }
-
+        
         error_log('SFAIC: Processing immediate async job for prompt: ' . $prompt_id);
-
+        
         // Process the prompt immediately
         $result = $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
-
+        
         if ($result) {
             error_log('SFAIC: Async processing completed successfully for prompt: ' . $prompt_id);
         } else {
             error_log('SFAIC: Async processing failed for prompt: ' . $prompt_id);
         }
-
+        
         wp_die('OK');
+    }
+    
+    /**
+     * Add JavaScript to prevent duplicate form submissions
+     */
+    public function add_duplicate_prevention_js() {
+        ?>
+        <script>
+        (function() {
+            // Prevent double form submission
+            var sfaicFormStates = {};
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                // Find all Fluent Forms
+                var forms = document.querySelectorAll('.frm-fluent-form, .fluentform, form.fluent_form_<?php echo get_the_ID(); ?>');
+                
+                forms.forEach(function(form) {
+                    var formId = form.getAttribute('id') || form.getAttribute('data-form_id') || 'form_' + Math.random();
+                    sfaicFormStates[formId] = false;
+                    
+                    form.addEventListener('submit', function(e) {
+                        if (sfaicFormStates[formId]) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('SFAIC: Preventing duplicate form submission for', formId);
+                            return false;
+                        }
+                        
+                        sfaicFormStates[formId] = true;
+                        
+                        // Find and disable submit buttons
+                        var submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"], .ff_submit_btn');
+                        submitButtons.forEach(function(btn) {
+                            btn.disabled = true;
+                            btn.style.opacity = '0.6';
+                            
+                            // Store original text
+                            var originalText = btn.textContent || btn.value;
+                            btn.setAttribute('data-original-text', originalText);
+                            
+                            // Update button text
+                            if (btn.tagName === 'BUTTON') {
+                                btn.innerHTML = '<span style="display: inline-block; animation: sfaic-spin 1s linear infinite;">⟳</span> Processing...';
+                            } else {
+                                btn.value = 'Processing...';
+                            }
+                        });
+                        
+                        // Reset after 10 seconds in case of error
+                        setTimeout(function() {
+                            sfaicFormStates[formId] = false;
+                            submitButtons.forEach(function(btn) {
+                                btn.disabled = false;
+                                btn.style.opacity = '1';
+                                
+                                var originalText = btn.getAttribute('data-original-text');
+                                if (originalText) {
+                                    if (btn.tagName === 'BUTTON') {
+                                        btn.textContent = originalText;
+                                    } else {
+                                        btn.value = originalText;
+                                    }
+                                }
+                            });
+                        }, 10000);
+                    });
+                });
+                
+                // Listen for Fluent Forms jQuery events if jQuery is available
+                if (typeof jQuery !== 'undefined') {
+                    jQuery(document).on('fluentform_submission_success', function(e, data) {
+                        var formId = data.form_id || jQuery(e.target).attr('id');
+                        if (formId && sfaicFormStates[formId] !== undefined) {
+                            sfaicFormStates[formId] = false;
+                        }
+                    });
+                    
+                    jQuery(document).on('fluentform_submission_failed', function(e, data) {
+                        var formId = data.form_id || jQuery(e.target).attr('id');
+                        if (formId && sfaicFormStates[formId] !== undefined) {
+                            sfaicFormStates[formId] = false;
+                            
+                            // Re-enable buttons
+                            var form = document.getElementById(formId);
+                            if (form) {
+                                var submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"], .ff_submit_btn');
+                                submitButtons.forEach(function(btn) {
+                                    btn.disabled = false;
+                                    btn.style.opacity = '1';
+                                    
+                                    var originalText = btn.getAttribute('data-original-text');
+                                    if (originalText) {
+                                        if (btn.tagName === 'BUTTON') {
+                                            btn.textContent = originalText;
+                                        } else {
+                                            btn.value = originalText;
+                                        }
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        })();
+        </script>
+        <style>
+            @keyframes sfaic-spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        </style>
+        <?php
     }
 
     /**
-     * Process a prompt with form data - CHANGED FROM PRIVATE TO PUBLIC
-     * 
-     * @param int $prompt_id The prompt ID
-     * @param array $form_data The form data
-     * @param int $entry_id The entry ID
-     * @param object $form The form object
-     * @return bool Success status
+     * Process a prompt with form data - PUBLIC for background job access
      */
     public function process_prompt($prompt_id, $form_data, $entry_id, $form) {
         $start_time = microtime(true);
@@ -411,16 +634,16 @@ class SFAIC_Forms_Integration {
             // Log the error if possible
             if (isset(sfaic_main()->response_logger)) {
                 sfaic_main()->response_logger->log_response(
-                        $prompt_id,
-                        $entry_id,
-                        $form->id,
-                        "Error: API instance not available",
-                        "",
-                        $provider,
-                        "",
-                        0,
-                        "error",
-                        "API instance not available"
+                    $prompt_id,
+                    $entry_id,
+                    $form->id,
+                    "Error: API instance not available",
+                    "",
+                    $provider,
+                    "",
+                    0,
+                    "error",
+                    "API instance not available"
                 );
             }
             return false;
@@ -447,16 +670,16 @@ class SFAIC_Forms_Integration {
                 // Log the error
                 if (isset(sfaic_main()->response_logger)) {
                     sfaic_main()->response_logger->log_response(
-                            $prompt_id,
-                            $entry_id,
-                            $form->id,
-                            "Error: No user prompt template configured",
-                            "",
-                            $provider,
-                            "",
-                            0,
-                            "error",
-                            "No user prompt template configured"
+                        $prompt_id,
+                        $entry_id,
+                        $form->id,
+                        "Error: No user prompt template configured",
+                        "",
+                        $provider,
+                        "",
+                        0,
+                        "error",
+                        "No user prompt template configured"
                     );
                 }
                 return false;
@@ -523,7 +746,7 @@ class SFAIC_Forms_Integration {
         } else {
             $response_content = $ai_response;
 
-            // TRIGGER PDF GENERATION ACTION - This is the key addition for PDF support
+            // TRIGGER PDF GENERATION ACTION
             if (isset(sfaic_main()->pdf_generator)) {
                 do_action('sfaic_after_ai_response_processed', $response_content, $prompt_id, $entry_id, $form_data, $form);
             }
@@ -535,17 +758,17 @@ class SFAIC_Forms_Integration {
             // Use the enhanced response logger with proper provider, model information, and token usage
             if (isset(sfaic_main()->response_logger)) {
                 $result = sfaic_main()->response_logger->log_response(
-                        $prompt_id,
-                        $entry_id,
-                        $form->id,
-                        $complete_prompt, // Save the actual prompt sent
-                        $response_content,
-                        $provider, // Pass the correct provider
-                        $model, // Pass the correct model
-                        $execution_time,
-                        $status,
-                        $error_message,
-                        $token_usage // Pass the token usage
+                    $prompt_id,
+                    $entry_id,
+                    $form->id,
+                    $complete_prompt, // Save the actual prompt sent
+                    $response_content,
+                    $provider, // Pass the correct provider
+                    $model, // Pass the correct model
+                    $execution_time,
+                    $status,
+                    $error_message,
+                    $token_usage // Pass the token usage
                 );
             }
         }
@@ -568,10 +791,6 @@ class SFAIC_Forms_Integration {
 
     /**
      * Format all form data into a structured text for AI
-     *
-     * @param array $form_data The form data
-     * @param int $prompt_id The prompt ID (for getting form field labels)
-     * @return string Formatted form data as text
      */
     private function format_all_form_data($form_data, $prompt_id) {
         $output = __('Here is the submitted form data:', 'chatgpt-fluent-connector') . "\n\n";
@@ -607,9 +826,6 @@ class SFAIC_Forms_Integration {
 
     /**
      * Get form field labels from a selected form
-     *
-     * @param int $prompt_id The prompt ID
-     * @return array Associative array of field keys and labels
      */
     private function get_form_field_labels($prompt_id) {
         $field_labels = array();
@@ -642,18 +858,11 @@ class SFAIC_Forms_Integration {
     }
 
     /**
-     * Send email with the AI response - Updated with customizable email content
-     * 
-     * @param int $prompt_id The prompt ID
-     * @param int $entry_id The submission entry ID
-     * @param array $form_data The submitted form data
-     * @param string $ai_response The AI response
-     * @param string $provider The AI provider used
-     * @return bool True if email sent successfully, false otherwise
+     * Send email with the AI response
      */
     private function send_email_response($prompt_id, $entry_id, $form_data, $ai_response, $provider = 'openai') {
         error_log('SFAIC: Starting email send process for entry: ' . $entry_id);
-
+        
         // Get email settings
         $email_to = get_post_meta($prompt_id, '_sfaic_email_to', true);
         $email_subject = get_post_meta($prompt_id, '_sfaic_email_subject', true);
@@ -734,7 +943,7 @@ class SFAIC_Forms_Integration {
 
         // Make recipients unique
         $all_recipients = array_unique($all_recipients);
-
+        
         error_log('SFAIC: Email recipients: ' . implode(', ', $all_recipients));
 
         // Set default subject if empty
@@ -808,125 +1017,9 @@ class SFAIC_Forms_Integration {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>' . esc_html($email_subject) . '</title>
-            <style type="text/css">
-                body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
-                table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
-                img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-                table { border-collapse: collapse !important; }
-                body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
-
-                @media screen and (max-width: 600px) {
-                    .container { width: 100% !important; max-width: 100% !important; }
-                }
-
-                body {
-                    font-family: Arial, Helvetica, sans-serif;
-                    font-size: 16px;
-                    line-height: 1.6;
-                    color: #333333;
-                    background-color: #f4f4f4;
-                    margin: 0;
-                    padding: 0;
-                    -webkit-font-smoothing: antialiased;
-                    -moz-osx-font-smoothing: grayscale;
-                }
-
-                .wrapper {
-                    width: 100%;
-                    table-layout: fixed;
-                    background-color: #f4f4f4;
-                    padding: 40px 0;
-                }
-
-                .container {
-                    background-color: #ffffff;
-                    max-width: 100%;
-                    margin: 0 auto;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    overflow: hidden;
-                }
-
-                .content {
-                    padding: 30px;
-                }
-
-                h1, h2, h3, h4, h5, h6 {
-                    margin: 0 0 15px 0;
-                    padding: 0;
-                    font-weight: bold;
-                    line-height: 1.4;
-                }
-
-                h2 {
-                    font-size: 24px;
-                    color: #333333;
-                }
-
-                p {
-                    margin: 0 0 15px 0;
-                    padding: 0;
-                }
-
-                .ai-response {
-                    background-color: #f5f5f5;
-                    padding: 20px;
-                    border-radius: 5px;
-                    margin: 20px 0;
-                    border-left: 4px solid #0073aa;
-                }
-
-                .form-data-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 30px;
-                }
-
-                .form-data-table th,
-                .form-data-table td {
-                    border: 1px solid #dddddd;
-                    padding: 12px;
-                    text-align: left;
-                }
-
-                .form-data-table th {
-                    background-color: #f5f5f5;
-                    font-weight: bold;
-                }
-
-                .form-data-table tr:nth-child(even) {
-                    background-color: #f9f9f9;
-                }
-
-                .pdf-notice {
-                    background-color: #f0f8ff;
-                    border-left: 4px solid #007cba;
-                    padding: 15px;
-                    margin: 20px 0;
-                    border-radius: 0 3px 3px 0;
-                }
-
-                .footer {
-                    background-color: #f8f9fa;
-                    padding: 20px;
-                    text-align: center;
-                    font-size: 14px;
-                    color: #666666;
-                }
-            </style>
         </head>
-        <body>
-            <div class="wrapper">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" class="container">
-                    <tr>
-                        <td>
-                            <div class="content">
-                                ' . $email_content . '
-                            </div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            ' . $email_content . '
         </body>
         </html>';
 
@@ -946,20 +1039,6 @@ class SFAIC_Forms_Integration {
             if ($pdf_path) {
                 $attachments[] = $pdf_path;
                 error_log('SFAIC: PDF attachment found: ' . $pdf_path);
-
-                // Add note about PDF attachment to email
-                $final_email_content = str_replace(
-                        '</div>
-                </td>
-            </tr>',
-                        '<div class="pdf-notice">
-                        <p><strong>📄 PDF Report:</strong> A detailed PDF report has been attached to this email.</p>
-                    </div>
-                    </div>
-                </td>
-            </tr>',
-                        $final_email_content
-                );
             } else {
                 error_log('SFAIC: No PDF attachment found');
             }
@@ -999,11 +1078,11 @@ class SFAIC_Forms_Integration {
         $html = '
     <div style="margin-top: 40px; border-top: 2px solid #ddd; padding-top: 20px;">
         <h3 style="color: #333; margin-bottom: 15px;">Form Submission Details</h3>
-        <table class="form-data-table">
+        <table style="width: 100%; border-collapse: collapse;">
             <thead>
                 <tr>
-                    <th>Field</th>
-                    <th>Value</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5;">Field</th>
+                    <th style="border: 1px solid #ddd; padding: 8px; background-color: #f5f5f5;">Value</th>
                 </tr>
             </thead>
             <tbody>';
@@ -1026,8 +1105,8 @@ class SFAIC_Forms_Integration {
 
             $html .= '
                 <tr>
-                    <td><strong>' . esc_html($label) . '</strong></td>
-                    <td>' . esc_html($field_value) . '</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;"><strong>' . esc_html($label) . '</strong></td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">' . esc_html($field_value) . '</td>
                 </tr>';
         }
 
@@ -1079,96 +1158,20 @@ class SFAIC_Forms_Integration {
         // Replace placeholders in subject
         $admin_email_subject = str_replace(array_keys($placeholders), array_values($placeholders), $admin_email_subject);
 
-        // Get provider name
-        switch ($provider) {
-            case 'gemini':
-                $provider_name = 'Google Gemini';
-                break;
-            case 'claude':
-                $provider_name = 'Anthropic Claude';
-                break;
-            default:
-                $provider_name = 'ChatGPT';
-                break;
-        }
-
-        // Build admin email content with all form data
+        // Build admin email content
         $admin_email_content = '
         <html>
         <head>
             <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    max-width: 900px;
-                    margin: 0 auto;
-                }
-                .container {
-                    padding: 20px;
-                }
-                .header {
-                    padding: 20px;
-                }
-                .section {
-                    padding: 20px;
-                    border-radius: 5px;
-                }
-                .section h3 {
-                    margin-top: 0;
-                    color: #0073aa;
-                    padding-bottom: 10px;
-                }
-                .form-data-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 15px;
-                }
-                .form-data-table th,
-                .form-data-table td {
-                    padding: 12px;
-                    text-align: left;
-                }
-                .form-data-table th {
-                    font-weight: bold;
-                    color: #333;
-                }
-                .ai-response {
-                    padding: 20px;
-                    margin-top: 15px;
-                }
-                .metadata {
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin-top: 20px;
-                }
-                .metadata p {
-                    margin: 5px 0;
-                }
+                body { font-family: Arial, sans-serif; }
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="section">
-                    <h3>Response</h3>
-                    <div class="ai-response">
-                        ' . wp_kses_post($ai_response) . '
-                    </div>
-                </div>
-                              
-                <div class="section">
-                    <h3>Form Submission Data</h3>
-                    ' . $this->generate_form_data_table($form_data, $prompt_id) . '
-                </div>
-
-                <div class="metadata">
-                    <p><strong>Submission Details:</strong></p>
-                    <p>Entry ID: ' . esc_html($entry_id) . '</p>
-                    <p>Form ID: ' . esc_html($form_id) . '</p>
-                    <p>AI Provider: ' . esc_html($provider_name) . '</p>
-                    <p>Prompt Used: ' . esc_html(get_the_title($prompt_id)) . '</p>
-                </div>
-            </div>
+            <h2>New Form Submission</h2>
+            <h3>AI Response:</h3>
+            <div>' . wp_kses_post($ai_response) . '</div>
+            <h3>Form Data:</h3>
+            ' . $this->generate_form_data_table($form_data, $prompt_id) . '
         </body>
         </html>';
 
@@ -1206,40 +1209,8 @@ class SFAIC_Forms_Integration {
         return $success;
     }
 
-    private function create_submission_fingerprint($form_data, $form_id) {
-        if (!is_array($form_data)) {
-            return '';
-        }
-
-        // Extract key fields for fingerprinting (excluding timestamps and tokens)
-        $key_data = array();
-        foreach ($form_data as $field => $value) {
-            // Skip internal fields, timestamps, and tokens
-            if (strpos($field, '_') === 0 ||
-                    in_array($field, array('timestamp', 'token', 'nonce', '_token', '_nonce'))) {
-                continue;
-            }
-
-            // Convert arrays to string for consistent hashing
-            if (is_array($value)) {
-                $value = implode('|', $value);
-            }
-
-            $key_data[$field] = $value;
-        }
-
-        // Sort for consistency
-        ksort($key_data);
-
-        // Create fingerprint with form ID
-        return md5($form_id . '_' . serialize($key_data));
-    }
-
     /**
      * Clean and prepare HTML response for display
-     * 
-     * @param string|WP_Error $response The response from the API
-     * @return string The cleaned HTML response or error message
      */
     private function clean_html_response($response) {
         // Basic HTML cleaning if needed
@@ -1247,154 +1218,23 @@ class SFAIC_Forms_Integration {
     }
 }
 
-// Add this JavaScript to prevent frontend double submissions
-// You can add this to your theme's footer or create a separate JS file
-
-add_action('wp_footer', 'sfaic_prevent_double_submission');
-
-function sfaic_prevent_double_submission() {
-    ?>
-    <script>
-        jQuery(document).ready(function ($) {
-            // Track form submission state
-            var formSubmitting = {};
-
-            // Handle Fluent Forms submission
-            $(document).on('submit', '.frm-fluent-form, .fluentform', function (e) {
-                var formId = $(this).attr('id') || $(this).data('form_id');
-
-                if (!formId) {
-                    formId = 'form_' + Math.random();
-                }
-
-                // Check if already submitting
-                if (formSubmitting[formId]) {
-                    e.preventDefault();
-                    console.log('SFAIC: Preventing duplicate submission for form:', formId);
-                    return false;
-                }
-
-                // Mark as submitting
-                formSubmitting[formId] = true;
-
-                // Disable submit button
-                var $submitBtn = $(this).find('button[type="submit"], input[type="submit"]');
-                $submitBtn.prop('disabled', true).addClass('sfaic-submitting');
-
-                // Add visual feedback
-                if ($submitBtn.length) {
-                    var originalText = $submitBtn.text() || $submitBtn.val();
-                    if ($submitBtn.is('button')) {
-                        $submitBtn.html('<span class="ff-btn-loading"></span> Processing...');
-                    } else {
-                        $submitBtn.val('Processing...');
-                    }
-
-                    // Store original text for restoration
-                    $submitBtn.data('original-text', originalText);
-                }
-
-                // Reset after 10 seconds (in case of error)
-                setTimeout(function () {
-                    formSubmitting[formId] = false;
-                    $submitBtn.prop('disabled', false).removeClass('sfaic-submitting');
-
-                    if ($submitBtn.data('original-text')) {
-                        if ($submitBtn.is('button')) {
-                            $submitBtn.html($submitBtn.data('original-text'));
-                        } else {
-                            $submitBtn.val($submitBtn.data('original-text'));
-                        }
-                    }
-                }, 10000);
-            });
-
-            // Listen for Fluent Forms events
-            $(document).on('fluentform_submission_success', function (e, data) {
-                var formId = data.form_id || $(e.target).attr('id');
-                formSubmitting[formId] = false;
-
-                // Re-enable submit button
-                var $form = $('#' + formId);
-                if (!$form.length) {
-                    $form = $('.fluentform[data-form_id="' + formId + '"]');
-                }
-
-                var $submitBtn = $form.find('button[type="submit"], input[type="submit"]');
-                $submitBtn.prop('disabled', false).removeClass('sfaic-submitting');
-            });
-
-            $(document).on('fluentform_submission_failed', function (e, data) {
-                var formId = data.form_id || $(e.target).attr('id');
-                formSubmitting[formId] = false;
-
-                // Re-enable submit button
-                var $form = $('#' + formId);
-                if (!$form.length) {
-                    $form = $('.fluentform[data-form_id="' + formId + '"]');
-                }
-
-                var $submitBtn = $form.find('button[type="submit"], input[type="submit"]');
-                $submitBtn.prop('disabled', false).removeClass('sfaic-submitting');
-
-                // Restore original text
-                if ($submitBtn.data('original-text')) {
-                    if ($submitBtn.is('button')) {
-                        $submitBtn.html($submitBtn.data('original-text'));
-                    } else {
-                        $submitBtn.val($submitBtn.data('original-text'));
-                    }
-                }
-            });
-        });
-    </script>
-    <style>
-        .sfaic-submitting {
-            opacity: 0.6;
-            cursor: not-allowed !important;
-        }
-        .ff-btn-loading:before {
-            content: "⟳";
-            display: inline-block;
-            animation: sfaic-spin 1s linear infinite;
-            margin-right: 5px;
-        }
-        @keyframes sfaic-spin {
-            from {
-                transform: rotate(0deg);
-            }
-            to {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
-    <?php
-
-}
-
-// Add a cleanup cron job for old transients
-add_action('init', 'sfaic_schedule_transient_cleanup');
-
-function sfaic_schedule_transient_cleanup() {
-    if (!wp_next_scheduled('sfaic_cleanup_transients')) {
-        wp_schedule_event(time(), 'hourly', 'sfaic_cleanup_transients');
+// Schedule cleanup of old transients
+add_action('init', function() {
+    if (!wp_next_scheduled('sfaic_cleanup_old_transients')) {
+        wp_schedule_event(time(), 'hourly', 'sfaic_cleanup_old_transients');
     }
-}
+});
 
-add_action('sfaic_cleanup_transients', 'sfaic_cleanup_old_transients');
-
-function sfaic_cleanup_old_transients() {
+add_action('sfaic_cleanup_old_transients', function() {
     global $wpdb;
-
+    
     // Clean up old SFAIC transients
     $wpdb->query(
-            "DELETE FROM {$wpdb->options} 
-         WHERE option_name LIKE '_transient_sfaic_fingerprint_%' 
-         OR option_name LIKE '_transient_sfaic_combo_%'
-         OR option_name LIKE '_transient_sfaic_duplicate_%'
-         AND option_name LIKE '_transient_timeout_%' 
-         AND option_value < UNIX_TIMESTAMP()"
+        "DELETE FROM {$wpdb->options} 
+         WHERE (option_name LIKE '_transient_sfaic_%' 
+         OR option_name LIKE '_transient_timeout_sfaic_%')
+         AND option_name NOT LIKE '%_lock%'"
     );
-
+    
     error_log('SFAIC: Cleaned up old transients');
-}
+});
