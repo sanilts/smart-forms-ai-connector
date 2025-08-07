@@ -71,7 +71,6 @@ class SFAIC_Response_Logger {
             // Get last name from custom mapping
             if (!empty($last_name_field) && isset($form_data[$last_name_field])) {     
                 $lname=$form_data[$last_name_field];
-                error_log('SFAIC:$last_name_field: ' . print_r($lname)); 
                 if(is_array($lname)){
                     $last_name = sanitize_text_field($lname['last_name']);
                     error_log('SFAIC: $last_name: ' . $last_name); 
@@ -404,7 +403,6 @@ class SFAIC_Response_Logger {
         if ($result === false) {
             // Log error for debugging
             error_log('CGPTFC: Failed to log response. WP Database Error: ' . $wpdb->last_error);
-            error_log('CGPTFC: Data attempted to insert: ' . print_r($data, true));
             return false;
         }
 
