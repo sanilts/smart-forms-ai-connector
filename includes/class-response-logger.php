@@ -13,7 +13,7 @@ class SFAIC_Response_Logger {
     /**
      * Table version - Incremented for new columns
      */
-    private $table_version = '1.4';
+    private $table_version = '1.6';
 
     /**
      * Constructor
@@ -25,11 +25,11 @@ class SFAIC_Response_Logger {
         // Add admin submenu for logs
         add_action('admin_menu', array($this, 'add_logs_submenu'));
 
-        // Make sure table exists
+        // Make sure table exists AND is up to date
         $this->ensure_table_exists();
 
-        // Check if table needs to be updated
-        add_action('admin_init', array($this, 'check_table_version'));
+        // Check if table needs to be updated - run this early
+        add_action('init', array($this, 'check_and_update_table'), 1);
 
         // Add assets for the logs page
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
@@ -56,28 +56,28 @@ class SFAIC_Response_Logger {
 
             $first_name = '';
             $last_name = '';
-                       
+
             // Get first name from custom mapping
-            if (!empty($first_name_field) && isset($form_data[$first_name_field])) {   
-                 $fname=$form_data[$first_name_field];
-                if(is_array($fname)){
+            if (!empty($first_name_field) && isset($form_data[$first_name_field])) {
+                $fname = $form_data[$first_name_field];
+                if (is_array($fname)) {
                     $first_name = sanitize_text_field($fname['first_name']);
-                }else{
+                } else {
                     $first_name = sanitize_text_field($form_data[$first_name_field]);
                 }
             }
-            
-            
+
+
             // Get last name from custom mapping
-            if (!empty($last_name_field) && isset($form_data[$last_name_field])) {     
-                $lname=$form_data[$last_name_field];
-                error_log('SFAIC:$last_name_field: ' . print_r($lname)); 
-                if(is_array($lname)){
+            if (!empty($last_name_field) && isset($form_data[$last_name_field])) {
+                $lname = $form_data[$last_name_field];
+                error_log('SFAIC:$last_name_field: ' . print_r($lname));
+                if (is_array($lname)) {
                     $last_name = sanitize_text_field($lname['last_name']);
-                    error_log('SFAIC: $last_name: ' . $last_name); 
-                }else{
-                     $last_name = sanitize_text_field($form_data[$last_name_field]);
-                }               
+                    error_log('SFAIC: $last_name: ' . $last_name);
+                } else {
+                    $last_name = sanitize_text_field($form_data[$last_name_field]);
+                }
             }
 
             // If we got names from custom mappings, return them
@@ -94,7 +94,7 @@ class SFAIC_Response_Logger {
         );
 
         foreach ($name_fields as $field) {
-            if (isset($form_data[$field]) && !empty($form_data[$field])) { 
+            if (isset($form_data[$field]) && !empty($form_data[$field])) {
                 return sanitize_text_field($form_data[$field]);
             }
         }
@@ -150,16 +150,29 @@ class SFAIC_Response_Logger {
     }
 
     /**
-     * Check if the table structure needs to be updated
+     * Check and update table structure if needed
      */
-    public function check_table_version() {
+    public function check_and_update_table() {
         $current_version = get_option('sfaic_logs_table_version', '1.0');
 
-        // If the table version is less than our version, we need to update it
+        // Force update if version is less than required
         if (version_compare($current_version, $this->table_version, '<')) {
             $this->update_table_structure();
             update_option('sfaic_logs_table_version', $this->table_version);
+            error_log('SFAIC: check_and_update_table');
+        }else{
+             error_log('SFAIC: check_and_update_table error'.$current_version);
         }
+    }
+
+    /**
+     * Check if a column exists in the table
+     */
+    private function column_exists($column_name) {
+        global $wpdb;
+        $columns = $wpdb->get_results("SHOW COLUMNS FROM {$this->table_name}", ARRAY_A);
+        $column_names = array_column($columns, 'Field');
+        return in_array($column_name, $column_names);
     }
 
     /**
@@ -179,7 +192,17 @@ class SFAIC_Response_Logger {
         $columns = $wpdb->get_results("SHOW COLUMNS FROM {$this->table_name}", ARRAY_A);
         $column_names = array_column($columns, 'Field');
 
-        // Add user name and email columns
+        // Add tracking_source column if it doesn't exist
+        if (!in_array('tracking_source', $column_names)) {
+            $result = $wpdb->query("ALTER TABLE {$this->table_name} ADD `tracking_source` VARCHAR(255) DEFAULT NULL AFTER `user_email`");
+            if ($result === false) {
+                error_log('SFAIC: Failed to add tracking_source column: ' . $wpdb->last_error);
+            } else {
+                error_log('SFAIC: Successfully added tracking_source column to response logs table');
+            }
+        }
+
+        // Add user name and email columns if they don't exist
         if (!in_array('user_name', $column_names)) {
             $wpdb->query("ALTER TABLE {$this->table_name} ADD `user_name` VARCHAR(255) DEFAULT NULL AFTER `entry_id`");
         }
@@ -260,6 +283,7 @@ class SFAIC_Response_Logger {
             entry_id bigint(20) NOT NULL,
             user_name varchar(255) DEFAULT NULL,
             user_email varchar(255) DEFAULT NULL,
+            tracking_source varchar(255) DEFAULT NULL,
             user_prompt longtext NOT NULL,
             prompt_template text DEFAULT NULL,
             ai_response longtext NOT NULL,
@@ -281,7 +305,8 @@ class SFAIC_Response_Logger {
             KEY status (status),
             KEY created_at (created_at),
             KEY user_email (user_email),
-            KEY user_name (user_name)
+            KEY user_name (user_name),
+            KEY tracking_source (tracking_source)
         ) $charset_collate;";
 
         dbDelta($sql);
@@ -290,14 +315,50 @@ class SFAIC_Response_Logger {
         update_option('sfaic_logs_table_version', $this->table_version);
     }
 
+    private function extract_tracking_source($form_data, $prompt_id = null) {
+        // Get the configured GET parameter name for this prompt
+        $get_param_name = '';
+        if (!empty($prompt_id)) {
+            $get_param_name = get_post_meta($prompt_id, '_sfaic_tracking_get_param', true);
+        }
+
+        // If no parameter configured, return empty
+        if (empty($get_param_name)) {
+            return '';
+        }
+
+        // Check if the parameter exists in form data (it should be passed from forms integration)
+        if (isset($form_data['_tracking_source'])) {
+            return sanitize_text_field($form_data['_tracking_source']);
+        }
+        error_log('SFAIC Logger: Tracking source Print Array- ' . print_r($form_data, true));
+        error_log(json_encode($form_data, JSON_PRETTY_PRINT));
+        error_log("GET Value".$_GET['from']);
+
+        // Fallback: check $_GET directly (shouldn't be needed if forms integration works correctly)
+        if (isset($_GET[$get_param_name])) {
+            return sanitize_text_field($_GET[$get_param_name]);
+        }
+
+        return "-";
+    }
+
     /**
      * Log a response with enhanced details including token usage and user name/email
      */
     public function log_response($prompt_id, $entry_id, $form_id, $user_prompt, $ai_response, $provider = null, $model = '', $execution_time = null, $status = 'success', $error_message = '', $token_usage = array(), $prompt_template = '', $request_json = '', $response_json = '', $form_data = array()) {
+
         global $wpdb;
 
         // Ensure table exists before trying to insert
         $this->ensure_table_exists();
+
+        // Extract tracking source from form data
+        $tracking_source = $this->extract_tracking_source($form_data, $prompt_id);
+        // Debug logging
+        if (!empty($tracking_source)) {
+            error_log('SFAIC Logger: Tracking source - ' . $tracking_source);
+        }
 
         // Check for WP_Error
         $response_text = '';
@@ -368,6 +429,7 @@ class SFAIC_Response_Logger {
             'entry_id' => $entry_id,
             'user_name' => $user_name,
             'user_email' => $user_email,
+            'tracking_source' => $tracking_source, // Add this line
             'user_prompt' => $user_prompt,
             'prompt_template' => $prompt_template,
             'ai_response' => $response_text,
@@ -433,6 +495,12 @@ class SFAIC_Response_Logger {
         // Check if table exists
         $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$this->table_name}'") === $this->table_name;
 
+        // Check if tracking_source column exists
+        $has_tracking_column = false;
+        if ($table_exists) {
+            $has_tracking_column = $this->column_exists('tracking_source');
+        }
+
         // Process view log details action
         if (isset($_GET['action']) && $_GET['action'] === 'view' && isset($_GET['log_id'])) {
             $this->render_log_details((int) $_GET['log_id']);
@@ -458,6 +526,10 @@ class SFAIC_Response_Logger {
         }
         if (isset($_GET['date_to']) && !empty($_GET['date_to'])) {
             $filters['date_to'] = sanitize_text_field($_GET['date_to']);
+        }
+        // Only add tracking source filter if column exists
+        if (isset($_GET['tracking_source']) && !empty($_GET['tracking_source']) && $has_tracking_column) {
+            $filters['tracking_source'] = sanitize_text_field($_GET['tracking_source']);
         }
 
         // NEW: Add chunking filter
@@ -562,10 +634,9 @@ class SFAIC_Response_Logger {
                 <div class="notice notice-error">
                     <p><?php _e('The logs table does not exist. Please try reactivating the plugin to create it.', 'chatgpt-fluent-connector'); ?></p>
                 </div>
-            <?php elseif (empty($logs) && empty($filters)): ?>
-                <div class="notice notice-info">
-                    <p><?php _e('No logs found. This could be because no forms have been submitted yet, or logging is not enabled on your prompts.', 'chatgpt-fluent-connector'); ?></p>
-                    <p><?php _e('To enable logging, edit a prompt and check the "Save responses to the database" option under Response Handling.', 'chatgpt-fluent-connector'); ?></p>
+            <?php elseif (!$has_tracking_column): ?>
+                <div class="notice notice-warning">
+                    <p><?php _e('Database update needed for tracking features. Please deactivate and reactivate the plugin to update the database structure.', 'chatgpt-fluent-connector'); ?></p>
                 </div>
             <?php endif; ?>
 
@@ -605,6 +676,35 @@ class SFAIC_Response_Logger {
                             <option value="yes" <?php selected(isset($filters['chunked']) ? $filters['chunked'] : '', 'yes'); ?>><?php _e('Chunked Only', 'chatgpt-fluent-connector'); ?></option>
                             <option value="no" <?php selected(isset($filters['chunked']) ? $filters['chunked'] : '', 'no'); ?>><?php _e('Single Response', 'chatgpt-fluent-connector'); ?></option>
                         </select>
+                        <?php if ($has_tracking_column): ?>
+                            <?php
+                            // Get unique tracking sources for filter dropdown
+                            $tracking_sources = $wpdb->get_col("
+                            SELECT DISTINCT tracking_source 
+                            FROM {$this->table_name} 
+                            WHERE tracking_source IS NOT NULL 
+                            AND tracking_source != '' 
+                            ORDER BY tracking_source
+                        ");
+                            ?>
+                            <?php if (!empty($tracking_sources)): ?>
+                                <select name="tracking_source">
+                                    <option value=""><?php _e('All Sources', 'chatgpt-fluent-connector'); ?></option>
+                                    <?php foreach ($tracking_sources as $source): ?>
+                                        <option value="<?php echo esc_attr($source); ?>" <?php selected(isset($filters['tracking_source']) ? $filters['tracking_source'] : '', $source); ?>>
+                                            <?php echo esc_html($source); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        <?php
+                        // In get_all_logs method, add filter condition (around line 1600)
+                        if (!empty($filters['tracking_source'])) {
+                            $where_clauses[] = 'l.tracking_source = %s';
+                            $query_params[] = $filters['tracking_source'];
+                        }
+                        ?>
 
                         <span>
                             <input type="date" name="date_from" placeholder="<?php _e('From date', 'chatgpt-fluent-connector'); ?>" 
@@ -659,13 +759,15 @@ class SFAIC_Response_Logger {
                         <th style="width: 130px;"><?php _e('Date', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 120px;"><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 150px;"><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
+                        <?php if ($has_tracking_column): ?>
+                            <th style="width: 100px;"><?php _e('Source', 'chatgpt-fluent-connector'); ?></th>
+                        <?php endif; ?>
                         <th><?php _e('Prompt', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Form', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Entry', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 70px;"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 80px;"><?php _e('Provider', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 90px;"><?php _e('Model', 'chatgpt-fluent-connector'); ?></th>
-                        <!-- NEW: Chunking Column -->
                         <th style="width: 80px;" title="<?php _e('Chunking Information', 'chatgpt-fluent-connector'); ?>"><?php _e('Chunks', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 100px;" title="<?php _e('Prompt / Completion / Total', 'chatgpt-fluent-connector'); ?>"><?php _e('Tokens', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Time', 'chatgpt-fluent-connector'); ?></th>
@@ -731,6 +833,17 @@ class SFAIC_Response_Logger {
                                 </td>
                                 <td title="<?php echo esc_attr($log->user_name ?? ''); ?>"><?php echo $user_name_display; ?></td>
                                 <td title="<?php echo esc_attr($log->user_email ?? ''); ?>"><?php echo $user_email_display; ?></td>
+                                <?php if ($has_tracking_column): ?>
+                                    <td>
+                                        <?php if (!empty($log->tracking_source)): ?>
+                                            <span class="tracking-badge" style="background: #f0f8ff; color: #0073aa; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">
+                                                <?php echo esc_html($log->tracking_source); ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="color: #999;">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                <?php endif; ?>
                                 <td>
                                     <?php if (isset($log->prompt_title) && !empty($log->prompt_title)) : ?>
                                         <a href="<?php echo esc_url(get_edit_post_link($log->prompt_id)); ?>">

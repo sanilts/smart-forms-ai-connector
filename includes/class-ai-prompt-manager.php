@@ -100,7 +100,7 @@ class SFAIC_Prompt_Manager {
                 __('Response Length & Chunking', 'chatgpt-fluent-connector'),
                 array($this, 'render_chunking_settings_meta_box'),
                 'sfaic_prompt',
-                'side',
+                'normal',
                 'default'
         );
 
@@ -110,7 +110,7 @@ class SFAIC_Prompt_Manager {
                 __('Background Processing Settings', 'chatgpt-fluent-connector'),
                 array($this, 'render_background_processing_meta_box'),
                 'sfaic_prompt',
-                'side',
+                'normal',
                 'default'
         );
 
@@ -119,9 +119,62 @@ class SFAIC_Prompt_Manager {
                 __('User Field Mapping', 'chatgpt-fluent-connector'),
                 array($this, 'render_field_mapping_meta_box'),
                 'sfaic_prompt',
-                'side',
+                'normal',
                 'default'
         );
+        
+        // Add a new meta box for tracking settings (in add_meta_boxes method around line 70)
+        add_meta_box(
+            'sfaic_tracking_settings',
+            __('Tracking Settings', 'chatgpt-fluent-connector'),
+            array($this, 'render_tracking_settings_meta_box'),
+            'sfaic_prompt',
+            'normal',
+            'default'
+        );
+    }
+    
+    // Add the new render method for tracking settings
+    public function render_tracking_settings_meta_box($post) {
+        // Get saved value
+        $tracking_get_param = get_post_meta($post->ID, '_sfaic_tracking_get_param', true);
+        ?>
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+            <h4 style="margin-top: 0; color: #0073aa;">📊 Source Tracking</h4>
+
+            <table class="form-table" style="margin: 0;">
+                <tr>
+                    <th style="width: 120px;">
+                        <label for="sfaic_tracking_get_param"><?php _e('GET Parameter:', 'chatgpt-fluent-connector'); ?></label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="sfaic_tracking_get_param" 
+                               id="sfaic_tracking_get_param" 
+                               value="<?php echo esc_attr($tracking_get_param); ?>" 
+                               class="regular-text"
+                               placeholder="e.g., from, source, ref">
+                        <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                            <?php _e('Enter the GET parameter name to track (e.g., "from" for ?from=value).', 'chatgpt-fluent-connector'); ?><br>
+                            <?php _e('Leave empty to disable tracking for this prompt.', 'chatgpt-fluent-connector'); ?>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <div style="background: #e8f4fd; padding: 10px; border-radius: 3px; margin-top: 15px; border-left: 4px solid #0073aa;">
+                <p style="margin: 0; font-size: 11px; color: #0073aa;">
+                    <strong>💡 Usage Example:</strong><br>
+                    <?php if (!empty($tracking_get_param)): ?>
+                        Your form URL: <code>domain.com/?<?php echo esc_html($tracking_get_param); ?>=newsletter</code><br>
+                        Will track source as: <strong>newsletter</strong>
+                    <?php else: ?>
+                        Configure a parameter name above to track form submission sources.
+                    <?php endif; ?>
+                </p>
+            </div>
+        </div>
+        <?php
     }
 
     /**
@@ -1174,6 +1227,7 @@ class SFAIC_Prompt_Manager {
         if (isset($_POST['sfaic_admin_email_subject'])) {
             update_post_meta($post_id, '_sfaic_admin_email_subject', sanitize_text_field($_POST['sfaic_admin_email_subject']));
         }
+        
 
         $log_responses = isset($_POST['sfaic_log_responses']) ? '1' : '0';
         update_post_meta($post_id, '_sfaic_log_responses', $log_responses);
@@ -1183,6 +1237,14 @@ class SFAIC_Prompt_Manager {
 
         if (isset($_POST['sfaic_email_field'])) {
             update_post_meta($post_id, '_sfaic_email_field', sanitize_text_field($_POST['sfaic_email_field']));
+        }
+        
+        // Save tracking GET parameter
+        if (isset($_POST['sfaic_tracking_get_param'])) {
+            $tracking_param = sanitize_text_field($_POST['sfaic_tracking_get_param']);
+            // Only allow alphanumeric and underscore
+            $tracking_param = preg_replace('/[^a-zA-Z0-9_]/', '', $tracking_param);
+            update_post_meta($post_id, '_sfaic_tracking_get_param', $tracking_param);
         }
     }
 

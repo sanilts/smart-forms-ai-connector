@@ -133,6 +133,7 @@ class SFAIC_Background_Job_Manager {
      * Simplified and more reliable job scheduling
      */
     public function schedule_job($job_type, $prompt_id, $form_id, $entry_id, $job_data, $delay = 0, $priority = 0) {
+        
         if (!$this->is_background_processing_enabled()) {
             error_log('SFAIC: Background processing disabled, processing immediately');
             return $this->process_job_immediately($job_type, $prompt_id, $form_id, $entry_id, $job_data);
@@ -155,7 +156,13 @@ class SFAIC_Background_Job_Manager {
         $job_data_json = wp_json_encode($job_data);
 
         error_log('SFAIC: Scheduling job - User: ' . $user_name . ' (' . $user_email . '), Scheduled: ' . $scheduled_time);
-
+        
+        $tracking_source = '';
+        if (isset($job_data['form_data']['_tracking_source'])) {
+            $tracking_source = $job_data['form_data']['_tracking_source'];
+        }
+        
+        
         $result = $wpdb->insert(
                 $this->jobs_table,
                 array(

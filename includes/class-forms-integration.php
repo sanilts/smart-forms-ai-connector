@@ -71,6 +71,19 @@ class SFAIC_Forms_Integration {
 
         // ONLY queue for later processing - DO NOT process here
         foreach ($prompts as $prompt) {
+            
+            // Check if this prompt has tracking enabled
+            $tracking_param = get_post_meta($prompt->ID, '_sfaic_tracking_get_param', true);
+
+            // Capture the tracking value if parameter is configured
+            if (!empty($tracking_param) && isset($_GET[$tracking_param])) {
+                $tracking_value = sanitize_text_field($_GET[$tracking_param]);
+                // Add to form data so it gets passed through the system
+                $formData['_tracking_source'] = $tracking_value;
+                error_log('SFAIC: Captured tracking source "' . $tracking_value . '" from GET parameter "' . $tracking_param . '"');
+            }
+            
+            
             $enable_background_processing = get_post_meta($prompt->ID, '_sfaic_enable_background_processing', true);
             
             // Default to enabled if not set (backwards compatibility)

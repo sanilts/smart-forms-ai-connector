@@ -1190,3 +1190,42 @@ select[name="chunked"] {
         color: #000 !important;
     }
 }
+
+/* Tracking Source Styles */
+.tracking-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: #f0f8ff;
+    color: #0073aa;
+    border: 1px solid #bee5ff;
+}
+
+.tracking-badge:empty {
+    display: none;
+}
+
+/* Highlight different sources with different colors */
+.tracking-badge[data-source*="email"] {
+    background: #e8f5e8;
+    color: #0a7e07;
+    border-color: #c3e6cb;
+}
+
+.tracking-badge[data-source*="social"] {
+    background: #fff4e6;
+    color: #b45309;
+    border-color: #ffeaa7;
+}
+
+.tracking-badge[data-source*="ad"],
+.tracking-badge[data-source*="google"],
+.tracking-badge[data-source*="facebook"] {
+    background: #fbeaea;
+    color: #a00;
+    border-color: #f5c6cb;
+}
