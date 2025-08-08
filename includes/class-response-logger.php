@@ -13,7 +13,7 @@ class SFAIC_Response_Logger {
     /**
      * Table version - Incremented for new columns
      */
-    private $table_version = '1.4';
+    private $table_version = '1.5';
 
     /**
      * Constructor
@@ -236,6 +236,11 @@ class SFAIC_Response_Logger {
         if (!in_array('total_tokens', $column_names)) {
             $wpdb->query("ALTER TABLE {$this->table_name} ADD `total_tokens` INT DEFAULT NULL AFTER `completion_tokens`");
         }
+        
+        // Add get_param_value column if it doesn't exist
+        if (!in_array('get_param_value', $column_names)) {
+            $wpdb->query("ALTER TABLE {$this->table_name} ADD `get_param_value` VARCHAR(255) DEFAULT NULL AFTER `user_email`");
+        }
     }
 
     /**
@@ -259,6 +264,7 @@ class SFAIC_Response_Logger {
             entry_id bigint(20) NOT NULL,
             user_name varchar(255) DEFAULT NULL,
             user_email varchar(255) DEFAULT NULL,
+            get_param_value varchar(255) DEFAULT NULL,
             user_prompt longtext NOT NULL,
             prompt_template text DEFAULT NULL,
             ai_response longtext NOT NULL,
@@ -273,14 +279,15 @@ class SFAIC_Response_Logger {
             request_json longtext DEFAULT NULL,
             response_json longtext DEFAULT NULL,
             created_at datetime NOT NULL,
-            PRIMARY KEY  (id),
+            PRIMARY KEY (id),
             KEY prompt_id (prompt_id),
             KEY form_id (form_id),
             KEY entry_id (entry_id),
             KEY status (status),
             KEY created_at (created_at),
             KEY user_email (user_email),
-            KEY user_name (user_name)
+            KEY user_name (user_name),
+            KEY get_param_value (get_param_value)
         ) $charset_collate;";
 
         dbDelta($sql);
@@ -292,7 +299,8 @@ class SFAIC_Response_Logger {
     /**
      * Log a response with enhanced details including token usage and user name/email
      */
-    public function log_response($prompt_id, $entry_id, $form_id, $user_prompt, $ai_response, $provider = null, $model = '', $execution_time = null, $status = 'success', $error_message = '', $token_usage = array(), $prompt_template = '', $request_json = '', $response_json = '', $form_data = array()) {
+public function log_response($prompt_id, $entry_id, $form_id, $user_prompt, $ai_response, $provider = null, $model = '', $execution_time = null, $status = 'success', $error_message = '', $token_usage = array(), $prompt_template = '', $request_json = '', $response_json = '', $form_data = array(), $get_param_value = '') {        
+    
         global $wpdb;
 
         // Ensure table exists before trying to insert
@@ -367,6 +375,7 @@ class SFAIC_Response_Logger {
             'entry_id' => $entry_id,
             'user_name' => $user_name,
             'user_email' => $user_email,
+            'get_param_value' => sanitize_text_field($get_param_value), // Add this line
             'user_prompt' => $user_prompt,
             'prompt_template' => $prompt_template,
             'ai_response' => $response_text,
@@ -657,6 +666,7 @@ class SFAIC_Response_Logger {
                         <th style="width: 130px;"><?php _e('Date', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 120px;"><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 150px;"><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
+                        <th style="width: 100px;"><?php _e('Source', 'chatgpt-fluent-connector'); ?></th> <!-- NEW COLUMN -->
                         <th><?php _e('Prompt', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Form', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Entry', 'chatgpt-fluent-connector'); ?></th>
@@ -678,6 +688,18 @@ class SFAIC_Response_Logger {
                             $execution_time = isset($log->execution_time) ? round($log->execution_time, 2) . 's' : '-';
                             $status_badge = ($log->status === 'error') ? '<span class="sfaic-badge sfaic-badge-error">' . __('Error', 'chatgpt-fluent-connector') . '</span>' : '<span class="sfaic-badge sfaic-badge-success">' . __('Success', 'chatgpt-fluent-connector') . '</span>';
 
+                            $get_param_label = 'Source'; // Default
+                            if (!empty($log->prompt_id)) {
+                                $custom_label = get_post_meta($log->prompt_id, '_sfaic_get_param_label', true);
+                                if (!empty($custom_label)) {
+                                    $get_param_label = $custom_label;
+                                }
+                            }
+                            
+                            // Format the GET parameter value
+                            $get_param_display = !empty($log->get_param_value) ? 
+                                '<span class="sfaic-get-param-badge">' . esc_html($log->get_param_value) . '</span>' : 
+                                '<span class="sfaic-get-param-empty">-</span>';
                             // Prepare provider badge
                             $provider_badge = '';
                             switch ($log->provider) {
@@ -722,6 +744,7 @@ class SFAIC_Response_Logger {
                                 $user_email_display = '<a href="mailto:' . esc_attr($log->user_email) . '">' . esc_html($log->user_email) . '</a>';
                             }
                             ?>
+                            
                             <tr class="<?php echo esc_attr($row_class); ?>">
                                 <td><?php echo esc_html($log->id); ?></td>
                                 <td>
@@ -729,6 +752,9 @@ class SFAIC_Response_Logger {
                                 </td>
                                 <td title="<?php echo esc_attr($log->user_name ?? ''); ?>"><?php echo $user_name_display; ?></td>
                                 <td title="<?php echo esc_attr($log->user_email ?? ''); ?>"><?php echo $user_email_display; ?></td>
+                                <td title="<?php echo esc_attr($get_param_label . ': ' . ($log->get_param_value ?? 'Not set')); ?>">
+                                    <?php echo $get_param_display; ?>
+                                </td>
                                 <td>
                                     <?php if (isset($log->prompt_title) && !empty($log->prompt_title)) : ?>
                                         <a href="<?php echo esc_url(get_edit_post_link($log->prompt_id)); ?>">

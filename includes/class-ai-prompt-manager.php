@@ -100,7 +100,7 @@ class SFAIC_Prompt_Manager {
                 __('Response Length & Chunking', 'chatgpt-fluent-connector'),
                 array($this, 'render_chunking_settings_meta_box'),
                 'sfaic_prompt',
-                'side',
+                'normal',
                 'default'
         );
 
@@ -110,7 +110,7 @@ class SFAIC_Prompt_Manager {
                 __('Background Processing Settings', 'chatgpt-fluent-connector'),
                 array($this, 'render_background_processing_meta_box'),
                 'sfaic_prompt',
-                'side',
+                'normal',
                 'default'
         );
 
@@ -122,6 +122,118 @@ class SFAIC_Prompt_Manager {
                 'side',
                 'default'
         );
+        
+        add_meta_box(
+            'sfaic_get_parameter_tracking',
+            __('URL Parameter Tracking', 'chatgpt-fluent-connector'),
+            array($this, 'render_get_parameter_meta_box'),
+            'sfaic_prompt',
+            'side',
+            'default'
+        );
+    }
+    
+    
+    /**
+    * Add this method to SFAIC_Prompt_Manager class to render the GET parameter meta box
+    */
+    public function render_get_parameter_meta_box($post) {
+       // Get saved values
+       $track_get_param = get_post_meta($post->ID, '_sfaic_track_get_param', true);
+       $get_param_name = get_post_meta($post->ID, '_sfaic_get_param_name', true);
+       $get_param_label = get_post_meta($post->ID, '_sfaic_get_param_label', true);
+
+       // Set defaults
+       if (empty($get_param_name)) {
+           $get_param_name = 'from';
+       }
+       if (empty($get_param_label)) {
+           $get_param_label = 'Source';
+       }
+       ?>
+       <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+           <h4 style="margin-top: 0; color: #0073aa;">🔗 GET Parameter Tracking</h4>
+
+           <table class="form-table" style="margin: 0;">
+               <tr>
+                   <th style="width: 150px;">
+                       <label for="sfaic_track_get_param"><?php _e('Enable Tracking:', 'chatgpt-fluent-connector'); ?></label>
+                   </th>
+                   <td>
+                       <label>
+                           <input type="checkbox" 
+                                  name="sfaic_track_get_param" 
+                                  id="sfaic_track_get_param" 
+                                  value="1" 
+                                  <?php checked($track_get_param, '1'); ?>>
+                           <?php _e('Track GET parameter from URL', 'chatgpt-fluent-connector'); ?>
+                       </label>
+                       <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                           <?php _e('When enabled, captures a GET parameter value from the URL when the form is loaded.', 'chatgpt-fluent-connector'); ?>
+                       </p>
+                   </td>
+               </tr>
+           </table>
+
+           <div id="get-param-settings" <?php echo ($track_get_param != '1') ? 'style="display:none;"' : ''; ?>>
+               <table class="form-table" style="margin: 15px 0 0 0;">
+                   <tr>
+                       <th style="width: 150px;">
+                           <label for="sfaic_get_param_name"><?php _e('Parameter Name:', 'chatgpt-fluent-connector'); ?></label>
+                       </th>
+                       <td>
+                           <input type="text" 
+                                  name="sfaic_get_param_name" 
+                                  id="sfaic_get_param_name" 
+                                  value="<?php echo esc_attr($get_param_name); ?>" 
+                                  class="regular-text"
+                                  placeholder="from">
+                           <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                               <?php _e('The GET parameter name to track (e.g., "from" for ?from=value).', 'chatgpt-fluent-connector'); ?>
+                           </p>
+                       </td>
+                   </tr>
+
+                   <tr>
+                       <th style="width: 150px;">
+                           <label for="sfaic_get_param_label"><?php _e('Display Label:', 'chatgpt-fluent-connector'); ?></label>
+                       </th>
+                       <td>
+                           <input type="text" 
+                                  name="sfaic_get_param_label" 
+                                  id="sfaic_get_param_label" 
+                                  value="<?php echo esc_attr($get_param_label); ?>" 
+                                  class="regular-text"
+                                  placeholder="Source">
+                           <p class="description" style="margin: 5px 0 0 0; font-size: 11px;">
+                               <?php _e('Label to display in logs table for this parameter.', 'chatgpt-fluent-connector'); ?>
+                           </p>
+                       </td>
+                   </tr>
+               </table>
+
+               <div style="background: #e8f4fd; padding: 10px; border-radius: 3px; margin-top: 15px; border-left: 4px solid #0073aa;">
+                   <p style="margin: 0; font-size: 11px; color: #0073aa;">
+                       <strong>💡 Usage Example:</strong><br>
+                       If parameter name is "from", URLs like <code>domain.com/form-page/?from=newsletter</code> 
+                       will track "newsletter" as the source value in logs.
+                   </p>
+               </div>
+           </div>
+       </div>
+
+       <script>
+           jQuery(document).ready(function($) {
+               $('#sfaic_track_get_param').change(function() {
+                   if ($(this).is(':checked')) {
+                       $('#get-param-settings').show();
+                   } else {
+                       $('#get-param-settings').hide();
+                   }
+               });
+           });
+       </script>
+       <?php
     }
 
     /**
@@ -1183,6 +1295,17 @@ class SFAIC_Prompt_Manager {
 
         if (isset($_POST['sfaic_email_field'])) {
             update_post_meta($post_id, '_sfaic_email_field', sanitize_text_field($_POST['sfaic_email_field']));
+        }
+        
+        $track_get_param = isset($_POST['sfaic_track_get_param']) ? '1' : '0';
+        update_post_meta($post_id, '_sfaic_track_get_param', $track_get_param);
+
+        if (isset($_POST['sfaic_get_param_name'])) {
+            update_post_meta($post_id, '_sfaic_get_param_name', sanitize_text_field($_POST['sfaic_get_param_name']));
+        }
+
+        if (isset($_POST['sfaic_get_param_label'])) {
+            update_post_meta($post_id, '_sfaic_get_param_label', sanitize_text_field($_POST['sfaic_get_param_label']));
         }
     }
 
