@@ -580,6 +580,7 @@ class SFAIC_Background_Job_Manager {
             // Get last name from custom mapping
             if (!empty($last_name_field) && isset($form_data[$last_name_field])) {     
                 $lname=$form_data[$last_name_field];
+                error_log('SFAIC:$last_name_field: ' . print_r($lname)); 
                 if(is_array($lname)){
                     $last_name = sanitize_text_field($lname['last_name']);
                     error_log('SFAIC: $last_name: ' . $last_name); 

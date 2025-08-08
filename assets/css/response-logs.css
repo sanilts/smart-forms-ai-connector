@@ -1190,37 +1190,3 @@ select[name="chunked"] {
         color: #000 !important;
     }
 }
-
-.sfaic-get-param-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    background: #2271b1;
-    color: #fff;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.sfaic-get-param-empty {
-    color: #999;
-    font-style: italic;
-}
-
-/* Different colors for different sources */
-.sfaic-get-param-badge[data-source="newsletter"] {
-    background: #00a32a;
-}
-
-.sfaic-get-param-badge[data-source="social"] {
-    background: #3858e9;
-}
-
-.sfaic-get-param-badge[data-source="email"] {
-    background: #d63638;
-}
-
-.sfaic-get-param-badge[data-source="direct"] {
-    background: #757575;
-}

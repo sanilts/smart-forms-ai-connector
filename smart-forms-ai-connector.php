@@ -3,7 +3,7 @@
  * Plugin Name: AromaPro Smart Forms AI Connector
  * Plugin URI: https://aromapro.com/
  * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing
- * Version: 2.0.18
+ * Version: 2.0.16
  * Author: Sanil T S
  * Author URI: https://www.fb.com/sanilts
  * License: GPL-2.0+
