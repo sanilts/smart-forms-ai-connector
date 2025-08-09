@@ -646,3 +646,22 @@ function sfaic_main() {
 
 // Initialize the plugin
 sfaic_main();
+
+
+function enqueue_fluentcrm_custom_js() {
+    wp_enqueue_script(
+        'fluentcrm-custom-js',
+        plugin_dir_url(__FILE__) . '/js/fluent-from.js',
+        array('jquery'),
+        '1.0.0',
+        true
+    );
+    
+    // Pass data to JavaScript
+    wp_localize_script('fluentcrm-custom-js', 'fcCustom', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('fc_custom_nonce'),
+        'user_id' => get_current_user_id()
+    ));
+}
+add_action('wp_enqueue_scripts', 'enqueue_fluentcrm_custom_js');

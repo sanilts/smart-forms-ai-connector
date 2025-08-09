@@ -324,23 +324,35 @@ class SFAIC_Response_Logger {
 
         // If no parameter configured, return empty
         if (empty($get_param_name)) {
-            return '';
+            $get_param_name='from';
+        }
+        
+        return $this->extractReferrerParameter($form_data, $get_param_name);
+       
+    }
+    
+    
+    private function extractReferrerParameter($data, $parameter = 'from') {
+        // Check if _wp_http_referer exists
+        if (!isset($data['_wp_http_referer'])) {
+            return null;
         }
 
-        // Check if the parameter exists in form data (it should be passed from forms integration)
-        if (isset($form_data['_tracking_source'])) {
-            return sanitize_text_field($form_data['_tracking_source']);
-        }
-        error_log('SFAIC Logger: Tracking source Print Array- ' . print_r($form_data, true));
-        error_log(json_encode($form_data, JSON_PRETTY_PRINT));
-        error_log("GET Value".$_GET['from']);
+        // Get the referrer URL
+        $referrer = $data['_wp_http_referer'];
 
-        // Fallback: check $_GET directly (shouldn't be needed if forms integration works correctly)
-        if (isset($_GET[$get_param_name])) {
-            return sanitize_text_field($_GET[$get_param_name]);
+        // Parse the URL to get the query string
+        $query_string = parse_url($referrer, PHP_URL_QUERY);
+
+        if (!$query_string) {
+            return null;
         }
 
-        return "-";
+        // Decode HTML entities and parse the query string
+        parse_str(html_entity_decode($query_string), $params);
+
+        // Return the requested parameter value
+        return $params[$parameter] ?? null;
     }
 
     /**

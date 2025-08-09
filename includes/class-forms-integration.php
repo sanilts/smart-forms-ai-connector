@@ -409,14 +409,18 @@ class SFAIC_Forms_Integration {
                     $prompt_id,
                     $entry_id,
                     $form->id,
-                    $complete_prompt, // Save the actual prompt sent
+                    $complete_prompt,
                     $response_content,
-                    $provider, // Pass the correct provider
-                    $model, // Pass the correct model
+                    $provider,
+                    $model,
                     $execution_time,
                     $status,
                     $error_message,
-                    $token_usage // Pass the token usage
+                    $token_usage,
+                    '', // prompt_template (can be empty for now)
+                    '', // request_json (can be empty for now)
+                    '', // response_json (can be empty for now)
+                    $form_data // <- Add this crucial parameter!
                 );
             }
         }
@@ -1089,6 +1093,47 @@ class SFAIC_Forms_Integration {
     }
 }
 
-// IMPORTANT: Register the AJAX handler for immediate async processing
-//add_action('wp_ajax_nopriv_sfaic_process_immediate_async', array('SFAIC_Forms_Integration', 'handle_immediate_async_processing'));
-//add_action('wp_ajax_sfaic_process_immediate_async', array('SFAIC_Forms_Integration', 'handle_immediate_async_processing'));
+
+
+add_action('fluentform_before_form_submit', 'prevent_duplicate_submission_database', 10, 3);
+function prevent_duplicate_submission_database($insertId, $formData, $form) {
+    global $wpdb;
+    
+    $form_id = $form->id;
+    
+    // Create a hash of the form data (excluding time-sensitive fields)
+    $data_for_hash = $formData;
+    unset($data_for_hash['__fluent_form_embded_post_id']);
+    unset($data_for_hash['_fluentform_']);
+    $submission_hash = md5(serialize($data_for_hash));
+    
+    // Check for duplicate submissions in the last minute
+    $table_name = $wpdb->prefix . 'fluentform_submissions';
+    $one_minute_ago = date('Y-m-d H:i:s', strtotime('-1 minute'));
+    
+    $duplicate = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM {$table_name} 
+        WHERE form_id = %d 
+        AND created_at > %s 
+        AND response LIKE %s 
+        ORDER BY id DESC 
+        LIMIT 1",
+        $form_id,
+        $one_minute_ago,
+        '%' . $wpdb->esc_like($submission_hash) . '%'
+    ));
+    
+    if ($duplicate) {
+        wp_send_json_error([
+            'message' => 'This form was already submitted less than a minute ago. Please wait before submitting again.',
+            'errors' => []
+        ], 423);
+    }
+    
+    // Store hash in form data for later reference
+    add_filter('fluentform_insert_response_data', function($response) use ($submission_hash) {
+        $response_data = json_decode($response, true);
+        $response_data['_submission_hash'] = $submission_hash;
+        return json_encode($response_data);
+    }, 10, 1);
+}
