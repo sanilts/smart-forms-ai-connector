@@ -363,7 +363,7 @@ class SFAIC_Prompt_Manager {
             <tr>
                 <th><label for="sfaic_system_prompt"><?php _e('System Prompt:', 'chatgpt-fluent-connector'); ?></label></th>
                 <td>
-                    <textarea name="sfaic_system_prompt" id="sfaic_system_prompt" class="large-text code" rows="20"><?php echo esc_textarea($system_prompt); ?></textarea>
+                    <textarea name="sfaic_system_prompt" id="sfaic_system_prompt" class="large-text code" rows="50"><?php echo esc_textarea($system_prompt); ?></textarea>
                     <p class="description"><?php _e('Instructions that define how the AI should behave (e.g., "You are a helpful assistant that specializes in...")', 'chatgpt-fluent-connector'); ?></p>
                 </td>
             </tr>
