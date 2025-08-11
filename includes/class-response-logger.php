@@ -774,7 +774,7 @@ class SFAIC_Response_Logger {
                         <?php if ($has_tracking_column): ?>
                             <th style="width: 100px;"><?php _e('Source', 'chatgpt-fluent-connector'); ?></th>
                         <?php endif; ?>
-                        <th><?php _e('Prompt', 'chatgpt-fluent-connector'); ?></th>
+                        <th style="min-width: 150px;"><?php _e('Prompt', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Form', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 50px;"><?php _e('Entry', 'chatgpt-fluent-connector'); ?></th>
                         <th style="width: 70px;"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
