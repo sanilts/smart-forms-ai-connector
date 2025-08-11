@@ -261,7 +261,7 @@ Structure it however you need for your use case.</pre>`
                 color: #666;
             }
             .sfaic-template-wrapper .template-editor {
-                min-height: 300px;
+                min-height: 740px;
             }
             .sfaic-template-wrapper .form-table th {
                 width: 200px;
