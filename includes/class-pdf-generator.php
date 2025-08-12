@@ -25,7 +25,7 @@ class SFAIC_PDF_Generator {
 
         // Hook into the AI response to fix encoding early
         add_filter('sfaic_ai_response', array($this, 'fix_response_encoding'), 5);
-        
+
         // Increase memory and execution time for PDF generation
         add_action('sfaic_before_pdf_generation', array($this, 'prepare_environment_for_pdf'));
     }
@@ -41,17 +41,17 @@ class SFAIC_PDF_Generator {
                 @ini_set('memory_limit', '256M');
             }
         }
-        
+
         // Increase execution time
         if (function_exists('set_time_limit')) {
             @set_time_limit(300); // 5 minutes
         }
-        
+
         // Disable output buffering issues
         if (function_exists('apache_setenv')) {
             @apache_setenv('no-gzip', '1');
         }
-        
+
         @ini_set('zlib.output_compression', '0');
     }
 
@@ -76,7 +76,7 @@ class SFAIC_PDF_Generator {
 
         // First, try to detect the actual encoding
         $detected_encoding = mb_detect_encoding($content, ['UTF-8', 'ISO-8859-1', 'Windows-1252', 'ASCII'], true);
-        
+
         // If it's not UTF-8, convert it
         if ($detected_encoding && $detected_encoding !== 'UTF-8') {
             $content = mb_convert_encoding($content, 'UTF-8', $detected_encoding);
@@ -88,7 +88,7 @@ class SFAIC_PDF_Generator {
         }, $content);
 
         // Fix mojibake patterns (common double-encoded sequences)
-        $mojibake_patterns =  array(
+        $mojibake_patterns = array(
             '/\xC3\xB0\xC5\x92[\x80-\xBF][\x80-\xBF]/' => '',
             '/Ã\x83Â©/' => 'é',
             '/Ã\x83Â¨/' => 'è',
@@ -140,9 +140,9 @@ class SFAIC_PDF_Generator {
 
         // Use callback to replace emojis
         $html = preg_replace_callback(
-            $emoji_pattern,
-            array($this, 'emoji_to_image_enhanced'),
-            $html
+                $emoji_pattern,
+                array($this, 'emoji_to_image_enhanced'),
+                $html
         );
 
         return $html;
@@ -227,10 +227,10 @@ class SFAIC_PDF_Generator {
                 $image_data = wp_remote_retrieve_body($response);
                 if (!empty($image_data) && strlen($image_data) > 100) {
                     $base64 = 'data:image/png;base64,' . base64_encode($image_data);
-                    
+
                     // Cache for 7 days
                     set_transient($cache_key, $base64, 7 * DAY_IN_SECONDS);
-                    
+
                     return $base64;
                 }
             }
@@ -250,7 +250,6 @@ class SFAIC_PDF_Generator {
             '⭐' => '<span style="color: #FFD700; font-size: 1.3em; font-weight: bold;">★</span>',
             '✨' => '<span style="color: #FFD700; font-size: 1.2em;">✦</span>',
             '💫' => '<span style="color: #87CEEB; font-size: 1.2em;">✧</span>',
-            
             // Hearts with better styling
             '❤️' => '<span style="color: #FF0000; font-size: 1.3em; text-shadow: 0 0 2px rgba(255,0,0,0.5);">♥</span>',
             '💙' => '<span style="color: #0000FF; font-size: 1.3em; text-shadow: 0 0 2px rgba(0,0,255,0.5);">♥</span>',
@@ -258,37 +257,31 @@ class SFAIC_PDF_Generator {
             '💛' => '<span style="color: #FFD700; font-size: 1.3em; text-shadow: 0 0 2px rgba(255,215,0,0.5);">♥</span>',
             '🧡' => '<span style="color: #FF8C00; font-size: 1.3em; text-shadow: 0 0 2px rgba(255,140,0,0.5);">♥</span>',
             '💜' => '<span style="color: #8A2BE2; font-size: 1.3em; text-shadow: 0 0 2px rgba(138,43,226,0.5);">♥</span>',
-            
             // Check marks and status indicators
             '✅' => '<span style="color: #00FF00; font-size: 1.3em; font-weight: bold; text-shadow: 0 0 2px rgba(0,255,0,0.5);">✓</span>',
             '✔️' => '<span style="color: #00FF00; font-size: 1.3em; font-weight: bold;">✓</span>',
             '❌' => '<span style="color: #FF0000; font-size: 1.3em; font-weight: bold; text-shadow: 0 0 2px rgba(255,0,0,0.5);">✗</span>',
             '❎' => '<span style="color: #FF0000; font-size: 1.2em;">⊗</span>',
-            
             // Circles and indicators
             '🔴' => '<span style="color: #FF0000; font-size: 1.3em;">●</span>',
             '🟢' => '<span style="color: #00FF00; font-size: 1.3em;">●</span>',
             '🔵' => '<span style="color: #0000FF; font-size: 1.3em;">●</span>',
             '🟡' => '<span style="color: #FFD700; font-size: 1.3em;">●</span>',
-            
             // Arrows with better styling
             '➡️' => '<span style="color: #000000; font-size: 1.3em; font-weight: bold;">→</span>',
             '⬅️' => '<span style="color: #000000; font-size: 1.3em; font-weight: bold;">←</span>',
             '⬆️' => '<span style="color: #000000; font-size: 1.3em; font-weight: bold;">↑</span>',
             '⬇️' => '<span style="color: #000000; font-size: 1.3em; font-weight: bold;">↓</span>',
-            
             // Tools and objects
             '💡' => '<span style="color: #FFD700; font-size: 1.3em;">💡</span>',
             '🔧' => '<span style="color: #A0A0A0; font-size: 1.3em;">🔧</span>',
             '📌' => '<span style="color: #FF0000; font-size: 1.3em;">📌</span>',
             '📊' => '<span style="color: #4169E1; font-size: 1.3em;">📊</span>',
-            
             // Warning and attention
             '⚠️' => '<span style="color: #FFD700; font-size: 1.3em; font-weight: bold;">⚠</span>',
             '🚨' => '<span style="color: #FF0000; font-size: 1.3em;">🚨</span>',
             '❗' => '<span style="color: #FF0000; font-size: 1.3em; font-weight: bold;">!</span>',
             '❓' => '<span style="color: #4169E1; font-size: 1.3em; font-weight: bold;">?</span>',
-            
             // Smileys with better fallbacks
             '😊' => '<span style="color: #FFD700; font-size: 1.3em;">☺</span>',
             '😃' => '<span style="color: #FFD700; font-size: 1.3em;">☺</span>',
@@ -357,7 +350,7 @@ class SFAIC_PDF_Generator {
         for ($i = 0; $i < $length; $i++) {
             $char = mb_substr($emoji, $i, 1, 'UTF-32');
             $codepoint = unpack('N', $char)[1];
-            
+
             // Skip variation selectors and zero-width joiners
             if ($codepoint !== 0xFE0F && $codepoint !== 0xFE0E && $codepoint !== 0x200D) {
                 $codepoints[] = sprintf('%04x', $codepoint);
@@ -457,12 +450,12 @@ class SFAIC_PDF_Generator {
      */
     public function add_pdf_settings_meta_box() {
         add_meta_box(
-            'sfaic_pdf_settings',
-            __('PDF Settings', 'chatgpt-fluent-connector'),
-            array($this, 'render_pdf_settings_meta_box'),
-            'sfaic_prompt',
-            'normal',
-            'default'
+                'sfaic_pdf_settings',
+                __('PDF Settings', 'chatgpt-fluent-connector'),
+                array($this, 'render_pdf_settings_meta_box'),
+                'sfaic_prompt',
+                'normal',
+                'default'
         );
     }
 
@@ -484,14 +477,20 @@ class SFAIC_PDF_Generator {
         $pdf_template_html = get_post_meta($post->ID, '_sfaic_pdf_template_html', true);
 
         // Set defaults
-        if (empty($pdf_filename)) $pdf_filename = 'ai-response-{entry_id}';
-        if (empty($pdf_title)) $pdf_title = 'AI Response Report';
-        if (empty($pdf_format)) $pdf_format = 'A4';
-        if (empty($pdf_orientation)) $pdf_orientation = 'P';
-        if (empty($pdf_margin)) $pdf_margin = '15';
-        if (empty($pdf_template_html)) $pdf_template_html = $this->get_enhanced_default_template();
+        if (empty($pdf_filename))
+            $pdf_filename = 'ai-response-{entry_id}';
+        if (empty($pdf_title))
+            $pdf_title = 'AI Response Report';
+        if (empty($pdf_format))
+            $pdf_format = 'A4';
+        if (empty($pdf_orientation))
+            $pdf_orientation = 'P';
+        if (empty($pdf_margin))
+            $pdf_margin = '15';
+        if (empty($pdf_template_html))
+            $pdf_template_html = $this->get_enhanced_default_template();
         ?>
-        
+
         <div class="sfaic-pdf-settings-notice" style="background: #e8f5e8; padding: 15px; margin-bottom: 20px; border-left: 4px solid #28a745; border-radius: 3px;">
             <h4 style="margin-top: 0; color: #28a745;">📄 Enhanced PDF Generation</h4>
             <p style="margin-bottom: 0;">This version includes improved emoji support, better encoding handling, and more reliable PDF generation with automatic retry mechanisms.</p>
@@ -846,8 +845,8 @@ class SFAIC_PDF_Generator {
         }
 
         // Check if our nonce is set and verify it
-        if (!isset($_POST['sfaic_pdf_settings_nonce']) || 
-            !wp_verify_nonce($_POST['sfaic_pdf_settings_nonce'], 'sfaic_pdf_settings_save')) {
+        if (!isset($_POST['sfaic_pdf_settings_nonce']) ||
+                !wp_verify_nonce($_POST['sfaic_pdf_settings_nonce'], 'sfaic_pdf_settings_save')) {
             return;
         }
 
@@ -913,7 +912,7 @@ class SFAIC_PDF_Generator {
             update_post_meta($entry_id, '_sfaic_pdf_generated_at', current_time('mysql'));
             update_post_meta($entry_id, '_sfaic_pdf_service', 'enhanced_local_mpdf');
             update_post_meta($entry_id, '_sfaic_pdf_size', $pdf_result['size']);
-            
+
             error_log("SFAIC PDF: Successfully generated PDF for entry {$entry_id}: {$pdf_result['filename']} ({$pdf_result['size']} bytes)");
         } else {
             error_log("SFAIC PDF: Failed to generate PDF for entry {$entry_id}: " . $pdf_result->get_error_message());
@@ -947,15 +946,15 @@ class SFAIC_PDF_Generator {
 
             // Process filename with enhanced placeholders
             $processed_filename = $this->process_enhanced_filename_placeholders(
-                $settings['pdf_filename'], $entry_id, $form_data, $form
+                    $settings['pdf_filename'], $entry_id, $form_data, $form
             );
 
             // Enhanced content processing
             $ai_response = $this->prepare_content_for_pdf($ai_response);
-            
+
             // Prepare enhanced template variables
             $template_vars = $this->prepare_enhanced_template_variables(
-                $settings, $ai_response, $entry_id, $form_data, $form
+                    $settings, $ai_response, $entry_id, $form_data, $form
             );
 
             // Process template with variables
@@ -984,11 +983,10 @@ class SFAIC_PDF_Generator {
 
             // Save PDF with enhanced validation
             return $this->save_enhanced_pdf_data($pdf_content, $processed_filename);
-
         } catch (Exception $e) {
             error_log('SFAIC PDF Generation Error: ' . $e->getMessage());
-            return new WP_Error('pdf_generation_failed', 
-                sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
+            return new WP_Error('pdf_generation_failed',
+                    sprintf(__('PDF generation failed: %s', 'chatgpt-fluent-connector'), $e->getMessage())
             );
         } finally {
             // Cleanup
@@ -1008,7 +1006,6 @@ class SFAIC_PDF_Generator {
 
         // Set longer execution time
         @set_time_limit(600); // 10 minutes
-
         // Enhanced output buffering control
         while (ob_get_level() > 0) {
             ob_end_clean();
@@ -1022,7 +1019,7 @@ class SFAIC_PDF_Generator {
         @ini_set('log_errors', '1');
         @ini_set('zlib.output_compression', '0');
         @ini_set('implicit_flush', '0');
-        
+
         // Set proper timezone if not set
         if (!ini_get('date.timezone')) {
             @ini_set('date.timezone', wp_timezone_string());
@@ -1057,18 +1054,18 @@ class SFAIC_PDF_Generator {
     }
 
     /**
-     * Enhanced content preparation for PDF
+     * Prepare content for PDF with Twemoji support
      */
     private function prepare_content_for_pdf($content) {
-        // Fix encoding issues
+        // Fix encoding issues first
         $content = $this->fix_encoding_comprehensive($content);
-        
-        // Convert emojis to images/fallbacks
-        $content = $this->convert_emojis_to_images($content);
-        
-        // Clean up HTML
+
+        // Convert emojis to Twemoji images specifically for mPDF
+        $content = $this->convert_emojis_to_twemoji_for_mpdf($content);
+
+        // Clean up HTML for PDF
         $content = $this->clean_html_for_pdf($content);
-        
+
         return $content;
     }
 
@@ -1081,16 +1078,16 @@ class SFAIC_PDF_Generator {
         $html = preg_replace('/<iframe[^>]*?>.*?<\/iframe>/is', '', $html);
         $html = preg_replace('/<object[^>]*?>.*?<\/object>/is', '', $html);
         $html = preg_replace('/<embed[^>]*?>/is', '', $html);
-        
+
         // Fix self-closing tags
         $html = preg_replace('/<(br|hr|img|input|meta|link)([^>]*?)>/i', '<$1$2 />', $html);
-        
+
         // Ensure proper paragraph spacing
         $html = preg_replace('/\n\s*\n/', '</p><p>', $html);
-        
+
         // Fix any unclosed tags (basic fix)
         $html = str_replace(['<p></p>', '<p> </p>', '<p>&nbsp;</p>'], '', $html);
-        
+
         return $html;
     }
 
@@ -1099,7 +1096,7 @@ class SFAIC_PDF_Generator {
      */
     private function prepare_enhanced_template_variables($settings, $ai_response, $entry_id, $form_data, $form) {
         $current_time = current_time('timestamp');
-        
+
         $template_vars = array(
             'title' => $settings['pdf_title'],
             'content' => $ai_response,
@@ -1126,7 +1123,7 @@ class SFAIC_PDF_Generator {
                 } else {
                     continue; // Skip non-scalar values
                 }
-                
+
                 // Process content for PDF
                 $field_value = $this->prepare_content_for_pdf($field_value);
                 $template_vars[$field_key] = $field_value;
@@ -1137,22 +1134,47 @@ class SFAIC_PDF_Generator {
     }
 
     /**
-     * Process template with variables
+     * Process template with Twemoji support
      */
     private function process_template_with_variables($template, $variables) {
-        // Replace all variables in template
+        // First replace variables
         foreach ($variables as $key => $value) {
+            // Convert emojis in variable values
+            if (is_string($value)) {
+                $value = $this->convert_emojis_to_twemoji_for_mpdf($value);
+            }
             $template = str_replace('{' . $key . '}', $value, $template);
         }
 
-        // Remove any remaining unprocessed placeholders
+        // Then convert any emojis in the template itself
+        $template = $this->convert_emojis_to_twemoji_for_mpdf($template);
+
+        // Remove unprocessed placeholders
         $template = preg_replace('/\{[^}]+\}/', '', $template);
 
         return $template;
     }
 
     /**
+     * Pre-cache common emojis for better performance
+     */
+    public function precache_common_emojis() {
+        $common_emojis = ['😀', '😃', '😄', '😊', '🙂', '😉', '❤️', '👍', '✅', '❌', '⭐', '🎉', '🔥', '💡', '📧', '📱', '🏠'];
+
+        foreach ($common_emojis as $emoji) {
+            $url = $this->get_twemoji_png_url($emoji);
+            if ($url) {
+                $this->fetch_and_encode_image($url);
+            }
+        }
+    }
+
+    /**
      * Create enhanced mPDF instance with better configuration
+     */
+
+    /**
+     * Create enhanced mPDF instance with better Twemoji support
      */
     private function create_enhanced_mpdf_instance($settings, $temp_dir) {
         $config = array(
@@ -1165,56 +1187,29 @@ class SFAIC_PDF_Generator {
             'margin_bottom' => $settings['pdf_margin'],
             'margin_header' => 0,
             'margin_footer' => 0,
-            'default_font' => 'dejavusans',
-            'default_font_size' => 12,
             'tempDir' => $temp_dir,
-            
-            // Enhanced configuration
-            'autoScriptToLang' => true,
-            'autoLangToFont' => true,
-            'allow_charset_conversion' => true,
-            'charset_in' => 'UTF-8',
-            'list_indent_first_level' => 0,
+            // Important for emoji handling
+            'allow_charset_conversion' => false, // Don't convert charset
+            'useSubstitutions' => false, // Don't substitute fonts
             'img_dpi' => 96,
-            'allow_output_buffering' => true,
-            'curlAllowUnsafeSslRequests' => true,
             'showImageErrors' => false,
-            'debug' => false,
-            'debugfonts' => false,
-            'useSubstitutions' => true,
-            'simpleTables' => false,
-            'packTableData' => true,
-            'dpi' => 96,
-            'PDFA' => false,
-            'PDFAauto' => false,
-            
-            // Font configuration
-            'fontDir' => array_merge(
-                (new \Mpdf\Config\ConfigVariables())->getDefaults()['fontDir'], 
-                [SFAIC_DIR . 'fonts/']
-            ),
-            'fontdata' => array_merge(
-                (new \Mpdf\Config\FontVariables())->getDefaults()['fontdata'], 
-                [
-                    'dejavusans' => [
-                        'R' => 'DejaVuSans.ttf',
-                        'B' => 'DejaVuSans-Bold.ttf',
-                        'I' => 'DejaVuSans-Oblique.ttf',
-                        'BI' => 'DejaVuSans-BoldOblique.ttf',
-                        'useOTL' => 0xFF,
-                        'useKashida' => 75,
-                    ],
-                    'arial' => [
-                        'R' => 'arial.ttf',
-                        'B' => 'arialbd.ttf',
-                        'I' => 'ariali.ttf',
-                        'BI' => 'arialbi.ttf',
-                    ]
-                ]
-            )
+            'allow_output_buffering' => true,
+            'curlTimeout' => 10,
+            'curlFollowLocation' => true,
+            // Allow external images (for Twemoji CDN)
+            'curlAllowUnsafeSslRequests' => true,
+            // Image handling
+            'imageVars' => [
+                'interpolation' => false, // Faster processing
+            ],
         );
 
-        return new \Mpdf\Mpdf($config);
+        $mpdf = new \Mpdf\Mpdf($config);
+
+        // Allow img tags with data URIs
+        $mpdf->allowInlineScripts = true;
+
+        return $mpdf;
     }
 
     /**
@@ -1230,15 +1225,14 @@ class SFAIC_PDF_Generator {
             // Set additional mPDF properties for better rendering
             $mpdf->SetDisplayMode('fullpage');
             $mpdf->SetCompression(true);
-            
+
             // Write HTML with error handling
             $mpdf->WriteHTML($html_content);
-            
+
             // Validate that content was written
             if ($mpdf->page < 1) {
                 throw new Exception('No pages were generated');
             }
-            
         } catch (Exception $e) {
             throw new Exception('Failed to write HTML to PDF: ' . $e->getMessage());
         }
@@ -1249,7 +1243,7 @@ class SFAIC_PDF_Generator {
      */
     private function process_enhanced_filename_placeholders($filename, $entry_id, $form_data, $form) {
         $current_time = current_time('timestamp');
-        
+
         $replacements = array(
             '{entry_id}' => $entry_id,
             '{form_id}' => $form->id ?? 0,
@@ -1401,19 +1395,19 @@ class SFAIC_PDF_Generator {
     private function ensure_unique_filename($directory, $filename) {
         $original_filename = $filename;
         $counter = 1;
-        
+
         while (file_exists($directory . '/' . $filename)) {
             $pathinfo = pathinfo($original_filename);
             $filename = $pathinfo['filename'] . '_' . $counter . '.' . $pathinfo['extension'];
             $counter++;
-            
+
             // Prevent infinite loop
             if ($counter > 1000) {
                 $filename = $pathinfo['filename'] . '_' . time() . '.' . $pathinfo['extension'];
                 break;
             }
         }
-        
+
         return $filename;
     }
 
@@ -1429,7 +1423,7 @@ class SFAIC_PDF_Generator {
                 error_log('SFAIC PDF: Failed to create temp directory: ' . $temp_dir);
                 return false;
             }
-            
+
             // Create security files for temp directory
             @file_put_contents($temp_dir . '/index.php', '<?php // Silence is golden');
             @file_put_contents($temp_dir . '/.htaccess', 'deny from all');
@@ -1495,18 +1489,18 @@ class SFAIC_PDF_Generator {
             if ($file_info) {
                 $mime_type = finfo_file($file_info, $pdf_path);
                 finfo_close($file_info);
-                
+
                 if ($mime_type === 'application/pdf') {
                     return $pdf_path;
                 }
             }
-            
+
             // Fallback validation - check PDF header
             $file_handle = fopen($pdf_path, 'r');
             if ($file_handle) {
                 $header = fread($file_handle, 4);
                 fclose($file_handle);
-                
+
                 if ($header === '%PDF') {
                     return $pdf_path;
                 }
@@ -1527,7 +1521,7 @@ class SFAIC_PDF_Generator {
         try {
             // Prepare environment
             $this->prepare_enhanced_pdf_environment();
-            
+
             // Ensure temp directory
             $temp_dir = $this->ensure_temp_directory();
             if (!$temp_dir) {
@@ -1549,16 +1543,16 @@ class SFAIC_PDF_Generator {
 
             // Enhanced test content
             $test_html = $this->get_comprehensive_test_html();
-            
+
             $mpdf->SetTitle('AI API Connector - Enhanced PDF Test');
             $mpdf->SetAuthor('AI API Connector Plugin');
             $mpdf->WriteHTML($test_html);
-            
+
             $pdf_content = $mpdf->Output('', 'S');
 
             // Comprehensive validation
             $validation_result = $this->validate_test_pdf($pdf_content);
-            
+
             if ($validation_result === true) {
                 return array(
                     'service' => 'Enhanced Local mPDF',
@@ -1576,7 +1570,6 @@ class SFAIC_PDF_Generator {
             } else {
                 return new WP_Error('test_validation_failed', $validation_result);
             }
-
         } catch (Exception $e) {
             return new WP_Error('mpdf_test_error', __('Enhanced mPDF test error: ', 'chatgpt-fluent-connector') . $e->getMessage());
         } finally {
@@ -1753,5 +1746,278 @@ class SFAIC_PDF_Generator {
      */
     public function clear_pdf_error_log() {
         delete_option('sfaic_last_pdf_error');
+    }
+
+    /**
+     * Enhanced Twemoji conversion optimized for mPDF
+     */
+    private function convert_emojis_to_twemoji_for_mpdf($html) {
+        // First fix encoding
+        $html = $this->fix_encoding_comprehensive($html);
+
+        // More comprehensive emoji pattern
+        $emoji_patterns = [
+            // Standard emoji ranges
+            '/[\x{1F600}-\x{1F64F}]/u', // Emoticons
+            '/[\x{1F300}-\x{1F5FF}]/u', // Symbols & Pictographs
+            '/[\x{1F680}-\x{1F6FF}]/u', // Transport & Map
+            '/[\x{1F700}-\x{1F77F}]/u', // Alchemical Symbols
+            '/[\x{1F780}-\x{1F7FF}]/u', // Geometric Shapes Extended
+            '/[\x{1F800}-\x{1F8FF}]/u', // Supplemental Arrows-C
+            '/[\x{1F900}-\x{1F9FF}]/u', // Supplemental Symbols and Pictographs
+            '/[\x{1FA00}-\x{1FA6F}]/u', // Chess Symbols
+            '/[\x{1FA70}-\x{1FAFF}]/u', // Symbols and Pictographs Extended-A
+            '/[\x{2600}-\x{26FF}]/u', // Miscellaneous Symbols
+            '/[\x{2700}-\x{27BF}]/u', // Dingbats
+            '/[\x{1F1E0}-\x{1F1FF}]/u', // Flags
+            '/[\x{2300}-\x{23FF}]/u', // Miscellaneous Technical
+            '/[\x{2460}-\x{24FF}]/u', // Enclosed Alphanumerics
+            '/[\x{25A0}-\x{25FF}]/u', // Geometric Shapes
+            '/[\x{2190}-\x{21FF}]/u', // Arrows
+            '/[\x{1F000}-\x{1F02F}]/u', // Mahjong Tiles
+            '/[\x{1F0A0}-\x{1F0FF}]/u', // Playing Cards
+        ];
+
+        foreach ($emoji_patterns as $pattern) {
+            $html = preg_replace_callback(
+                    $pattern,
+                    array($this, 'emoji_to_twemoji_img'),
+                    $html
+            );
+        }
+
+        // Also handle emoji with modifiers (skin tones, etc.)
+        $html = $this->handle_emoji_sequences($html);
+
+        return $html;
+    }
+
+    /**
+     * Convert single emoji to Twemoji image tag
+     */
+    private function emoji_to_twemoji_img($matches) {
+        $emoji = $matches[0];
+
+        // Get Twemoji URL
+        $twemoji_url = $this->get_twemoji_svg_url($emoji);
+
+        if ($twemoji_url) {
+            // Try to get the SVG content for inline embedding
+            $svg_content = $this->fetch_twemoji_svg($twemoji_url);
+
+            if ($svg_content) {
+                // Use inline SVG for better mPDF compatibility
+                return $this->create_inline_svg_for_mpdf($svg_content);
+            } else {
+                // Fallback to base64 encoded PNG
+                $png_url = $this->get_twemoji_png_url($emoji);
+                $image_data = $this->fetch_and_encode_image($png_url);
+
+                if ($image_data) {
+                    return '<img src="' . $image_data . '" style="width: 1em; height: 1em; vertical-align: middle;" />';
+                }
+            }
+        }
+
+        // Ultimate fallback
+        return $this->get_emoji_html_fallback($emoji);
+    }
+
+    /**
+     * Get Twemoji SVG URL (better quality for PDFs)
+     */
+    private function get_twemoji_svg_url($emoji) {
+        $codepoints = $this->emoji_to_codepoints_array($emoji);
+        if (empty($codepoints)) {
+            return false;
+        }
+
+        // Remove variation selectors (FE0F) for Twemoji URLs
+        $codepoints = array_filter($codepoints, function ($cp) {
+            return !in_array($cp, ['fe0f', 'fe0e']);
+        });
+
+        $filename = implode('-', $codepoints);
+        return 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/' . $filename . '.svg';
+    }
+
+    /**
+     * Get Twemoji PNG URL as fallback
+     */
+    private function get_twemoji_png_url($emoji) {
+        $codepoints = $this->emoji_to_codepoints_array($emoji);
+        if (empty($codepoints)) {
+            return false;
+        }
+
+        // Remove variation selectors
+        $codepoints = array_filter($codepoints, function ($cp) {
+            return !in_array($cp, ['fe0f', 'fe0e']);
+        });
+
+        $filename = implode('-', $codepoints);
+        return 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/' . $filename . '.png';
+    }
+
+    /**
+     * Convert emoji to array of codepoints
+     */
+    private function emoji_to_codepoints_array($emoji) {
+        $codepoints = [];
+        $emoji = mb_convert_encoding($emoji, 'UTF-32', 'UTF-8');
+        $length = mb_strlen($emoji, 'UTF-32');
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = mb_substr($emoji, $i, 1, 'UTF-32');
+            $codepoint = unpack('N', $char)[1];
+
+            // Skip zero-width joiners for URL construction
+            if ($codepoint !== 0x200D) {
+                $codepoints[] = sprintf('%04x', $codepoint);
+            }
+        }
+
+        return $codepoints;
+    }
+
+    /**
+     * Fetch Twemoji SVG content
+     */
+    private function fetch_twemoji_svg($url) {
+        // Check cache first
+        $cache_key = 'twemoji_svg_' . md5($url);
+        $cached = get_transient($cache_key);
+
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $response = wp_remote_get($url, array(
+            'timeout' => 5,
+            'sslverify' => false,
+            'user-agent' => 'Mozilla/5.0 (mPDF Generator)'
+        ));
+
+        if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+            $svg_content = wp_remote_retrieve_body($response);
+
+            // Cache for 30 days
+            set_transient($cache_key, $svg_content, 30 * DAY_IN_SECONDS);
+
+            return $svg_content;
+        }
+
+        return false;
+    }
+
+    /**
+     * Create inline SVG for mPDF
+     */
+    private function create_inline_svg_for_mpdf($svg_content) {
+        // Clean and optimize SVG for mPDF
+        $svg_content = preg_replace('/<\?xml[^>]*\?>/', '', $svg_content);
+        $svg_content = preg_replace('/<!DOCTYPE[^>]*>/', '', $svg_content);
+
+        // Add width and height if not present
+        if (strpos($svg_content, 'width=') === false) {
+            $svg_content = str_replace('<svg', '<svg width="20" height="20"', $svg_content);
+        }
+
+        // Wrap in a span for proper inline display
+        return '<span style="display: inline-block; width: 1em; height: 1em; vertical-align: middle;">' . $svg_content . '</span>';
+    }
+
+    /**
+     * Fetch and encode image as base64
+     */
+    private function fetch_and_encode_image($url) {
+        // Check cache
+        $cache_key = 'twemoji_base64_' . md5($url);
+        $cached = get_transient($cache_key);
+
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $response = wp_remote_get($url, array(
+            'timeout' => 5,
+            'sslverify' => false
+        ));
+
+        if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+            $image_data = wp_remote_retrieve_body($response);
+            $base64 = 'data:image/png;base64,' . base64_encode($image_data);
+
+            // Cache for 30 days
+            set_transient($cache_key, $base64, 30 * DAY_IN_SECONDS);
+
+            return $base64;
+        }
+
+        return false;
+    }
+
+    /**
+     * Handle complex emoji sequences (with ZWJ, skin tones, etc.)
+     */
+    private function handle_emoji_sequences($html) {
+        // Pattern for emoji sequences with Zero Width Joiner
+        $zwj_pattern = '/[\x{1F3FB}-\x{1F3FF}]|[\x{200D}]/u';
+
+        // Handle family emojis, professions with gender/skin tone, etc.
+        $complex_sequences = [
+            // Man/Woman + ZWJ + profession
+            '/[\x{1F468}\x{1F469}][\x{200D}][\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F900}-\x{1F9FF}]/u',
+            // Flags (two regional indicator symbols)
+            '/[\x{1F1E6}-\x{1F1FF}][\x{1F1E6}-\x{1F1FF}]/u',
+            // Emoji with skin tone modifiers
+            '/[\x{1F3FB}-\x{1F3FF}]/u',
+        ];
+
+        foreach ($complex_sequences as $pattern) {
+            $html = preg_replace_callback(
+                    $pattern,
+                    array($this, 'emoji_to_twemoji_img'),
+                    $html
+            );
+        }
+
+        return $html;
+    }
+
+    /**
+     * Get HTML fallback for emoji
+     */
+    private function get_emoji_html_fallback($emoji) {
+        // Map common emojis to HTML entities or text
+        $fallback_map = [
+            '😀' => '☺',
+            '😃' => '☺',
+            '😄' => '☺',
+            '😁' => '☺',
+            '😊' => '☺',
+            '🙂' => '☺',
+            '😉' => ';)',
+            '❤️' => '♥',
+            '💙' => '♥',
+            '💚' => '♥',
+            '⭐' => '★',
+            '✨' => '✦',
+            '✅' => '✓',
+            '❌' => '✗',
+            '⚠️' => '!',
+            '💡' => '(i)',
+            '📧' => '@',
+            '📱' => '[phone]',
+            '🏠' => '[home]',
+            '🔍' => '[search]',
+        ];
+
+        if (isset($fallback_map[$emoji])) {
+            return '<span style="font-family: Arial, sans-serif;">' . $fallback_map[$emoji] . '</span>';
+        }
+
+        // For unknown emojis, return empty or placeholder
+        return '<span style="color: #999;">[emoji]</span>';
     }
 }
