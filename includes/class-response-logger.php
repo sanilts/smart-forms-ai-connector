@@ -764,150 +764,151 @@ class SFAIC_Response_Logger {
             </div>
 
             <!-- Enhanced Logs Table with Chunking Information -->
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;"><?php _e('ID', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 130px;"><?php _e('Date', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 120px;"><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 150px;"><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
-                        <?php if ($has_tracking_column): ?>
-                            <th style="width: 100px;"><?php _e('Source', 'chatgpt-fluent-connector'); ?></th>
-                        <?php endif; ?>
-                        <th style="width: 250px;"><?php _e('Prompt', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 50px;"><?php _e('Form', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 50px;"><?php _e('Entry', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 70px;"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 80px;"><?php _e('Provider', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 90px;"><?php _e('Model', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 80px;" title="<?php _e('Chunking Information', 'chatgpt-fluent-connector'); ?>"><?php _e('Chunks', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 100px;" title="<?php _e('Prompt / Completion / Total', 'chatgpt-fluent-connector'); ?>"><?php _e('Tokens', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 50px;"><?php _e('Time', 'chatgpt-fluent-connector'); ?></th>
-                        <th style="width: 140px;"><?php _e('Actions', 'chatgpt-fluent-connector'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($logs)) : ?>
-                        <?php
-                        foreach ($logs as $log) :
-                            $row_class = ($log->status === 'error') ? 'error' : '';
-                            $execution_time = isset($log->execution_time) ? round($log->execution_time, 2) . 's' : '-';
-                            $status_badge = ($log->status === 'error') ? '<span class="sfaic-badge sfaic-badge-error">' . __('Error', 'chatgpt-fluent-connector') . '</span>' : '<span class="sfaic-badge sfaic-badge-success">' . __('Success', 'chatgpt-fluent-connector') . '</span>';
+            <div class="sfaic-table-wrapper">
+                <table class="wp-list-table widefat fixed striped sfaic-logs-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;"><?php _e('ID', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 130px;"><?php _e('Date', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 120px;"><?php _e('Name', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 150px;"><?php _e('Email', 'chatgpt-fluent-connector'); ?></th>
+                            <?php if ($has_tracking_column): ?>
+                                <th style="width: 100px;"><?php _e('Source', 'chatgpt-fluent-connector'); ?></th>
+                            <?php endif; ?>
+                            <th style="width: 250px;"><?php _e('Prompt', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 50px;"><?php _e('Form', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 50px;"><?php _e('Entry', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 70px;"><?php _e('Status', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 80px;"><?php _e('Provider', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 90px;"><?php _e('Model', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 80px;" title="<?php _e('Chunking Information', 'chatgpt-fluent-connector'); ?>"><?php _e('Chunks', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 100px;" title="<?php _e('Prompt / Completion / Total', 'chatgpt-fluent-connector'); ?>"><?php _e('Tokens', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 50px;"><?php _e('Time', 'chatgpt-fluent-connector'); ?></th>
+                            <th style="width: 140px;"><?php _e('Actions', 'chatgpt-fluent-connector'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($logs)) : ?>
+                            <?php
+                            foreach ($logs as $log) :
+                                $row_class = ($log->status === 'error') ? 'error' : '';
+                                $execution_time = isset($log->execution_time) ? round($log->execution_time, 2) . 's' : '-';
+                                $status_badge = ($log->status === 'error') ? '<span class="sfaic-badge sfaic-badge-error">' . __('Error', 'chatgpt-fluent-connector') . '</span>' : '<span class="sfaic-badge sfaic-badge-success">' . __('Success', 'chatgpt-fluent-connector') . '</span>';
 
-                            // Prepare provider badge
-                            $provider_badge = '';
-                            switch ($log->provider) {
-                                case 'openai':
-                                    $provider_badge = '<span class="sfaic-api-badge openai">ChatGPT</span>';
-                                    break;
-                                case 'gemini':
-                                    $provider_badge = '<span class="sfaic-api-badge gemini">Gemini</span>';
-                                    break;
-                                case 'claude':
-                                    $provider_badge = '<span class="sfaic-api-badge claude">Claude</span>';
-                                    break;
-                            }
-
-                            // Format token usage
-                            $token_display = '-';
-                            if (!empty($log->total_tokens)) {
-                                $token_display = '<span title="' . esc_attr(sprintf(__('Prompt: %s, Completion: %s, Total: %s', 'chatgpt-fluent-connector'),
-                                                        number_format_i18n($log->prompt_tokens ?? 0),
-                                                        number_format_i18n($log->completion_tokens ?? 0),
-                                                        number_format_i18n($log->total_tokens)
-                                                )) . '">' . number_format_i18n($log->total_tokens) . '</span>';
-
-                                // Check if tokens are high
-                                $model_limits = $this->get_model_token_limits($log->provider, $log->model);
-                                $usage_percentage = ($log->total_tokens / $model_limits['max_tokens']) * 100;
-
-                                if ($usage_percentage > 80) {
-                                    $token_display = '<span class="token-warning" title="' . esc_attr(sprintf(__('Warning: %s%% of model limit', 'chatgpt-fluent-connector'), round($usage_percentage))) . '">' . $token_display . ' ⚠️</span>';
+                                // Prepare provider badge
+                                $provider_badge = '';
+                                switch ($log->provider) {
+                                    case 'openai':
+                                        $provider_badge = '<span class="sfaic-api-badge openai">ChatGPT</span>';
+                                        break;
+                                    case 'gemini':
+                                        $provider_badge = '<span class="sfaic-api-badge gemini">Gemini</span>';
+                                        break;
+                                    case 'claude':
+                                        $provider_badge = '<span class="sfaic-api-badge claude">Claude</span>';
+                                        break;
                                 }
-                            }
 
-                            // NEW: Get chunking information
-                            $chunking_info = $this->get_log_chunking_info($log->id, $log->entry_id);
-                            $chunking_display = $this->format_chunking_display($chunking_info);
+                                // Format token usage
+                                $token_display = '-';
+                                if (!empty($log->total_tokens)) {
+                                    $token_display = '<span title="' . esc_attr(sprintf(__('Prompt: %s, Completion: %s, Total: %s', 'chatgpt-fluent-connector'),
+                                                            number_format_i18n($log->prompt_tokens ?? 0),
+                                                            number_format_i18n($log->completion_tokens ?? 0),
+                                                            number_format_i18n($log->total_tokens)
+                                                    )) . '">' . number_format_i18n($log->total_tokens) . '</span>';
 
-                            // Format user name and email with proper display
-                            $user_name_display = !empty($log->user_name) ? esc_html($log->user_name) : '-';
-                            $user_email_display = '-';
+                                    // Check if tokens are high
+                                    $model_limits = $this->get_model_token_limits($log->provider, $log->model);
+                                    $usage_percentage = ($log->total_tokens / $model_limits['max_tokens']) * 100;
 
-                            if (!empty($log->user_email)) {
-                                $user_email_display = '<a href="mailto:' . esc_attr($log->user_email) . '">' . esc_html($log->user_email) . '</a>';
-                            }
-                            ?>
-                            <tr class="<?php echo esc_attr($row_class); ?>">
-                                <td><?php echo esc_html($log->id); ?></td>
-                                <td>
-                                    <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($log->created_at))); ?>
-                                </td>
-                                <td title="<?php echo esc_attr($log->user_name ?? ''); ?>"><?php echo $user_name_display; ?></td>
-                                <td title="<?php echo esc_attr($log->user_email ?? ''); ?>"><?php echo $user_email_display; ?></td>
-                                <?php if ($has_tracking_column): ?>
+                                    if ($usage_percentage > 80) {
+                                        $token_display = '<span class="token-warning" title="' . esc_attr(sprintf(__('Warning: %s%% of model limit', 'chatgpt-fluent-connector'), round($usage_percentage))) . '">' . $token_display . ' ⚠️</span>';
+                                    }
+                                }
+
+                                // NEW: Get chunking information
+                                $chunking_info = $this->get_log_chunking_info($log->id, $log->entry_id);
+                                $chunking_display = $this->format_chunking_display($chunking_info);
+
+                                // Format user name and email with proper display
+                                $user_name_display = !empty($log->user_name) ? esc_html($log->user_name) : '-';
+                                $user_email_display = '-';
+
+                                if (!empty($log->user_email)) {
+                                    $user_email_display = '<a href="mailto:' . esc_attr($log->user_email) . '">' . esc_html($log->user_email) . '</a>';
+                                }
+                                ?>
+                                <tr class="<?php echo esc_attr($row_class); ?>">
+                                    <td><?php echo esc_html($log->id); ?></td>
                                     <td>
-                                        <?php if (!empty($log->tracking_source)): ?>
-                                            <span class="tracking-badge" style="background: #f0f8ff; color: #0073aa; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">
-                                                <?php echo esc_html($log->tracking_source); ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <span style="color: #999;">-</span>
+                                        <?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), strtotime($log->created_at))); ?>
+                                    </td>
+                                    <td title="<?php echo esc_attr($log->user_name ?? ''); ?>"><?php echo $user_name_display; ?></td>
+                                    <td title="<?php echo esc_attr($log->user_email ?? ''); ?>"><?php echo $user_email_display; ?></td>
+                                    <?php if ($has_tracking_column): ?>
+                                        <td>
+                                            <?php if (!empty($log->tracking_source)): ?>
+                                                <span class="tracking-badge" style="background: #f0f8ff; color: #0073aa; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600;">
+                                                    <?php echo esc_html($log->tracking_source); ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span style="color: #999;">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    <?php endif; ?>
+                                    <td>
+                                        <?php if (isset($log->prompt_title) && !empty($log->prompt_title)) : ?>
+                                            <a href="<?php echo esc_url(get_edit_post_link($log->prompt_id)); ?>">
+                                                <?php echo esc_html($log->prompt_title); ?>
+                                            </a>
+                                        <?php else : ?>
+                                            <a href="<?php echo esc_url(get_edit_post_link($log->prompt_id)); ?>">
+                                                <?php echo esc_html(get_the_title($log->prompt_id)); ?>
+                                            </a>
                                         <?php endif; ?>
                                     </td>
-                                <?php endif; ?>
-                                <td>
-                                    <?php if (isset($log->prompt_title) && !empty($log->prompt_title)) : ?>
-                                        <a href="<?php echo esc_url(get_edit_post_link($log->prompt_id)); ?>">
-                                            <?php echo esc_html($log->prompt_title); ?>
+                                    <td><?php echo esc_html($log->form_id); ?></td>
+                                    <td><?php echo esc_html($log->entry_id); ?></td>
+                                    <td><?php echo $status_badge; ?></td>
+                                    <td><?php echo $provider_badge; ?></td>
+                                    <td style="font-size: 11px;"><?php echo esc_html($log->model); ?></td>
+                                    <!-- NEW: Chunking Display -->
+                                    <td class="column-chunks"><?php echo $chunking_display; ?></td>
+                                    <td class="column-tokens"><?php echo $token_display; ?></td>
+                                    <td><?php echo esc_html($execution_time); ?></td>
+                                    <td>
+                                        <a href="<?php
+                                        echo esc_url(add_query_arg(array(
+                                            'post_type' => 'sfaic_prompt',
+                                            'page' => 'sfaic-response-logs',
+                                            'action' => 'view',
+                                            'log_id' => $log->id
+                                        )));
+                                        ?>" class="button button-small">
+                                               <?php _e('View', 'chatgpt-fluent-connector'); ?>
                                         </a>
-                                    <?php else : ?>
-                                        <a href="<?php echo esc_url(get_edit_post_link($log->prompt_id)); ?>">
-                                            <?php echo esc_html(get_the_title($log->prompt_id)); ?>
-                                        </a>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?php echo esc_html($log->form_id); ?></td>
-                                <td><?php echo esc_html($log->entry_id); ?></td>
-                                <td><?php echo $status_badge; ?></td>
-                                <td><?php echo $provider_badge; ?></td>
-                                <td style="font-size: 11px;"><?php echo esc_html($log->model); ?></td>
-                                <!-- NEW: Chunking Display -->
-                                <td class="column-chunks"><?php echo $chunking_display; ?></td>
-                                <td class="column-tokens"><?php echo $token_display; ?></td>
-                                <td><?php echo esc_html($execution_time); ?></td>
-                                <td>
-                                    <a href="<?php
-                                    echo esc_url(add_query_arg(array(
-                                        'post_type' => 'sfaic_prompt',
-                                        'page' => 'sfaic-response-logs',
-                                        'action' => 'view',
-                                        'log_id' => $log->id
-                                    )));
-                                    ?>" class="button button-small">
-                                           <?php _e('View', 'chatgpt-fluent-connector'); ?>
-                                    </a>
 
-                                    <!-- Restart button -->
-                                    <button type="button" 
-                                            class="button button-small sfaic-restart-process" 
-                                            data-log-id="<?php echo esc_attr($log->id); ?>"
-                                            style="margin-left: 5px;"
-                                            title="<?php _e('Restart AI process for this entry', 'chatgpt-fluent-connector'); ?>">
-                                        <span class="dashicons dashicons-update" style="vertical-align: middle; font-size: 12px; line-height: 1;"></span>
-                                        <?php _e('Restart', 'chatgpt-fluent-connector'); ?>
-                                    </button>
-                                </td>
+                                        <!-- Restart button -->
+                                        <button type="button" 
+                                                class="button button-small sfaic-restart-process" 
+                                                data-log-id="<?php echo esc_attr($log->id); ?>"
+                                                style="margin-left: 5px;"
+                                                title="<?php _e('Restart AI process for this entry', 'chatgpt-fluent-connector'); ?>">
+                                            <span class="dashicons dashicons-update" style="vertical-align: middle; font-size: 12px; line-height: 1;"></span>
+                                            <?php _e('Restart', 'chatgpt-fluent-connector'); ?>
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else : ?>
+                            <tr>
+                                <td colspan="14"><?php _e('No logs found matching your criteria.', 'chatgpt-fluent-connector'); ?></td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr>
-                            <td colspan="14"><?php _e('No logs found matching your criteria.', 'chatgpt-fluent-connector'); ?></td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>    
             <!-- Bottom Pagination -->
             <div class="tablenav bottom">
                 <div class="tablenav-pages">

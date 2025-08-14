@@ -1229,3 +1229,278 @@ select[name="chunked"] {
     color: #a00;
     border-color: #f5c6cb;
 }
+
+
+/**
+ * Horizontal Scrolling for Response Logs Table
+ * Add this section to your existing response-logs.css file
+ */
+
+/* ============================================
+   HORIZONTAL SCROLLING FOR LOGS TABLE
+   ============================================ */
+
+/* Table wrapper for horizontal scrolling */
+.sfaic-table-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    margin-bottom: 20px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+    border-radius: 4px;
+    position: relative;
+}
+
+/* Ensure table has minimum width */
+.sfaic-logs-table {
+    min-width: 1600px; /* Adjust based on your column needs */
+    margin: 0;
+    border: none;
+    width: 100%;
+}
+
+/* Remove fixed table layout to allow proper scrolling */
+.sfaic-table-wrapper .wp-list-table.fixed {
+    table-layout: auto !important;
+}
+
+/* Sticky first column (ID) for reference while scrolling */
+.sfaic-logs-table thead th:first-child,
+.sfaic-logs-table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: #fff;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+.sfaic-logs-table thead th:first-child {
+    background-color: #f0f0f0;
+    z-index: 11;
+}
+
+/* Sticky last column (Actions) for easy access */
+.sfaic-logs-table thead th:last-child,
+.sfaic-logs-table tbody td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    background-color: #fff;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    min-width: 140px;
+}
+
+.sfaic-logs-table thead th:last-child {
+    background-color: #f0f0f0;
+    z-index: 11;
+}
+
+/* Ensure proper background on hover for sticky columns */
+.sfaic-logs-table tbody tr:hover td:first-child,
+.sfaic-logs-table tbody tr:hover td:last-child {
+    background-color: #f8f9fa;
+}
+
+/* Enhanced scrollbar styling */
+.sfaic-table-wrapper::-webkit-scrollbar {
+    height: 14px;
+    background: #f1f1f1;
+}
+
+.sfaic-table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 0 0 4px 4px;
+}
+
+.sfaic-table-wrapper::-webkit-scrollbar-thumb {
+    background: #aaa;
+    border-radius: 7px;
+    border: 2px solid #f1f1f1;
+    transition: background 0.3s;
+}
+
+.sfaic-table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+/* Firefox scrollbar */
+.sfaic-table-wrapper {
+    scrollbar-width: thin;
+    scrollbar-color: #aaa #f1f1f1;
+}
+
+/* Scroll indicators - shadows on left/right when scrollable */
+.sfaic-table-wrapper::before,
+.sfaic-table-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    pointer-events: none;
+    z-index: 9;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sfaic-table-wrapper::before {
+    left: 0;
+    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+}
+
+.sfaic-table-wrapper::after {
+    right: 0;
+    background: linear-gradient(to left, rgba(0,0,0,0.1), transparent);
+}
+
+/* Show scroll indicators when scrolled */
+.sfaic-table-wrapper.has-scroll-left::before {
+    opacity: 1;
+}
+
+.sfaic-table-wrapper.has-scroll-right::after {
+    opacity: 1;
+}
+
+/* Scroll hint message */
+.sfaic-scroll-hint {
+    text-align: center;
+    padding: 8px;
+    background: #f0f8ff;
+    color: #0073aa;
+    font-size: 13px;
+    margin-bottom: 10px;
+    border: 1px solid #bee5ff;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.sfaic-scroll-hint .dashicons {
+    font-size: 16px;
+    animation: slide-horizontal 2s infinite;
+}
+
+@keyframes slide-horizontal {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(10px); }
+}
+
+/* Column width optimizations for better scrolling */
+.sfaic-logs-table th,
+.sfaic-logs-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 8px 12px;
+}
+
+/* Allow wrapping for specific columns that need it */
+.sfaic-logs-table td:nth-child(3), /* Name */
+.sfaic-logs-table td:nth-child(4), /* Email */
+.sfaic-logs-table td:nth-child(5) { /* Prompt title */
+    white-space: normal;
+    word-break: break-word;
+    max-width: 200px;
+}
+
+/* Ensure minimum column widths */
+.sfaic-logs-table th:nth-child(1), /* ID */
+.sfaic-logs-table td:nth-child(1) {
+    min-width: 50px;
+    width: 50px;
+}
+
+.sfaic-logs-table th:nth-child(2), /* Date */
+.sfaic-logs-table td:nth-child(2) {
+    min-width: 140px;
+}
+
+.sfaic-logs-table th:nth-child(3), /* Name */
+.sfaic-logs-table td:nth-child(3) {
+    min-width: 120px;
+}
+
+.sfaic-logs-table th:nth-child(4), /* Email */
+.sfaic-logs-table td:nth-child(4) {
+    min-width: 180px;
+}
+
+.sfaic-logs-table th:nth-child(5), /* Source/Tracking */
+.sfaic-logs-table td:nth-child(5) {
+    min-width: 100px;
+}
+
+.sfaic-logs-table th:nth-child(6), /* Prompt */
+.sfaic-logs-table td:nth-child(6) {
+    min-width: 200px;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 1600px) {
+    .sfaic-table-wrapper {
+        margin-left: -20px;
+        margin-right: -20px;
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
+    }
+    
+    /* Show scroll hint on smaller screens */
+    .sfaic-scroll-hint {
+        display: flex;
+    }
+}
+
+@media screen and (max-width: 782px) {
+    /* On mobile, make the wrapper full width */
+    .sfaic-table-wrapper {
+        margin-left: -10px;
+        margin-right: -10px;
+        padding-left: 0;
+    }
+    
+    /* Adjust minimum table width for mobile */
+    .sfaic-logs-table {
+        min-width: 1200px;
+    }
+    
+    /* Smaller font size on mobile */
+    .sfaic-logs-table {
+        font-size: 12px;
+    }
+    
+    /* Adjust sticky column shadows on mobile */
+    .sfaic-logs-table thead th:first-child,
+    .sfaic-logs-table tbody td:first-child,
+    .sfaic-logs-table thead th:last-child,
+    .sfaic-logs-table tbody td:last-child {
+        box-shadow: none;
+        border-right: 1px solid #ddd;
+    }
+}
+
+/* Print styles - show full table without scrolling */
+@media print {
+    .sfaic-table-wrapper {
+        overflow: visible !important;
+    }
+    
+    .sfaic-logs-table {
+        min-width: auto !important;
+        width: 100% !important;
+    }
+    
+    .sfaic-scroll-hint {
+        display: none !important;
+    }
+    
+    /* Remove sticky positioning for print */
+    .sfaic-logs-table thead th,
+    .sfaic-logs-table tbody td {
+        position: static !important;
+    }
+}

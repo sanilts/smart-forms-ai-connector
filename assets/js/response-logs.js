@@ -503,3 +503,297 @@ jQuery(document).ready(function ($) {
         });
     });
 });
+
+
+
+
+
+
+
+
+
+/**
+ * Horizontal Scrolling Enhancement for Response Logs Table
+ * Add this to your existing response-logs.js file
+ */
+
+// Add this inside your existing jQuery(document).ready() function
+jQuery(document).ready(function($) {
+    
+    // Initialize horizontal scrolling for the table
+    function initializeTableScrolling() {
+        const $tableWrapper = $('.sfaic-table-wrapper');
+        
+        if ($tableWrapper.length === 0) {
+            // If wrapper doesn't exist, wrap the table
+            const $table = $('.wp-list-table.widefat.striped');
+            if ($table.length && !$table.parent().hasClass('sfaic-table-wrapper')) {
+                $table.wrap('<div class="sfaic-table-wrapper"></div>');
+                // Re-get the wrapper
+                const $newWrapper = $('.sfaic-table-wrapper');
+                initScrollIndicators($newWrapper);
+            }
+        } else {
+            initScrollIndicators($tableWrapper);
+        }
+    }
+    
+    // Initialize scroll indicators
+    function initScrollIndicators($wrapper) {
+        if (!$wrapper || $wrapper.length === 0) return;
+        
+        // Function to update scroll indicators
+        function updateScrollIndicators() {
+            const scrollLeft = $wrapper.scrollLeft();
+            const scrollWidth = $wrapper[0].scrollWidth;
+            const clientWidth = $wrapper[0].clientWidth;
+            
+            // Remove existing classes
+            $wrapper.removeClass('has-scroll-left has-scroll-right');
+            
+            // Add appropriate classes based on scroll position
+            if (scrollLeft > 10) {
+                $wrapper.addClass('has-scroll-left');
+            }
+            
+            if (scrollLeft < scrollWidth - clientWidth - 10) {
+                $wrapper.addClass('has-scroll-right');
+            }
+            
+            // Show initial state
+            if (scrollWidth > clientWidth) {
+                if (scrollLeft === 0) {
+                    $wrapper.addClass('has-scroll-right');
+                }
+            }
+        }
+        
+        // Update indicators on scroll
+        $wrapper.on('scroll', updateScrollIndicators);
+        
+        // Update indicators on window resize
+        $(window).on('resize', debounce(updateScrollIndicators, 250));
+        
+        // Initial update
+        setTimeout(updateScrollIndicators, 100);
+        
+        // Add scroll hint if table is scrollable
+        addScrollHint($wrapper);
+        
+        // Add keyboard navigation
+        addKeyboardNavigation($wrapper);
+        
+        // Add smooth scrolling
+        $wrapper.css('scroll-behavior', 'smooth');
+    }
+    
+    // Add scroll hint for user guidance
+    function addScrollHint($wrapper) {
+        if (!$wrapper || $wrapper.length === 0) return;
+        
+        const scrollWidth = $wrapper[0].scrollWidth;
+        const clientWidth = $wrapper[0].clientWidth;
+        
+        // Only show hint if table is scrollable and hint hasn't been shown
+        if (scrollWidth > clientWidth && !$wrapper.hasClass('hint-shown')) {
+            const $hint = $('<div class="sfaic-scroll-hint">' +
+                '<span class="dashicons dashicons-arrow-right-alt"></span>' +
+                'Scroll horizontally to see all columns' +
+                '<span class="dashicons dashicons-arrow-left-alt"></span>' +
+                '</div>');
+            
+            $wrapper.before($hint);
+            $wrapper.addClass('hint-shown');
+            
+            // Hide hint after first scroll
+            $wrapper.one('scroll', function() {
+                $hint.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            });
+            
+            // Auto-hide hint after 5 seconds
+            setTimeout(function() {
+                $hint.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }, 5000);
+        }
+    }
+    
+    // Add keyboard navigation for horizontal scrolling
+    function addKeyboardNavigation($wrapper) {
+        if (!$wrapper || $wrapper.length === 0) return;
+        
+        // Make wrapper focusable
+        $wrapper.attr('tabindex', '0');
+        
+        $wrapper.on('keydown', function(e) {
+            const scrollAmount = 100;
+            let preventDefault = false;
+            
+            switch(e.keyCode) {
+                case 37: // Left arrow
+                    $wrapper.scrollLeft($wrapper.scrollLeft() - scrollAmount);
+                    preventDefault = true;
+                    break;
+                case 39: // Right arrow
+                    $wrapper.scrollLeft($wrapper.scrollLeft() + scrollAmount);
+                    preventDefault = true;
+                    break;
+                case 36: // Home key
+                    if (e.ctrlKey) {
+                        $wrapper.scrollLeft(0);
+                        preventDefault = true;
+                    }
+                    break;
+                case 35: // End key
+                    if (e.ctrlKey) {
+                        $wrapper.scrollLeft($wrapper[0].scrollWidth);
+                        preventDefault = true;
+                    }
+                    break;
+            }
+            
+            if (preventDefault) {
+                e.preventDefault();
+            }
+        });
+        
+        // Add focus indicator
+        $wrapper.on('focus', function() {
+            $(this).css('outline', '2px solid #0073aa');
+        }).on('blur', function() {
+            $(this).css('outline', 'none');
+        });
+    }
+    
+    // Debounce function for resize events
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Initialize on page load
+    initializeTableScrolling();
+    
+    // Reinitialize after AJAX operations (filters, pagination, etc.)
+    $(document).ajaxComplete(function(event, xhr, settings) {
+        // Check if the AJAX call is related to the logs page
+        if (settings.url && settings.url.includes('sfaic-response-logs')) {
+            setTimeout(initializeTableScrolling, 100);
+        }
+    });
+    
+    // Column visibility toggle (optional feature)
+    function addColumnVisibilityToggle() {
+        const $tableWrapper = $('.sfaic-table-wrapper');
+        if ($tableWrapper.length === 0) return;
+        
+        const columns = [
+            { index: 5, name: 'Source', key: 'tracking_source' },
+            { index: 10, name: 'Model', key: 'model' },
+            { index: 11, name: 'Chunks', key: 'chunks' },
+            { index: 12, name: 'Tokens', key: 'tokens' },
+            { index: 13, name: 'Time', key: 'execution_time' }
+        ];
+        
+        const $toggleContainer = $('<div class="sfaic-column-toggles">' +
+            '<span style="margin-right: 10px;"><strong>Show/Hide Columns:</strong></span>' +
+            '</div>');
+        
+        $toggleContainer.css({
+            'margin-bottom': '10px',
+            'padding': '10px',
+            'background': '#f0f0f1',
+            'border-radius': '4px',
+            'display': 'flex',
+            'align-items': 'center',
+            'flex-wrap': 'wrap',
+            'gap': '10px'
+        });
+        
+        columns.forEach(function(column) {
+            const savedState = localStorage.getItem('sfaic_column_' + column.key);
+            const isChecked = savedState !== '0';
+            
+            const $checkbox = $('<label style="margin: 0; cursor: pointer;">' +
+                '<input type="checkbox" ' + (isChecked ? 'checked' : '') + 
+                ' data-column="' + column.index + '" data-key="' + column.key + '"> ' +
+                column.name +
+                '</label>');
+            
+            $checkbox.find('input').on('change', function() {
+                const columnIndex = $(this).data('column');
+                const columnKey = $(this).data('key');
+                const isChecked = $(this).is(':checked');
+                
+                // Show/hide the column
+                $('.sfaic-logs-table th:nth-child(' + (columnIndex + 1) + '), ' +
+                  '.sfaic-logs-table td:nth-child(' + (columnIndex + 1) + ')').toggle(isChecked);
+                
+                // Save preference
+                localStorage.setItem('sfaic_column_' + columnKey, isChecked ? '1' : '0');
+                
+                // Update scroll indicators after column change
+                const $wrapper = $('.sfaic-table-wrapper');
+                if ($wrapper.length) {
+                    $wrapper.trigger('scroll');
+                }
+            });
+            
+            // Apply saved state on load
+            if (!isChecked) {
+                $('.sfaic-logs-table th:nth-child(' + (column.index + 1) + '), ' +
+                  '.sfaic-logs-table td:nth-child(' + (column.index + 1) + ')').hide();
+            }
+            
+            $toggleContainer.append($checkbox);
+        });
+        
+        $tableWrapper.before($toggleContainer);
+    }
+    
+    // Uncomment to enable column visibility toggle
+    // addColumnVisibilityToggle();
+    
+    // Quick scroll buttons (optional)
+    function addQuickScrollButtons() {
+        const $wrapper = $('.sfaic-table-wrapper');
+        if ($wrapper.length === 0) return;
+        
+        const $buttonContainer = $('<div class="sfaic-quick-scroll-buttons"></div>');
+        $buttonContainer.css({
+            'position': 'absolute',
+            'top': '10px',
+            'right': '10px',
+            'z-index': '100',
+            'display': 'flex',
+            'gap': '5px'
+        });
+        
+        const $scrollLeftBtn = $('<button class="button button-small" title="Scroll to start">←</button>');
+        const $scrollRightBtn = $('<button class="button button-small" title="Scroll to end">→</button>');
+        
+        $scrollLeftBtn.on('click', function() {
+            $wrapper.animate({ scrollLeft: 0 }, 300);
+        });
+        
+        $scrollRightBtn.on('click', function() {
+            $wrapper.animate({ scrollLeft: $wrapper[0].scrollWidth }, 300);
+        });
+        
+        $buttonContainer.append($scrollLeftBtn, $scrollRightBtn);
+        $wrapper.css('position', 'relative').append($buttonContainer);
+    }
+    
+    // Uncomment to add quick scroll buttons
+    // addQuickScrollButtons();
+});
