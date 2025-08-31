@@ -635,7 +635,41 @@ class SFAIC_Main {
                 return $this->api; // Default to OpenAI
         }
     }
+     // In the plugin_deactivation method (around line 337), add these to clean up
+    public function plugin_deactivation() {
+        // Clear all scheduled cron events
+        wp_clear_scheduled_hook('sfaic_process_background_job');
+        wp_clear_scheduled_hook('sfaic_cleanup_old_jobs');
+        wp_clear_scheduled_hook('sfaic_cleanup_stuck_jobs_periodic');
+        wp_clear_scheduled_hook('sfaic_process_pending_forms'); // Add this line
+
+        // Log deactivation
+        error_log('SFAIC: Plugin deactivated - background processing stopped');
+    }
 }
+
+// Add this to your main plugin file or in an appropriate location
+function sfaic_reset_cron_schedules() {
+    // Clear existing schedules
+    wp_clear_scheduled_hook('sfaic_process_background_job');
+    wp_clear_scheduled_hook('sfaic_cleanup_stuck_jobs_periodic');
+    wp_clear_scheduled_hook('sfaic_process_pending_forms');
+    
+    // Re-schedule with new timing
+    wp_schedule_event(time() + 60, 'every_minute', 'sfaic_process_background_job');
+    wp_schedule_event(time() + 60, 'every_minute', 'sfaic_cleanup_stuck_jobs_periodic');
+    wp_schedule_event(time() + 60, 'sfaic_every_minute', 'sfaic_process_pending_forms');
+    
+    // Update option to track this change
+    update_option('sfaic_cron_schedule_version', '2.0');
+}
+
+// Hook this to run on plugin activation or admin_init
+add_action('admin_init', function() {
+    if (get_option('sfaic_cron_schedule_version') !== '2.0') {
+        sfaic_reset_cron_schedules();
+    }
+});
 
 /**
  * Returns the main instance of the plugin
