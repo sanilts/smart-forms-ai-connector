@@ -15,6 +15,7 @@ class SFAIC_Forms_Integration {
     const CRON_HOOK = 'sfaic_process_pending_forms';
     const PENDING_FLAG_KEY = '_sfaic_pending_processing';
     const PROCESSED_FLAG_KEY = '_sfaic_processed';
+    const PENDING_ENTRIES_OPTION = 'sfaic_pending_entries';
 
     /**
      * Constructor
@@ -46,13 +47,27 @@ class SFAIC_Forms_Integration {
      * This should take less than 0.001 seconds
      */
     public function flag_for_processing($entry_id, $form_data, $form) {
-        // Single database write - absolute minimum
-        update_post_meta($entry_id, self::PENDING_FLAG_KEY, array(
-            'form_id' => $form->id,
-            'time' => time()
-        ));
+        // Get existing pending entries or initialize empty array
+        $pending_entries = get_option(self::PENDING_ENTRIES_OPTION, array());
         
-        // That's it! No scheduling, no processing, just flag and return
+        // Add this entry to pending list with metadata
+        $pending_entries[$entry_id] = array(
+            'form_id' => $form->id,
+            'time' => time(),
+            'status' => 'pending'
+        );
+        
+        // Save the updated list
+        update_option(self::PENDING_ENTRIES_OPTION, $pending_entries, false);
+        
+        error_log('SFAIC: Flagged entry ' . $entry_id . ' from form ' . $form->id . ' for processing');
+        
+        // Schedule immediate processing
+        if (!wp_next_scheduled(self::CRON_HOOK)) {
+            wp_schedule_single_event(time() + 5, self::CRON_HOOK);
+        }
+        
+        // That's it! No direct processing, just flag and return
         return;
     }
     
@@ -93,23 +108,20 @@ class SFAIC_Forms_Integration {
         
         set_transient('sfaic_last_admin_check', true, 5); // Check every 5 seconds max
         
-        // Process in background
-        wp_schedule_single_event(time(), self::CRON_HOOK);
+        // Check if there are pending entries
+        $pending_entries = get_option(self::PENDING_ENTRIES_OPTION, array());
+        if (!empty($pending_entries)) {
+            // Process in background
+            wp_schedule_single_event(time(), self::CRON_HOOK);
+        }
     }
     
     /**
      * Process all pending submissions (runs via cron)
      */
     public function process_pending_submissions() {
-        global $wpdb;
-        
-        // Find all entries with pending flag
-        $pending_entries = $wpdb->get_results($wpdb->prepare(
-            "SELECT post_id, meta_value FROM {$wpdb->postmeta} 
-             WHERE meta_key = %s 
-             LIMIT 10",
-            self::PENDING_FLAG_KEY
-        ));
+        // Get all pending entries
+        $pending_entries = get_option(self::PENDING_ENTRIES_OPTION, array());
         
         if (empty($pending_entries)) {
             return;
@@ -117,8 +129,49 @@ class SFAIC_Forms_Integration {
         
         error_log('SFAIC: Processing ' . count($pending_entries) . ' pending submissions');
         
-        foreach ($pending_entries as $entry) {
-            $this->process_single_entry($entry->post_id, maybe_unserialize($entry->meta_value));
+        // Process up to 10 entries at a time
+        $processed = 0;
+        foreach ($pending_entries as $entry_id => $meta_data) {
+            if ($processed >= 10) {
+                break;
+            }
+            
+            // Process this entry
+            $result = $this->process_single_entry($entry_id, $meta_data);
+            
+            if ($result) {
+                // Remove from pending list if successfully processed
+                unset($pending_entries[$entry_id]);
+                $processed++;
+            } else {
+                // Mark as failed if processing failed multiple times
+                if (isset($meta_data['attempts'])) {
+                    $meta_data['attempts']++;
+                } else {
+                    $meta_data['attempts'] = 1;
+                }
+                
+                if ($meta_data['attempts'] >= 3) {
+                    // Failed too many times, remove from queue
+                    error_log('SFAIC: Entry ' . $entry_id . ' failed after 3 attempts, removing from queue');
+                    unset($pending_entries[$entry_id]);
+                } else {
+                    // Update attempt count
+                    $pending_entries[$entry_id] = $meta_data;
+                }
+            }
+        }
+        
+        // Update the pending entries list
+        if (empty($pending_entries)) {
+            delete_option(self::PENDING_ENTRIES_OPTION);
+        } else {
+            update_option(self::PENDING_ENTRIES_OPTION, $pending_entries, false);
+            
+            // Schedule another processing run if there are still pending entries
+            if (!wp_next_scheduled(self::CRON_HOOK)) {
+                wp_schedule_single_event(time() + 10, self::CRON_HOOK);
+            }
         }
     }
     
@@ -126,18 +179,12 @@ class SFAIC_Forms_Integration {
      * Process a single entry
      */
     private function process_single_entry($entry_id, $meta_data) {
-        // Remove pending flag immediately to prevent reprocessing
-        delete_post_meta($entry_id, self::PENDING_FLAG_KEY);
-        
-        // Mark as processing
-        update_post_meta($entry_id, self::PROCESSED_FLAG_KEY, 'processing');
-        
         error_log('SFAIC: Processing entry ' . $entry_id . ' for form ' . $meta_data['form_id']);
         
         // Get form from database
         if (!function_exists('wpFluent')) {
             error_log('SFAIC: wpFluent not available');
-            return;
+            return false;
         }
         
         $form = wpFluent()->table('fluentform_forms')
@@ -146,7 +193,7 @@ class SFAIC_Forms_Integration {
             
         if (!$form) {
             error_log('SFAIC: Form not found: ' . $meta_data['form_id']);
-            return;
+            return false;
         }
         
         // Get submission data from database
@@ -155,8 +202,8 @@ class SFAIC_Forms_Integration {
             ->first();
             
         if (!$submission || empty($submission->response)) {
-            error_log('SFAIC: Submission not found: ' . $entry_id);
-            return;
+            error_log('SFAIC: Submission not found or empty: ' . $entry_id);
+            return false;
         }
         
         $form_data = json_decode($submission->response, true);
@@ -181,20 +228,30 @@ class SFAIC_Forms_Integration {
         
         if (empty($prompts)) {
             error_log('SFAIC: No prompts found for form ID: ' . $meta_data['form_id']);
-            update_post_meta($entry_id, self::PROCESSED_FLAG_KEY, 'no_prompts');
-            return;
+            return true; // Return true to remove from queue even if no prompts
         }
         
         // Process each prompt
+        $all_processed = true;
         foreach ($prompts as $prompt) {
-            $this->process_prompt_for_entry($prompt->ID, $entry_id, $form_data, $form);
+            $prompt_result = $this->process_prompt_for_entry($prompt->ID, $entry_id, $form_data, $form);
+            if (!$prompt_result) {
+                $all_processed = false;
+            }
         }
         
-        // Mark as completed
-        update_post_meta($entry_id, self::PROCESSED_FLAG_KEY, 'completed');
-        update_post_meta($entry_id, '_sfaic_processed_at', current_time('mysql'));
+        // Store processing completion status in a custom option/table
+        $processed_entries = get_option('sfaic_processed_entries', array());
+        $processed_entries[$entry_id] = array(
+            'processed_at' => current_time('mysql'),
+            'form_id' => $meta_data['form_id'],
+            'success' => $all_processed
+        );
+        update_option('sfaic_processed_entries', $processed_entries, false);
         
         error_log('SFAIC: Completed processing entry: ' . $entry_id);
+        
+        return true;
     }
     
     /**
@@ -259,13 +316,14 @@ class SFAIC_Forms_Integration {
             
             if ($job_id) {
                 error_log('SFAIC: Scheduled background job ' . $job_id);
+                return true;
             } else {
                 // Fallback to immediate processing
-                $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
+                return $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
             }
         } else {
             // Process immediately
-            $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
+            return $this->process_prompt($prompt_id, $form_data, $entry_id, $form);
         }
     }
     
