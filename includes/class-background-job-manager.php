@@ -14,6 +14,7 @@ class SFAIC_Background_Job_Manager {
     private $table_version = '1.3';
 
     const CRON_HOOK = 'sfaic_process_background_job';
+    const CRON_INTERVAL = 30;
     const STATUS_PENDING = 'pending';
     const STATUS_PROCESSING = 'processing';
     const STATUS_COMPLETED = 'completed';
@@ -119,8 +120,8 @@ class SFAIC_Background_Job_Manager {
         );
 
         $schedules['every_2_minutes'] = array(
-            'interval' => 120,
-            'display' => __('Every 2 Minutes', 'chatgpt-fluent-connector')
+            'interval' => 60,
+            'display' => __('Every 1 Minutes', 'chatgpt-fluent-connector')
         );
 
         return $schedules;
