@@ -34,7 +34,7 @@ class SFAIC_Forms_Integration {
             add_action('init', array($this, 'ensure_cron_scheduled'));
             
             // Add more frequent check on admin requests
-            add_action('admin_init', array($this, 'maybe_process_pending'));
+            add_action('init', array($this, 'maybe_process_pending'));
             
             $hooks_registered = true;
             error_log('SFAIC: Ultra-fast flag-based integration initialized');

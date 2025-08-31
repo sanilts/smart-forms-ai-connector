@@ -51,10 +51,7 @@ class SFAIC_Background_Job_Manager {
      */
     public function maybe_process_immediately() {
         // Only run on admin requests to avoid frontend impact
-        if (!is_admin()) {
-            return;
-        }
-
+        
         // Check if there are pending jobs and if cron hasn't run recently
         global $wpdb;
 
