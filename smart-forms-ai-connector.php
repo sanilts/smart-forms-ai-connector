@@ -3,7 +3,7 @@
  * Plugin Name: AromaPro Smart Forms AI Connector
  * Plugin URI: https://aromapro.com/
  * Description: Connect Fluent Forms with ChatGPT, Google Gemini, or Anthropic Claude to generate AI responses for form submissions and create PDF documents with background processing
- * Version: 2.0.33
+ * Version: 2.0.35
  * Author: Sanil T S
  * Author URI: https://www.fb.com/sanilts
  * License: GPL-2.0+
@@ -328,6 +328,7 @@ class SFAIC_Main {
         wp_clear_scheduled_hook('sfaic_process_background_job');
         wp_clear_scheduled_hook('sfaic_cleanup_old_jobs');
         wp_clear_scheduled_hook('sfaic_cleanup_stuck_jobs_periodic');
+        wp_clear_scheduled_hook('sfaic_process_pending_forms'); // Add this line
         
         // Log deactivation
         error_log('SFAIC: Plugin deactivated - background processing stopped');
@@ -335,7 +336,7 @@ class SFAIC_Main {
         // Note: We don't delete the database tables on deactivation
         // as users might want to keep their data when temporarily deactivating
     }
-
+       
     /**
      * Add dashboard widget for background jobs monitoring - WordPress style
      */
@@ -634,17 +635,6 @@ class SFAIC_Main {
             default:
                 return $this->api; // Default to OpenAI
         }
-    }
-     // In the plugin_deactivation method (around line 337), add these to clean up
-    public function plugin_deactivation() {
-        // Clear all scheduled cron events
-        wp_clear_scheduled_hook('sfaic_process_background_job');
-        wp_clear_scheduled_hook('sfaic_cleanup_old_jobs');
-        wp_clear_scheduled_hook('sfaic_cleanup_stuck_jobs_periodic');
-        wp_clear_scheduled_hook('sfaic_process_pending_forms'); // Add this line
-
-        // Log deactivation
-        error_log('SFAIC: Plugin deactivated - background processing stopped');
     }
 }
 
