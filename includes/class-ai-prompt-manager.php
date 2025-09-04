@@ -1016,6 +1016,52 @@ class SFAIC_Prompt_Manager {
                     <p class="description"><?php _e('Subject line for admin notification emails. Supports placeholders like {form_title}, {date}, {time}', 'chatgpt-fluent-connector'); ?></p>
                 </td>
             </tr>
+            
+            // Add this after the existing admin email settings
+            <tr class="admin-email-settings" <?php echo ($admin_email_enabled != '1') ? 'style="display:none;"' : ''; ?>>
+                        <th><label for="sfaic_admin_additional_email_field"><?php _e('Additional Admin Email Field:', 'chatgpt-fluent-connector'); ?></label></th>
+                        <td>
+                            <?php
+                            // Get ALL fields including hidden ones
+                            $all_form_fields = $this->get_all_form_fields_including_hidden($form_id);
+                            $selected_additional_field = get_post_meta($post->ID, '_sfaic_admin_additional_email_field', true);
+                            ?>
+                            <select name="sfaic_admin_additional_email_field" id="sfaic_admin_additional_email_field" class="regular-text">
+                                <option value=""><?php _e('-- None --', 'chatgpt-fluent-connector'); ?></option>
+                                <optgroup label="<?php _e('Regular Fields', 'chatgpt-fluent-connector'); ?>">
+                                    <?php foreach ($all_form_fields as $field_key => $field_label):
+                                        if (strpos($field_label, '[Hidden Field]') === false):
+                                            ?>
+                                            <option value="<?php echo esc_attr($field_key); ?>" <?php selected($selected_additional_field, $field_key); ?>>
+                                            <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
+                                            </option>
+            <?php endif;
+        endforeach; ?>
+                                </optgroup>
+                                <optgroup label="<?php _e('Hidden Fields', 'chatgpt-fluent-connector'); ?>">
+                                        <?php foreach ($all_form_fields as $field_key => $field_label):
+                                            if (strpos($field_label, '[Hidden Field]') !== false):
+                                                ?>
+                                            <option value="<?php echo esc_attr($field_key); ?>" <?php selected($selected_additional_field, $field_key); ?>>
+                <?php echo esc_html($field_label); ?> (<?php echo esc_html($field_key); ?>)
+                                            </option>
+                                    <?php endif;
+                                endforeach; ?>
+                                </optgroup>
+                            </select>
+                            <p class="description">
+                            <?php _e('Select any form field (including hidden fields) containing an additional email address to receive admin notifications.', 'chatgpt-fluent-connector'); ?><br>
+                                <strong><?php _e('Note:', 'chatgpt-fluent-connector'); ?></strong> <?php _e('This can be a regular field or a hidden field containing an email address.', 'chatgpt-fluent-connector'); ?>
+                            </p>
+
+                            <?php if (!empty($selected_additional_field)): ?>
+                                <div style="margin-top: 10px; padding: 10px; background: #f0f8ff; border-left: 4px solid #0073aa; border-radius: 3px;">
+                                    <strong><?php _e('Selected Field:', 'chatgpt-fluent-connector'); ?></strong> <?php echo esc_html($selected_additional_field); ?><br>
+                                    <small><?php _e('Make sure this field contains a valid email address in the form submission.', 'chatgpt-fluent-connector'); ?></small>
+                                </div>
+                    <?php endif; ?>
+                        </td>
+                    </tr>
 
             <tr>
                 <th><label for="sfaic_log_responses"><?php _e('Log Responses:', 'chatgpt-fluent-connector'); ?></label></th>
@@ -1246,6 +1292,11 @@ class SFAIC_Prompt_Manager {
             $tracking_param = preg_replace('/[^a-zA-Z0-9_]/', '', $tracking_param);
             update_post_meta($post_id, '_sfaic_tracking_get_param', $tracking_param);
         }
+        
+        // Add this after saving other admin email settings
+        if (isset($_POST['sfaic_admin_additional_email_field'])) {
+            update_post_meta($post_id, '_sfaic_admin_additional_email_field', sanitize_text_field($_POST['sfaic_admin_additional_email_field']));
+        }
     }
 
     /**
@@ -1420,56 +1471,71 @@ class SFAIC_Prompt_Manager {
         return $field_labels;
     }
 
-    /**
-     * Get form email fields from a form ID
-     * 
-     * @param int $form_id The form ID
-     * @return array Associative array of field keys and labels for email fields
-     */
-    private function get_form_email_fields($form_id) {
-        $email_fields = array();
+ /**
+ * Get form email fields from a form ID (including hidden fields)
+ * 
+ * @param int $form_id The form ID
+ * @return array Associative array of field keys and labels for email fields
+ */
+private function get_form_email_fields($form_id) {
+    $email_fields = array();
 
-        if (empty($form_id) || !function_exists('wpFluent')) {
-            return $email_fields;
+    if (empty($form_id) || !function_exists('wpFluent')) {
+        return $email_fields;
+    }
+
+    // Get all form fields
+    $all_fields = $this->get_form_fields($form_id);
+
+    // Common email field names
+    $common_email_fields = array('email', 'your_email', 'user_email', 'email_address', 'customer_email', 'cc_email', 'additional_email');
+
+    // Filter fields that might be email fields based on name or type
+    foreach ($all_fields as $field_key => $field_label) {
+        // Check if field name contains 'email' or matches common patterns
+        if (stripos($field_key, 'email') !== false ||
+                stripos($field_label, 'email') !== false ||
+                in_array(strtolower($field_key), $common_email_fields)) {
+            $email_fields[$field_key] = $field_label;
         }
+    }
 
-        // Get all form fields
-        $all_fields = $this->get_form_fields($form_id);
+    // If no email fields found directly, try to look in the form structure for email input types AND hidden fields
+    if (empty($email_fields) || true) { // Always check form structure for hidden fields
+        // Get form structure
+        $form = wpFluent()->table('fluentform_forms')
+                ->where('id', $form_id)
+                ->first();
 
-        // Common email field names
-        $common_email_fields = array('email', 'your_email', 'user_email', 'email_address', 'customer_email');
+        if ($form && !empty($form->form_fields)) {
+            $formFields = json_decode($form->form_fields, true);
 
-        // Filter fields that might be email fields based on name or type
-        foreach ($all_fields as $field_key => $field_label) {
-            // Check if field name contains 'email'
-            if (stripos($field_key, 'email') !== false ||
-                    stripos($field_label, 'email') !== false ||
-                    in_array(strtolower($field_key), $common_email_fields)) {
-                $email_fields[$field_key] = $field_label;
-            }
-        }
-
-        // If no email fields found directly, try to look in the form structure for email input types
-        if (empty($email_fields)) {
-            // Get form structure
-            $form = wpFluent()->table('fluentform_forms')
-                    ->where('id', $form_id)
-                    ->first();
-
-            if ($form && !empty($form->form_fields)) {
-                $formFields = json_decode($form->form_fields, true);
-
-                if (!empty($formFields['fields'])) {
-                    foreach ($formFields['fields'] as $field) {
-                        if (
-                        // Check for email input types
-                                (!empty($field['attributes']['type']) && $field['attributes']['type'] === 'email') ||
-                                // Check for specific element types that are emails
-                                (!empty($field['element']) && $field['element'] === 'input_email')
-                        ) {
-                            if (!empty($field['attributes']['name'])) {
-                                $field_name = $field['attributes']['name'];
-                                $field_label = !empty($field['settings']['label']) ? $field['settings']['label'] : $field_name;
+            if (!empty($formFields['fields'])) {
+                foreach ($formFields['fields'] as $field) {
+                    // Check for email input types
+                    if ((!empty($field['attributes']['type']) && $field['attributes']['type'] === 'email') ||
+                        (!empty($field['element']) && $field['element'] === 'input_email')) {
+                        
+                        if (!empty($field['attributes']['name'])) {
+                            $field_name = $field['attributes']['name'];
+                            $field_label = !empty($field['settings']['label']) ? $field['settings']['label'] : $field_name;
+                            $email_fields[$field_name] = $field_label;
+                        }
+                    }
+                    
+                    // Check for hidden fields that might contain emails
+                    if (!empty($field['element']) && ($field['element'] === 'input_hidden' || $field['element'] === 'hidden')) {
+                        if (!empty($field['attributes']['name'])) {
+                            $field_name = $field['attributes']['name'];
+                            // Check if the hidden field name suggests it contains an email
+                            if (stripos($field_name, 'email') !== false || 
+                                stripos($field_name, 'cc') !== false ||
+                                stripos($field_name, 'recipient') !== false ||
+                                stripos($field_name, 'notify') !== false) {
+                                
+                                $field_label = !empty($field['settings']['label']) ? 
+                                    $field['settings']['label'] . ' (Hidden)' : 
+                                    $field_name . ' (Hidden)';
                                 $email_fields[$field_name] = $field_label;
                             }
                         }
@@ -1477,10 +1543,68 @@ class SFAIC_Prompt_Manager {
                 }
             }
         }
-
-        return $email_fields;
     }
 
+    return $email_fields;
+}
+
+/**
+ * Get all form fields including hidden fields for admin email selection
+ * 
+ * @param int $form_id The form ID
+ * @return array Associative array of field keys and labels
+ */
+private function get_all_form_fields_including_hidden($form_id) {
+    $all_fields = array();
+
+    if (empty($form_id) || !function_exists('wpFluent')) {
+        return $all_fields;
+    }
+
+    // First get regular fields
+    $regular_fields = $this->get_form_fields($form_id);
+    
+    // Add regular fields to the list
+    foreach ($regular_fields as $field_key => $field_label) {
+        $all_fields[$field_key] = $field_label;
+    }
+
+    // Now specifically look for hidden fields in the form structure
+    $form = wpFluent()->table('fluentform_forms')
+            ->where('id', $form_id)
+            ->first();
+
+    if ($form && !empty($form->form_fields)) {
+        $formFields = json_decode($form->form_fields, true);
+
+        if (!empty($formFields['fields'])) {
+            foreach ($formFields['fields'] as $field) {
+                // Check for hidden fields
+                if (!empty($field['element']) && 
+                    ($field['element'] === 'input_hidden' || 
+                     $field['element'] === 'hidden' ||
+                     (isset($field['attributes']['type']) && $field['attributes']['type'] === 'hidden'))) {
+                    
+                    if (!empty($field['attributes']['name'])) {
+                        $field_name = $field['attributes']['name'];
+                        
+                        // Don't add if already in the list
+                        if (!isset($all_fields[$field_name])) {
+                            $field_label = !empty($field['settings']['label']) ? 
+                                $field['settings']['label'] . ' [Hidden Field]' : 
+                                $field_name . ' [Hidden Field]';
+                            
+                            // Add with special indicator that it's hidden
+                            $all_fields[$field_name] = $field_label;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return $all_fields;
+}
     /**
      * Helper method to format all form data for AI processing
      */
